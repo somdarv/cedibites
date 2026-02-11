@@ -82,6 +82,7 @@ export function LocationProvider({ children, autoRequest = false }: LocationProv
                 setCoordinates(coords);
                 setPermissionStatus('granted');
                 setError(null);
+                console.log('Location obtained:', coords);
 
                 // Store location for quick access (expires after 1 hour)
                 const locationData = {
@@ -89,6 +90,7 @@ export function LocationProvider({ children, autoRequest = false }: LocationProv
                     timestamp: Date.now(),
                 };
                 localStorage.setItem('user-location', JSON.stringify(locationData));
+                console.log('Stored location:', locationData);
             },
             (error) => {
                 setPermissionStatus('denied');
