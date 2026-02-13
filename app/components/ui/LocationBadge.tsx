@@ -16,7 +16,7 @@ export default function LocationBadge({ branch, distance, onClick, fullWidth, is
         return (
             <button
                 disabled
-                className={`flex items-center gap-2 px-4 py-2.5 bg-primary/50 rounded-full cursor-wait ${fullWidth ? 'w-full justify-center' : ''
+                className={`flex items-center gap-2 px- py-2.5 bg-primary/50 rounded-full cursor-wait ${fullWidth ? 'w-full justify-center' : ''
                     }`}
             >
                 <Loader size="sm" variant="white" />
@@ -33,7 +33,7 @@ export default function LocationBadge({ branch, distance, onClick, fullWidth, is
                 className={`flex items-center gap-2 px-2 py-2 bg-primary-light hover:bg-primary-hover border-2 border-dashed border-neutral-gray rounded-full transition-all group ${fullWidth ? 'w-full justify-center' : ''
                     }`}
             >
-                {/* <MapPinIcon size={18} weight="bold" className="text-text-dark" /> */}
+                <MapPinIcon size={18} weight="bold" className="text-text-dark" />
                 <span className="text-sm font-semibold text-text-gray">
                     Select Branch
                 </span>
@@ -44,16 +44,16 @@ export default function LocationBadge({ branch, distance, onClick, fullWidth, is
     return (
         <button
             onClick={onClick}
-            className={`flex cursor-pointer bordes border-dashed border-text-text-light items-center gap-2 px-3 py-2 bg-transparent text-primary hover:bg-primary-hover/10 text-text-text-dark rounded-full transition-all group shadow-lg hover:shadow-xl '
+            className={`flex hover:bg-primary/10  cursor-pointer bordes border-dashed border-text-text-light items-center gap-2 hover:gap-2.5 lg:py-0 lg:px- md:py-2 bg-transparent text-primary  text-text-text-dark rounded-full transition-all group  '
                 }`}
         >
             {/* <MapPinAreaIcon size={20} weight="fill" className="group-hover:scale-110 transition-transform" /> */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-">
                 <span className="text- flex items-center font-bold  tracking-wide">
                     {branch.name.replace(' Branch', ' Branch')}
                 </span>
                 <span className="text- flex items-center font-bold  tracking-wide">
-                    <CaretRightIcon weight="bold" size={18} className="text-primary" />                </span>
+                    <CaretRightIcon weight="bold" size={16} className="text-primary" />                </span>
                 {/* {distance && (
                     <>
                         <span className="text-text-light">•</span>

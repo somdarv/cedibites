@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Button from '../base/Button';
-import { HamburgerIcon, ListIcon, HouseIcon, PathIcon, ShoppingBagIcon, UserIcon } from "@phosphor-icons/react";
+import { HamburgerIcon, ListIcon, HouseIcon, PathIcon, ShoppingBagIcon, UserIcon, PhoneIcon } from "@phosphor-icons/react";
 import Image from 'next/image';
 import LocationBadge from '../ui/LocationBadge';
 import { useBranch } from '../providers/BranchProvider';
 import { useLocation } from '../providers/LocationProvider';
 import { useModal } from '../providers/ModalProvider';
+
 
 
 
@@ -70,8 +71,7 @@ export default function Navbar({
     const isLocationLoading = permissionStatus === 'prompt' && !coordinates;
 
     const navItems: NavItem[] = [
-        { label: 'Home', icon: <Image src="https52532
-            ://icons8.com/icon/ocVv75cTYUBU/home-page" alt="Home" width={24} height={24} />, href: '/' },
+        { label: 'Home', icon: <ListIcon weight='bold' size={32} />, href: '/' },
         { label: 'Our Menu', icon: <HamburgerIcon weight="fill" size={32} />, href: '/menu' },
         { label: 'Track Order', icon: <PathIcon weight="fill" size={32} />, href: '/orders' },
     ];
@@ -107,75 +107,59 @@ export default function Navbar({
                     </div >
 
                     {/* NavRow 2 */}
-                    < div className='w-full mx-auto my- rounde bg-brand-darker dark:bg-brand-dark flex justify-between items-center py-6 px-12 ' >
+                    < div className='w-full px-6 sm:px-12 py-6 mx-auto my- rounde bg-brand-darker dark:bg-brand-dark flex justify-between items-center  ' >
                         {/* left side */}
                         {/* Logo */}
-                        <div className='flex w-[25%] bg-r items-center gap-x-2'>
+                        <div className='flex shrink-0 bg-r items-center gap-x-2'>
                             <Link href="/" className='text-2xl font- flex items-center gap-2 text-primary'>
                                 <Image src="/cblogo.webp" alt="CediBites Logo" width={44} height={44} className='object-contain' />
-                                <p className='hidden uppercas md:flex text-3xl font-bold font-body'>CediBites</p>
+                                <p className='hidde uppercas md:flex text-3xl md:text-3xl font-bold font-body'>CediBites</p>
                             </Link>
 
-                            <div className='hidden md:flex'>
-                                <LocationBadge
-                                    branch={selectedBranch}
-                                    distance={branchDistance}
-                                    onClick={openBranchSelector}
-                                    fullWidth={false}
-                                    isLoading={isLocationLoading}
 
-                                />
-                            </div>
                         </div>
 
                         {/* middle side */}
                         <div className='w-[50%] bg-re'>
-                            <ul className='hidden md:flex items-center justify-center gap-12'>
+                            <ul className='hidden md:flex items-center justify-center gap-6'>
                                 {navItems.map((item, index) => (
                                     <li key={index}>
                                         <div className=''>
-                                            <Link href={item.href} className={` hover:text-primary gap-2 flex text-lg items-center   ${pathname === item.href ? 'text-primary font-extrabold px-6 py-2 backdrop-blur-md bg-primary/10 rounded-full ' : 'text-text-light font-bold'}`}>
-                                                {item.icon} {item.label}
+                                            <Link href={item.href} className={` hover:text-primary gap-2 flex md:text-base xl:text-lg items-center   ${pathname === item.href ? 'text-primary font-extrabold px-6 py-2 backdrop-blur-md bg-primary/25 rounded-full ' : 'text-text-light font-bold px-2 xl:px-6 rounded-full py-2 bg-transparent'}`}>
+                                                <span className="hidden xl:inline-flex">{item.icon}</span>
+                                                {item.label}
                                             </Link>
                                         </div>
                                     </li>
                                 ))}
                             </ul>
 
-                            <div className='flex md:hidden'>
-                                <LocationBadge
-                                    branch={selectedBranch}
-                                    distance={branchDistance}
-                                    onClick={openBranchSelector}
-                                    fullWidth={false}
-                                    isLoading={isLocationLoading}
-                                />
-                            </div>
+
                         </div>
 
 
                         {/* right side - COMBINED */}
-                        <div className='flex w-[25%] justify-end items-center gap-3'>
+                        <div className='flex justify-end items-center gap-3'>
 
                             <div>
-                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-light'>
-                                    <ShoppingBagIcon weight='bold' size={20} className='text-text-dark' />
+                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-gray'>
+                                    <ShoppingBagIcon weight='bold' size={20} className='text-text-' />
                                     <span className='absolute text-xs top-0 right-[-4] bg-error rounded-full w-3 h-3 text-text-light'>
 
                                     </span>
                                 </button>
                             </div>
                             <div>
-                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-light'>
-                                    <UserIcon weight='bold' size={20} className='text-text-dark' />
+                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-gray'>
+                                    <UserIcon weight='bold' size={20} className='text-text-' />
                                 </button>
                             </div>
-                            {/* Mobile menu icon */}
-                            <div className='flex md:hidden items-center justify-end'>
-                                <div className='w-10 h-10 flex rounded-full bg-brand-darker items-center justify-center'>
-                                    <ListIcon weight="bold" className="text-primary" size={24} />
-                                </div>
+                            <div className='md:hidden flex'>
+                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-gray'>
+                                    <ListIcon weight="bold" className="text-primar" size={24} />
+                                </button>
                             </div>
+
                         </div>
 
                     </div >

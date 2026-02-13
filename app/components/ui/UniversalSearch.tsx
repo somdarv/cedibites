@@ -218,8 +218,8 @@ export default function UniversalSearch({
     return (
         <>
 
-            <div className="py-6 px-12 border- border-neutral-gray/20 w-full">
-                <div className="relative">
+            <div className="py border- my-4 md:my-0 border-neutral-gray/20 w-ful">
+                <div className="relative w-full">
                     <MagnifyingGlassIcon
                         size={24}
                         weight="bold"
@@ -232,7 +232,7 @@ export default function UniversalSearch({
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch(query)}
-                        className="w-full pl-14 pr-12 py-3 bg-neutral-light dark:bg-brand-dark border-2 border-neutral-gray/50 focus:border-2 focus:border-primary rounded-full text-text-dark dark:text-text-light placeholder:text-neutral-gray transition-all outline-none text-lg"
+                        className="w-full pl-14 pr-4 md:pr-12 py-3 md:py-4 bg-neutral-light dark:bg-brand-dark border-2 border-neutral-gray/50 focus:border-2 focus:border-primary rounded-full text-text-dark dark:text-text-light placeholder:text-neutral-gray transition-all outline-none text-lg"
                     />
                     {query && (
                         <button
