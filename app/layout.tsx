@@ -7,6 +7,8 @@ import LocationRequestModal from "./components/ui/LocationRequestModal";
 import { ModalProvider } from "./components/providers/ModalProvider";
 import BranchSelectorModal from "./components/ui/BranchSelectorModal";
 import { BranchProvider } from "./components/providers/BranchProvider";
+import { MenuDiscoveryProvider } from "./components/providers/MenuDiscoveryProvider";
+
 
 // Google Font - Caprasimo (for brand/headings)
 const caprasimo = Caprasimo({
@@ -52,18 +54,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${cabin.variable} ${caprasimo.variable}  bg-neutral-light dark:bg-brand-darker antialiased`}>
+    <html lang="en" className={`${cabin.variable} ${caprasimo.variable}  bg-neutral-light bg-image dark:bg-brand-darker antialiased`}>
       <body
         className={``}
       >
         <ModalProvider >
-          <LocationProvider autoRequest={false}>
-            <LocationRequestModal />
-            <BranchProvider>
-              <BranchSelectorModal />
-              {children}
-            </BranchProvider>
-          </LocationProvider>
+          <MenuDiscoveryProvider>
+            <LocationProvider autoRequest={false}>
+              <LocationRequestModal />
+              <BranchProvider>
+                <BranchSelectorModal />
+                {children}
+              </BranchProvider>
+            </LocationProvider>
+          </MenuDiscoveryProvider>
         </ModalProvider>
 
       </body>

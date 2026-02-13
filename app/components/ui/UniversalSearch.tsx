@@ -232,12 +232,12 @@ export default function UniversalSearch({
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch(query)}
-                        className="w-full pl-14 pr-12 py-4 bg-neutral-light dark:bg-brand-dark border-2 border-neutral-gray/50 focus:border-2 focus:border-primary rounded-full text-text-dark dark:text-text-light placeholder:text-neutral-gray transition-all outline-none text-lg"
+                        className="w-full pl-14 pr-12 py-3 bg-neutral-light dark:bg-brand-dark border-2 border-neutral-gray/50 focus:border-2 focus:border-primary rounded-full text-text-dark dark:text-text-light placeholder:text-neutral-gray transition-all outline-none text-lg"
                     />
                     {query && (
                         <button
                             onClick={() => setQuery('')}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-light dark:hover:bg-brand-dark transition-colors"
+                            className="absolute cursor-pointer hover:bg-neutral-gray/10 right-4 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full  dark:hover:bg-brand-dark transition-colors"
                         >
                             <XIcon size={20} weight="bold" />
                         </button>

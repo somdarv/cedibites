@@ -70,8 +70,9 @@ export default function Navbar({
     const isLocationLoading = permissionStatus === 'prompt' && !coordinates;
 
     const navItems: NavItem[] = [
-        { label: 'Home', icon: <HouseIcon weight="fill" size={32} />, href: '/' },
-        { label: 'Menu', icon: <HamburgerIcon weight="fill" size={32} />, href: '/menu' },
+        { label: 'Home', icon: <Image src="https52532
+            ://icons8.com/icon/ocVv75cTYUBU/home-page" alt="Home" width={24} height={24} />, href: '/' },
+        { label: 'Our Menu', icon: <HamburgerIcon weight="fill" size={32} />, href: '/menu' },
         { label: 'Track Order', icon: <PathIcon weight="fill" size={32} />, href: '/orders' },
     ];
 
@@ -85,12 +86,12 @@ export default function Navbar({
     return (
         <>
             <nav>
-                <div className={`md:ixed top-0 left-0 w-full z-50 transition-all duration-300 `}>
+                <div className={`fixed top-0 left-0 w-full z-10 transition-all duration-300 `}>
                     {/* NavRow1 */}
-                    <div className='w-full bg-brand-dark flex justify-between items-center '>
+                    < div className='w-full bg-brown flex justify-between items-center ' >
 
                         {/* phone Numbers */}
-                        <div className='w-full md:w-[50%]    flex'>
+                        < div className='w-full    flex' >
                             {/* {phoneNumbers.map((phone, index) => (
                                 <div
                                     key={index}
@@ -102,25 +103,38 @@ export default function Navbar({
                                     <p className='text-text-light group-hover:text-primary'>{phone}</p>
                                 </div>
                             ))} */}
-                        </div>
-                    </div>
+                        </div >
+                    </div >
 
                     {/* NavRow 2 */}
-                    <div className='w-[95%] md:w-[80%] mx-auto my- rounded-b-4xl bg-brand-darker dark:bg-brand-dark flex justify-between items-center py-6 px-12 '>
+                    < div className='w-full mx-auto my- rounde bg-brand-darker dark:bg-brand-dark flex justify-between items-center py-6 px-12 ' >
                         {/* left side */}
                         {/* Logo */}
-                        <Link href="/" className='text-2xl font- flex items-center gap-2 text-primary' style={{ fontFamily: 'var(--font-family-brand)' }}>
-                            <Image src="/cblogo.webp" alt="CediBites Logo" width={44} height={44} className='object-contain' />
-                            <p className='hidden md:flex uppercase font-caprasimo'>CediBites</p>
-                        </Link>
+                        <div className='flex w-[25%] bg-r items-center gap-x-2'>
+                            <Link href="/" className='text-2xl font- flex items-center gap-2 text-primary'>
+                                <Image src="/cblogo.webp" alt="CediBites Logo" width={44} height={44} className='object-contain' />
+                                <p className='hidden uppercas md:flex text-3xl font-bold font-body'>CediBites</p>
+                            </Link>
+
+                            <div className='hidden md:flex'>
+                                <LocationBadge
+                                    branch={selectedBranch}
+                                    distance={branchDistance}
+                                    onClick={openBranchSelector}
+                                    fullWidth={false}
+                                    isLoading={isLocationLoading}
+
+                                />
+                            </div>
+                        </div>
 
                         {/* middle side */}
-                        <div>
+                        <div className='w-[50%] bg-re'>
                             <ul className='hidden md:flex items-center justify-center gap-12'>
                                 {navItems.map((item, index) => (
                                     <li key={index}>
                                         <div className=''>
-                                            <Link href={item.href} className={` hover:text-primary gap-2 flex text-base items-center   ${pathname === item.href ? 'text-primary font-extrabold px-6 py-2 backdrop-blur- ' : 'text-text-light font-bold'}`}>
+                                            <Link href={item.href} className={` hover:text-primary gap-2 flex text-lg items-center   ${pathname === item.href ? 'text-primary font-extrabold px-6 py-2 backdrop-blur-md bg-primary/10 rounded-full ' : 'text-text-light font-bold'}`}>
                                                 {item.icon} {item.label}
                                             </Link>
                                         </div>
@@ -141,18 +155,21 @@ export default function Navbar({
 
 
                         {/* right side - COMBINED */}
-                        <div className='flex items-center gap-3'>
-                            <div className='hidden md:flex'>
-                                <LocationBadge
-                                    branch={selectedBranch}
-                                    distance={branchDistance}
-                                    onClick={openBranchSelector}
-                                    fullWidth={false}
-                                    isLoading={isLocationLoading}
+                        <div className='flex w-[25%] justify-end items-center gap-3'>
 
-                                />
+                            <div>
+                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-light'>
+                                    <ShoppingBagIcon weight='bold' size={20} className='text-text-dark' />
+                                    <span className='absolute text-xs top-0 right-[-4] bg-error rounded-full w-3 h-3 text-text-light'>
+
+                                    </span>
+                                </button>
                             </div>
-
+                            <div>
+                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-light'>
+                                    <UserIcon weight='bold' size={20} className='text-text-dark' />
+                                </button>
+                            </div>
                             {/* Mobile menu icon */}
                             <div className='flex md:hidden items-center justify-end'>
                                 <div className='w-10 h-10 flex rounded-full bg-brand-darker items-center justify-center'>
@@ -160,10 +177,11 @@ export default function Navbar({
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                </div>
-            </nav>
+                    </div >
+
+                </div >
+            </nav >
         </>
     );
 }

@@ -20,7 +20,7 @@ export default function DynamicGreeting() {
     return (
         <div>
             {/* Left: Greeting */}
-            <div className="shrink-0 flex justify-center p-6 rounded-xl ">
+            <div className="shrink-0 flex justify-center py-6 rounded-xl ">
                 <div>
                     <h2 className="text-lg font-family-body md:text-3xl w-auto font-bold text-primary mb-">
                         {greeting}
