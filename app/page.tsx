@@ -10,6 +10,9 @@ import UniversalSearch from './components/ui/UniversalSearch'
 import DynamicGreeting from './components/ui/DynamicGreeting'
 import HeroSearch from './components/sections/HeroSearch'
 import MenuGrid from './components/ui/MenuGrid'
+import PromoBanner from './components/ui/PromoBanner'
+import Footer from './components/layout/Footer'
+
 
 
 
@@ -29,14 +32,10 @@ export default function page() {
       </div>
       <div className='mt-24 '>
         <HeroSearch />
-
       </div>
       <MenuGrid />
-
-
-
-
-
+      <PromoBanner />
+      <Footer />
 
 
     </div>

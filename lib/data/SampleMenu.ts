@@ -155,6 +155,7 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: 'Large', price: 68 },
         ],
         icon: '🥬',
+        image: '/images/menu/kk.webp',
         url: '/menu?item=kontomire-stew',
     },
 
@@ -172,7 +173,7 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: 'Family', price: 240 },
         ],
         icon: '🍱',
-        image: '/images/menu/9.webp',
+        image: '/images/menu/10.webp',
         url: '/menu?item=cedibites-classic-combo',
         popular: true,
     },
@@ -187,6 +188,8 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: 'Family', price: 220 },
         ],
         icon: '🥡',
+        image: '/images/menu/11.webp',
+
         url: '/menu?item=waakye-pack',
         popular: true,
     },
@@ -246,6 +249,7 @@ export const sampleMenuItems: MenuItem[] = [
         ],
         icon: '🍠',
         url: '/menu?item=kelewele',
+        image: '/images/menu/12.webp',
         popular: true,
     },
     {
@@ -259,6 +263,8 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: 'Large', price: 40 },
         ],
         icon: '🍌',
+        image: '/images/menu/17.webp',
+
         url: '/menu?item=fried-plantain',
     },
     {
@@ -272,6 +278,8 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: 'Large', price: 32 },
         ],
         icon: '🥗',
+        image: '/images/menu/18.webp',
+
         url: '/menu?item=coleslaw',
     },
     {
@@ -285,6 +293,8 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: 'Large', price: 48 },
         ],
         icon: '🍙',
+        image: '/images/menu/19.webp',
+
         url: '/menu?item=shito-rice',
     },
     {
@@ -298,6 +308,8 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: 'Large', price: 40 },
         ],
         icon: '🍆',
+
+
         url: '/menu?item=garden-egg-salad',
     },
 
@@ -315,6 +327,8 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: 'Large', price: 38 },
         ],
         icon: '🍘',
+        image: '/images/menu/13.webp',
+
         url: '/menu?item=chin-chin-bites',
         popular: true,
     },
@@ -329,6 +343,7 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: '6 pieces', price: 90 },
         ],
         icon: '🥧',
+        image: '/images/menu/10.webp',
         url: '/menu?item=meat-pie',
         popular: true,
     },
@@ -387,7 +402,9 @@ export const sampleMenuItems: MenuItem[] = [
             { key: 'large', label: '6 pieces', price: 45 },
         ],
         icon: '🍍',
+        image: '/images/menu/14.webp',
         url: '/menu?item=pineapple-fritters',
+
         popular: true,
     },
     {
@@ -488,6 +505,7 @@ export const sampleMenuItems: MenuItem[] = [
         ],
         icon: '🍍',
         url: '/menu?item=pineapple-ginger-juice',
+        image: '/images/menu/15.webp',
         popular: true,
     },
     {

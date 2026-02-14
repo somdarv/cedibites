@@ -8,6 +8,7 @@ import { ModalProvider } from "./components/providers/ModalProvider";
 import BranchSelectorModal from "./components/ui/BranchSelectorModal";
 import { BranchProvider } from "./components/providers/BranchProvider";
 import { MenuDiscoveryProvider } from "./components/providers/MenuDiscoveryProvider";
+import { CartProvider } from "./components/providers/CartProvider";
 
 
 // Google Font - Caprasimo (for brand/headings)
@@ -59,18 +60,20 @@ export default function RootLayout({
         className={``}
       >
         <ModalProvider >
-          <MenuDiscoveryProvider>
-            <LocationProvider autoRequest={false}>
-              <LocationRequestModal />
-              <BranchProvider>
-                <BranchSelectorModal />
-                {children}
-              </BranchProvider>
-            </LocationProvider>
-          </MenuDiscoveryProvider>
+          <CartProvider>
+            <MenuDiscoveryProvider>
+              <LocationProvider autoRequest={false}>
+                <LocationRequestModal />
+                <BranchProvider>
+                  <BranchSelectorModal />
+                  {children}
+                </BranchProvider>
+              </LocationProvider>
+            </MenuDiscoveryProvider>
+          </CartProvider>
         </ModalProvider>
 
       </body>
-    </html>
+    </html >
   );
 }

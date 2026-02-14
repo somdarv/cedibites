@@ -1,15 +1,17 @@
 'use client';
 
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import Button from '../base/Button';
-import { HamburgerIcon, ListIcon, HouseIcon, PathIcon, ShoppingBagIcon, UserIcon, PhoneIcon } from "@phosphor-icons/react";
+import { HamburgerIcon, ListIcon, HouseIcon, PathIcon, ShoppingBagIcon, UserIcon } from "@phosphor-icons/react";
 import Image from 'next/image';
 import LocationBadge from '../ui/LocationBadge';
 import { useBranch } from '../providers/BranchProvider';
 import { useLocation } from '../providers/LocationProvider';
 import { useModal } from '../providers/ModalProvider';
+import { useCart } from '../providers/CartProvider';
+import CartDrawer from '../ui/CartDrawer';
 
 
 
@@ -18,71 +20,33 @@ const App = () => {
 
 };
 
+
 interface NavItem {
     label: string;
     href: string;
-    active?: boolean;
     icon: React.ReactNode;
 }
 
-interface NavbarProps {
-    cartItemCount?: number;
-    cartTotal?: number;
-    userName?: string;
-    userAvatar?: string;
-    onCartClick?: () => void;
-    onLocationClick?: () => void;
-}
-
-export default function Navbar({
-    cartItemCount = 0,
-    cartTotal = 0,
-    userName,
-    userAvatar,
-    onCartClick = () => { },
-    onLocationClick = () => { },
-}: NavbarProps) {
+export default function Navbar() {
     const pathname = usePathname();
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isCartOpen, setIsCartOpen] = useState(false);
     const { selectedBranch, getBranchesWithDistance } = useBranch();
-    const { openBranchSelector } = useModal();
+    const { openBranchSelector, openCart } = useModal();
     const { coordinates, permissionStatus } = useLocation();
-    const [mounted, setMounted] = useState(false);
-
+    const { totalItems } = useCart();
 
     const branchDistance = coordinates && selectedBranch
         ? getBranchesWithDistance(coordinates.latitude, coordinates.longitude)
             .find(b => b.id === selectedBranch.id)?.distance
         : null;
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    useEffect(() => {
-        if (isMobileMenuOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-    }, [isMobileMenuOpen]);
-
-    // 👇 Check if location is being requested
     const isLocationLoading = permissionStatus === 'prompt' && !coordinates;
 
     const navItems: NavItem[] = [
-        { label: 'Home', icon: <ListIcon weight='bold' size={32} />, href: '/' },
-        { label: 'Our Menu', icon: <HamburgerIcon weight="fill" size={32} />, href: '/menu' },
-        { label: 'Track Order', icon: <PathIcon weight="fill" size={32} />, href: '/orders' },
+        { label: 'Home', icon: <HouseIcon weight="fill" size={20} />, href: '/' },
+        { label: 'Our Menu', icon: <HamburgerIcon weight="fill" size={20} />, href: '/menu' },
+        { label: 'Track Order', icon: <PathIcon weight="fill" size={20} />, href: '/orders' },
     ];
-
-    const isActive = (href: string) => pathname === href;
-
-    const phoneNumbers = [
-        '+233 24 123 4567',
-        '+233 50 987 6543',
-    ];
-
     return (
         <>
             <nav>
@@ -142,20 +106,29 @@ export default function Navbar({
                         <div className='flex justify-end items-center gap-3'>
 
                             <div>
-                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-gray'>
-                                    <ShoppingBagIcon weight='bold' size={20} className='text-text-' />
-                                    <span className='absolute text-xs top-0 right-[-4] bg-error rounded-full w-3 h-3 text-text-light'>
-
-                                    </span>
+                                <button
+                                    onClick={openCart}
+                                    className="relative w-10 h-10 flex items-center justify-center rounded-full cursor-pointer bg-neutral-light/80 hover:bg-neutral-light  transition-colors"
+                                    aria-label="Open cart"
+                                >
+                                    <ShoppingBagIcon weight="bold" size={20} className="text-text-dark" />
+                                    {totalItems > 0 && (
+                                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-error text-white text-[10px] font-bold rounded-full px-1 leading-none">
+                                            {totalItems > 99 ? '99+' : totalItems}
+                                        </span>
+                                    )}
                                 </button>
                             </div>
                             <div>
-                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-gray'>
+                                <button onClick={() => setIsCartOpen(true)}
+
+                                    className="relative w-10 h-10 flex items-center justify-center rounded-full cursor-pointer bg-neutral-light/80 hover:bg-neutral-light  transition-colors">
                                     <UserIcon weight='bold' size={20} className='text-text-' />
                                 </button>
                             </div>
                             <div className='md:hidden flex'>
-                                <button className='w-9 h-9 relative flex items-center justify-center rounded-full cursor-pointer bg-neutral-gray'>
+                                <button
+                                    className="relative w-10 h-10 flex items-center justify-center rounded-full cursor-pointer bg-neutral-light/80 hover:bg-neutral-light  transition-colors">
                                     <ListIcon weight="bold" className="text-primar" size={24} />
                                 </button>
                             </div>
@@ -166,6 +139,8 @@ export default function Navbar({
 
                 </div >
             </nav >
+            <CartDrawer />
+
         </>
     );
 }
