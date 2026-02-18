@@ -3,84 +3,14 @@
 import { useEffect, useState } from 'react';
 import { XIcon, MagnifyingGlassIcon, MapPinIcon, ClockIcon, PhoneIcon, GpsFixIcon } from '@phosphor-icons/react';
 import { useModal } from '../providers/ModalProvider';
-import { useBranch } from '../providers/BranchProvider';
+import { useBranch, type Branch } from '../providers/BranchProvider';
 import { useLocation } from '../providers/LocationProvider';
-
-interface Branch {
-    id: string;
-    name: string;
-    address: string;
-    area: string;
-    phone: string;
-    coordinates: { latitude: number; longitude: number };
-    deliveryRadius: number;
-    operatingHours: string;
-    isOpen: boolean;
-}
-
-const branches: Branch[] = [
-    {
-        id: '1',
-        name: 'Osu Branch',
-        address: '123 Oxford Street, Osu',
-        area: 'Osu',
-        phone: '+233 24 123 4567',
-        coordinates: { latitude: 5.5557, longitude: -0.1769 },
-        deliveryRadius: 5,
-        operatingHours: '8:00 AM - 10:00 PM',
-        isOpen: true,
-    },
-    {
-        id: '2',
-        name: 'East Legon Branch',
-        address: '45 American House, East Legon',
-        area: 'East Legon',
-        phone: '+233 50 987 6543',
-        coordinates: { latitude: 5.6465, longitude: -0.1549 },
-        deliveryRadius: 5,
-        operatingHours: '8:00 AM - 11:00 PM',
-        isOpen: true,
-    },
-    {
-        id: '3',
-        name: 'Spintex Branch',
-        address: '78 Spintex Road',
-        area: 'Spintex',
-        phone: '+233 20 555 1234',
-        coordinates: { latitude: 5.6372, longitude: -0.0924 },
-        deliveryRadius: 4,
-        operatingHours: '9:00 AM - 9:00 PM',
-        isOpen: false,
-    },
-    {
-        id: '4',
-        name: 'Tema Branch',
-        address: 'Community 1, Tema',
-        area: 'Tema',
-        phone: '+233 24 777 8888',
-        coordinates: { latitude: 5.6698, longitude: -0.0166 },
-        deliveryRadius: 6,
-        operatingHours: '8:00 AM - 10:00 PM',
-        isOpen: true,
-    },
-    {
-        id: '5',
-        name: 'Madina Branch',
-        address: 'Remy Junction, Madina',
-        area: 'Madina',
-        phone: '+233 55 444 3333',
-        coordinates: { latitude: 5.6805, longitude: -0.1665 },
-        deliveryRadius: 5,
-        operatingHours: '8:00 AM - 10:00 PM',
-        isOpen: true,
-    },
-];
 
 export default function BranchSelectorModal() {
     const { isBranchSelectorOpen, closeBranchSelector } = useModal();
     const [searchQuery, setSearchQuery] = useState('');
     const [isRequestingLocation, setIsRequestingLocation] = useState(false);
-    const { setSelectedBranch, selectNearestBranchNow } = useBranch();
+    const { setSelectedBranch, selectNearestBranchNow, branches } = useBranch();
     const { requestLocation, permissionStatus, coordinates, error } = useLocation();
 
     const handleUseMyLocation = () => {
@@ -143,7 +73,7 @@ export default function BranchSelectorModal() {
                     </div>
                     <button
                         onClick={closeBranchSelector}
-                        className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-neutral-gray/15 transition-colors"
+                        className="w-10 h-10 flex cursor-pointer items-center justify-center rounded-full hover:bg-neutral-gray/15 transition-colors"
                         aria-label="Close"
                     >
                         <XIcon size={24} className="text-text-gray dark:text-text-light" />
@@ -171,7 +101,7 @@ export default function BranchSelectorModal() {
                 <button
                     onClick={handleUseMyLocation}
                     disabled={isRequestingLocation}
-                    className="mx-6 mt-3 mb-1 flex items-center justify-center gap-2 py-2.5 rounded-full border border-primary/30 hover:bg-primary/10 transition-colors disabled:opacity-60"
+                    className="mx-6 mt-3 cursor-pointer mb-1 flex items-center justify-center gap-2 py-2.5 rounded-full border border-primary/30 hover:bg-primary/10 transition-colors disabled:opacity-60"
                 >
                     <GpsFixIcon size={20} className="text-primary" weight="bold" />
                     <span className="text-text-dark dark:text-text-light font-semibold text-sm">
@@ -214,8 +144,8 @@ export default function BranchSelectorModal() {
                                                 {branch.name}
                                             </h3>
                                             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full flex-shrink-0 ${branch.isOpen
-                                                    ? 'bg-secondary/20 text-secondary dark:bg-secondary dark:text-white'
-                                                    : 'bg-error/20 text-error dark:bg-error dark:text-white'
+                                                ? 'bg-secondary/20 text-secondary dark:bg-secondary dark:text-white'
+                                                : 'bg-error/20 text-error dark:bg-error dark:text-white'
                                                 }`}>
                                                 {branch.isOpen ? 'Open' : 'Closed'}
                                             </span>

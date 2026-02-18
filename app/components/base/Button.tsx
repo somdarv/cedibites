@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes, ReactNode } from 'react';
-import { Size, Variant, BaseComponentProps } from '@/types/components';
+import { Size, Variant, ButtonType, BaseComponentProps } from '@/types/components';
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, BaseComponentProps {
+interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'>, BaseComponentProps {
     children: ReactNode;
     variant?: Variant;
     size?: Size;
@@ -9,6 +9,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, BaseCompo
     icon?: ReactNode;
     iconPosition?: 'left' | 'right';
     loading?: boolean;
+    type?: ButtonType;
 }
 
 const sizeClasses: Record<Size, string> = {

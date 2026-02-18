@@ -5,7 +5,6 @@ import { useBranch } from '../providers/BranchProvider';
 import LocationBadge from './LocationBadge';
 import { useLocation } from '../providers/LocationProvider';
 import { useModal } from '../providers/ModalProvider';
-import { ClockIcon } from '@phosphor-icons/react';
 
 export default function DynamicGreeting() {
     const [greeting, setGreeting] = useState('Good Evening!');
@@ -34,7 +33,7 @@ export default function DynamicGreeting() {
 
     // Check if branch is currently open
     const isBranchOpen = () => {
-        if (!selectedBranch?.hours) return null;
+        if (!selectedBranch?.operatingHours) return null;
         const now = new Date();
         const hour = now.getHours();
         return hour >= 9 && hour < 22;
@@ -95,35 +94,18 @@ export default function DynamicGreeting() {
                     />
                 </div>
 
-                {/* Opening Hours */}
-                {selectedBranch && (
-                    <div className="hidde xl:flex flex-col justify-between pt-2 border-t border-brown/20">
-                        <div className="flex items-center gap-2">
-                            <ClockIcon
-                                size={16}
-                                weight="fill"
-                                className="text-brown/70"
-                            />
-                            <p className="text-sm font-semibold text-brown">
-                                Opening Hours
-                            </p>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm text-brown/70">
-                                {selectedBranch.hours || 'Mon - Sun: 9:00 AM - 10:00 PM'}
-                            </p>
-                            {isOpen !== null && (
-                                <span
-                                    className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isOpen
-                                        ? 'bg-secondary text-white'
-                                        : 'bg-brown/20 text-brown'
-                                        }`}
-                                >
-                                    {isOpen ? 'Open Now' : 'Closed'}
-                                </span>
-                            )}
-                        </div>
+                {/* Open/Closed badge */}
+                {selectedBranch && isOpen !== null && (
+                    <div className="pt-2 border-t border-brown/20">
+                        <span
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${isOpen
+                                ? 'bg-secondary text-white'
+                                : 'bg-brown/20 text-brown'
+                                }`}
+                        >
+                            <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-white animate-pulse' : 'bg-brown/60'}`} />
+                            {isOpen ? 'Open Now' : 'Closed'}
+                        </span>
                     </div>
                 )}
             </div>

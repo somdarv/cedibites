@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -21,11 +21,14 @@ interface NavItem {
     label: string;
     href: string;
     icon: React.ReactNode;
+    matchPrefixes?: string[];
 }
 
 export default function Navbar() {
     const pathname = usePathname();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const userMenuRef = useRef<HTMLDivElement>(null);
 
     const { selectedBranch, getBranchesWithDistance } = useBranch();
     const { openBranchSelector, openCart, openAuth } = useModal();
@@ -46,16 +49,37 @@ export default function Navbar() {
     useEffect(() => { setIsMobileMenuOpen(false); }, [pathname]);
 
     useEffect(() => {
-        const h = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsMobileMenuOpen(false); };
+        const h = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsMobileMenuOpen(false);
+                setIsUserMenuOpen(false);
+            }
+        };
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
     }, []);
 
+    useEffect(() => { setIsUserMenuOpen(false); }, [pathname]);
+
+    useEffect(() => {
+        const h = (e: MouseEvent) => {
+            if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+                setIsUserMenuOpen(false);
+            }
+        };
+        if (isUserMenuOpen) document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
+    }, [isUserMenuOpen]);
+
     const navItems: NavItem[] = [
         { label: 'Home', icon: <HouseIcon weight="fill" size={20} />, href: '/' },
         { label: 'Our Menu', icon: <HamburgerIcon weight="fill" size={20} />, href: '/menu' },
-        { label: 'Track Order', icon: <PathIcon weight="fill" size={20} />, href: '/orders' },
+        { label: 'Track Order', icon: <PathIcon weight="fill" size={20} />, href: '/orders', matchPrefixes: ['/orders/', '/order-history'] },
     ];
+
+    const isNavActive = (item: NavItem) =>
+        pathname === item.href ||
+        item.matchPrefixes?.some(p => pathname === p || pathname.startsWith(p)) === true;
 
     const initials = user?.name ? user.name.charAt(0).toUpperCase() : null;
 
@@ -85,7 +109,7 @@ export default function Navbar() {
                             <ul className='hidden md:flex items-center justify-center gap-6'>
                                 {navItems.map((item, index) => (
                                     <li key={index}>
-                                        <Link href={item.href} className={`hover:text-primary gap-2 flex md:text-base xl:text-lg items-center ${pathname === item.href ? 'text-primary font-extrabold px-6 py-2 backdrop-blur-md bg-primary/25 rounded-full' : 'text-text-light font-bold px-2 xl:px-6 rounded-full py-2 bg-transparent'}`}>
+                                        <Link href={item.href} className={`hover:text-primary gap-2 flex md:text-base xl:text-lg items-center ${isNavActive(item) ? 'text-primary font-extrabold px-6 py-2 backdrop-blur-md bg-primary/25 rounded-full' : 'text-text-light font-bold px-2 xl:px-6 rounded-full py-2 bg-transparent'}`}>
                                             <span className="hidden xl:inline-flex">{item.icon}</span>
                                             {item.label}
                                         </Link>
@@ -112,31 +136,33 @@ export default function Navbar() {
                             </button>
 
                             {/* ── Desktop user button ─────────────────────────── */}
-                            <div className="hidden md:block relative group">
+                            <div ref={userMenuRef} className="hidden md:block relative">
                                 {isLoggedIn ? (
                                     <>
-                                        {/* Avatar with initial */}
+                                        {/* Avatar — click to toggle */}
                                         <button
+                                            onClick={() => setIsUserMenuOpen(prev => !prev)}
                                             className="w-10 h-10 flex items-center justify-center rounded-full cursor-pointer bg-primary hover:bg-primary-hover text-white font-bold text-sm transition-colors"
                                             aria-label="My account"
+                                            aria-expanded={isUserMenuOpen}
                                         >
                                             {initials}
                                         </button>
 
-                                        {/* Hover dropdown */}
-                                        <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-brand-darker rounded-2xl shadow-xl border border-neutral-gray/10 py-2
-                                            opacity-0 scale-95 pointer-events-none
-                                            group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto
-                                            transition-all duration-150 origin-top-right z-40">
-                                            <div className="px-4 py-3 border-b border-neutral-gray/8">
+                                        {/* Click dropdown */}
+                                        <div className={`absolute right-0 top-full mt-2 w-52 bg-white dark:bg-brand-darker rounded-2xl shadow-xl border border-neutral-gray/10 py-2
+                                            transition-all duration-150 origin-top-right z-40
+                                            ${isUserMenuOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'}`}>
+                                            <div className="px-4 py-3 border-b border-neutral-gray/10">
                                                 <p className="text-sm font-bold text-text-dark dark:text-text-light truncate">{user?.name}</p>
                                                 <p className="text-xs text-neutral-gray truncate">{user?.phone}</p>
                                             </div>
-                                            <Link href="/orders"
+                                            <Link href="/order-history"
+                                                onClick={() => setIsUserMenuOpen(false)}
                                                 className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-dark dark:text-text-light hover:text-primary hover:bg-primary/5 transition-colors">
                                                 <PathIcon weight="fill" size={14} className="text-neutral-gray" /> My Orders
                                             </Link>
-                                            <button onClick={logout}
+                                            <button onClick={() => { logout(); setIsUserMenuOpen(false); }}
                                                 className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-error hover:bg-error/5 transition-colors">
                                                 <SignOutIcon weight="fill" size={14} /> Sign Out
                                             </button>
@@ -248,7 +274,7 @@ export default function Navbar() {
                         <p className="text-[10px] font-bold text-neutral-gray uppercase tracking-widest mb-3 px-1">Menu</p>
                         <ul className="flex flex-col gap-1">
                             {navItems.map((item) => {
-                                const isActive = pathname === item.href;
+                                const isActive = isNavActive(item);
                                 return (
                                     <li key={item.href}>
                                         <Link href={item.href} onClick={() => setIsMobileMenuOpen(false)}

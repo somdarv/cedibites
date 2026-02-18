@@ -3,7 +3,7 @@
 import React from 'react'
 import DynamicGreeting from '../ui/DynamicGreeting'
 import UniversalSearch from '../ui/UniversalSearch'
-import { sampleMenuItems } from '@/lib/data/SampleMenu'
+
 import { HeroSearchCategoryItems } from '@/lib/data/HeroSearchCategoryItems'
 import { useMenuDiscovery } from '../providers/MenuDiscoveryProvider'
 import PromoBanner from '../ui/PromoBanner'
@@ -28,7 +28,7 @@ export default function HeroSearch() {
 
             {/* Row 2: Search and Categories */}
             <div className='w-[95%] mb-4 md:w-[80%] lg:w-[70%] bg-transparent md:bg-primary/5 md:px-6 md:py-6 rounded-2xl mx-auto'>
-                <UniversalSearch items={sampleMenuItems} />
+                <UniversalSearch />
 
                 <div className='flex gap-3 w-full overflow-x-auto no-scrollbar mt-3 pb-1'>
                     {HeroSearchCategoryItems.map((item) => (

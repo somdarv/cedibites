@@ -1,4 +1,4 @@
-// app/track/page.tsx
+// app/orders/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -22,7 +22,7 @@ export default function TrackOrderPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError('');
 
@@ -42,7 +42,7 @@ export default function TrackOrderPage() {
         setIsLoading(true);
 
         // Navigate to tracking page
-        router.push(`/track/${cleanCode}`);
+        router.push(`/orders/${cleanCode}`);
     };
 
     const handleExampleClick = () => {
@@ -77,7 +77,7 @@ export default function TrackOrderPage() {
 
                 <div className='w-full flex justify-end mb-8'>
                     <button
-                        onClick={() => router.push('/orders')}
+                        onClick={() => router.push('/order-history')}
                         className="text-base flex items-center cursor-pointer font-semibold text-primary hover:text-primary-hover hover:underline transition-colors"
                     >
                         View Order History
@@ -283,7 +283,7 @@ export default function TrackOrderPage() {
                             href="tel:+233501234567"
                             className="text-primary hover:text-primary-hover font-semibold text-sm hover:underline"
                         >
-                            📞 Call Support: +233 50 123 4567
+                            Call Support: +233 50 123 4567
                         </a>
                         <span className="hidden sm:inline text-neutral-gray">•</span>
 

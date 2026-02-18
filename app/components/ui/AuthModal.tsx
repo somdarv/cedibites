@@ -338,7 +338,7 @@ export default function AuthModal() {
                         <span className="text-sm font-bold text-neutral-gray">CediBites</span>
                     </div>
                     <button onClick={handleClose}
-                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-neutral-gray/10 transition-colors">
+                        className="w-9 h-9 cursor-pointer flex items-center justify-center rounded-full hover:bg-neutral-gray/10 transition-colors">
                         <XIcon size={18} weight="bold" className="text-text-dark dark:text-text-light" />
                     </button>
                 </div>
