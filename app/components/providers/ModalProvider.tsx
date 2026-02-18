@@ -17,6 +17,11 @@ interface ModalContextType {
     isCartOpen: boolean;
     openCart: () => void;
     closeCart: () => void;
+
+    // Auth Modal
+    isAuthOpen: boolean;
+    openAuth: () => void;
+    closeAuth: () => void;
 }
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
@@ -25,37 +30,42 @@ export function ModalProvider({ children }: { children: ReactNode }) {
     const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false);
     const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
+    const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-    // ── Single scroll lock — fires whenever any modal state changes ──
+    // ── Single scroll lock ──
     useEffect(() => {
-        const anyOpen = isBranchSelectorOpen || isLocationModalOpen || isCartOpen;
+        const anyOpen = isBranchSelectorOpen || isLocationModalOpen || isCartOpen || isAuthOpen;
         document.body.style.overflow = anyOpen ? 'hidden' : '';
         return () => { document.body.style.overflow = ''; };
-    }, [isBranchSelectorOpen, isLocationModalOpen, isCartOpen]);
+    }, [isBranchSelectorOpen, isLocationModalOpen, isCartOpen, isAuthOpen]);
 
     // Branch Selector
-    const openBranchSelector = () => {
-        setIsBranchSelectorOpen(true);
-        setIsLocationModalOpen(false);
-    };
+    const openBranchSelector = () => { setIsBranchSelectorOpen(true); setIsLocationModalOpen(false); };
     const closeBranchSelector = () => setIsBranchSelectorOpen(false);
 
     // Location Modal
-    const openLocationModal = () => {
-        setIsLocationModalOpen(true);
-        setIsBranchSelectorOpen(false);
-    };
+    const openLocationModal = () => { setIsLocationModalOpen(true); setIsBranchSelectorOpen(false); };
     const closeLocationModal = () => setIsLocationModalOpen(false);
 
     // Cart Drawer
     const openCart = () => setIsCartOpen(true);
     const closeCart = () => setIsCartOpen(false);
 
+    // Auth Modal — closes everything else when opening
+    const openAuth = () => {
+        setIsAuthOpen(true);
+        setIsCartOpen(false);
+        setIsBranchSelectorOpen(false);
+        setIsLocationModalOpen(false);
+    };
+    const closeAuth = () => setIsAuthOpen(false);
+
     return (
         <ModalContext.Provider value={{
             isBranchSelectorOpen, openBranchSelector, closeBranchSelector,
             isLocationModalOpen, openLocationModal, closeLocationModal,
             isCartOpen, openCart, closeCart,
+            isAuthOpen, openAuth, closeAuth,
         }}>
             {children}
         </ModalContext.Provider>

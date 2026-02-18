@@ -155,7 +155,7 @@ export default function PromoBanner() {
     const banner = BANNERS[activeIndex];
 
     return (
-        <div className="w-[95%] md:w-[80%] xl:w-[70%] mx-auto mb-12 mt-2">
+        <div className="w-full mx-auto mb- mt-">
             {/* Card */}
             <div
                 className="relative overflow-hidden rounded-2xl px-6 py-5 md:px-10 md:py-7 transition-all duration-300"

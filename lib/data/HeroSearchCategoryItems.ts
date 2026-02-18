@@ -4,28 +4,23 @@ export const HeroSearchCategoryItems = [
         label: 'Most Popular'
     },
     {
-        id: 'Starters & Sides',
-        label: 'Starters & Sides'
+        id: 'Basic Meals',
+        label: 'Basic Meals'
     },
     {
-        id: 'Appetizers',
-        label: 'Appetizers'
+        id: 'Budget Bowls',
+        label: 'Budget Bowls'
     },
-    {
-        id: 'Main Dishes',
-        label: 'Main Dishes'
-    },
-    {
-        id: 'Desserts',
-        label: 'Desserts'
-    },
-
     {
         id: 'Combos',
         label: 'Combos'
     },
     {
+        id: 'Top Ups',
+        label: 'Top Ups'
+    },
+    {
         id: 'Drinks',
         label: 'Drinks'
     },
-]
+];

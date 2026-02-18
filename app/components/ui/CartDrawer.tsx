@@ -12,6 +12,7 @@ import { useCart, CartItem } from '@/app/components/providers/CartProvider';
 import { useModal } from '@/app/components/providers/ModalProvider';
 import { useBranch, Branch, BranchWithDistance } from '@/app/components/providers/BranchProvider';
 import { useLocation } from '@/app/components/providers/LocationProvider';
+import { useAuth } from '../providers/AuthProvider';
 
 const formatPrice = (p: number) => `GHS ${p.toFixed(2)}`;
 const DELIVERY_FEE = 15;
@@ -89,7 +90,7 @@ export default function CartDrawer() {
         <>
             {/* Backdrop */}
             <div
-                className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300
+                className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity duration-300
                     ${isCartOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
                 onClick={closeCart}
             />
@@ -116,7 +117,8 @@ export default function CartDrawer() {
                             {view === 'branch-conflict' && 'Heads Up!'}
                         </h2>
                         {view === 'cart' && totalItems > 0 && (
-                            <span className="text-[10px] font-bold px-1.5 py-1 rounded-full bg-neutral-gray text-white">{totalItems}</span>
+                            <span className="text-base font-bold text-text-dark  rounded-full dark:text-white">({totalItems})
+                            </span>
                         )}
                     </div>
                     <button onClick={closeCart} className="w-9 cursor-pointer h-9 flex items-center justify-center rounded-full hover:bg-neutral-gray/15 transition-colors">
@@ -257,7 +259,7 @@ export default function CartDrawer() {
                             {conflictResult.unavailable.map(ci => (
                                 <div key={ci.cartItemId} className="flex items-center gap-3 bg-error/5 border border-error/15 rounded-xl p-3">
                                     <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-error/10 shrink-0">
-                                        {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">{ci.item.icon ?? '🍽️'}</div>}
+                                        {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -275,7 +277,7 @@ export default function CartDrawer() {
                                 {conflictResult.available.map(ci => (
                                     <div key={ci.cartItemId} className="flex items-center gap-3 bg-secondary/5 border border-secondary/15 rounded-xl p-3">
                                         <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-secondary/10 shrink-0">
-                                            {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">{ci.item.icon ?? '🍽️'}</div>}
+                                            {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -314,7 +316,7 @@ function CartItemRow({ cartItem, onRemove, onIncrease, onDecrease }: {
     return (
         <div className="flex items-center gap-3 bg-white/60 dark:bg-white/5 rounded-2xl p-3">
             <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-primary/10 shrink-0">
-                {cartItem.item.image && !imgError ? <Image src={cartItem.item.image} alt={cartItem.item.name} fill sizes="64px" className="object-cover" onError={() => setImgError(true)} /> : <div className="w-full h-full flex items-center justify-center text-2xl">{cartItem.item.icon ?? '🍽️'}</div>}
+                {cartItem.item.image && !imgError ? <Image src={cartItem.item.image} alt={cartItem.item.name} fill sizes="64px" className="object-cover" onError={() => setImgError(true)} /> : <div className="w-full h-full" />}
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-text-dark dark:text-text-light leading-tight truncate">{cartItem.item.name}</p>

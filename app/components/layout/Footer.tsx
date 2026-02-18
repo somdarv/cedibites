@@ -51,7 +51,7 @@ export default function Footer() {
         <footer className="bg-brand-darker border-t border-white/5 mt-8">
 
             {/* Main Footer Grid */}
-            <div className="w-[95%] md:w-[80%] xl:w-[70%] mx-auto py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+            <div className="w-[95%] hidden md:w-[80%] xl:w-[70%] mx-auto py-12 md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
 
                 {/* ── Col 1: Brand ── */}
                 <div className="flex flex-col gap-4 sm:col-span-2 lg:col-span-1">
@@ -149,7 +149,7 @@ export default function Footer() {
             <div className="w-[95%] md:w-[80%] xl:w-[70%] mx-auto border-t border-white/5" />
 
             {/* Bottom Bar */}
-            <div className="w-[95%] md:w-[80%] xl:w-[70%] mx-auto py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="w-[95%] md:w-[80%] xl:w-[70%] py-8 mx-auto md:py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
                 <p className="text-xs text-white/30">
                     © {new Date().getFullYear()} CediBites Restaurant. All rights reserved.
                 </p>

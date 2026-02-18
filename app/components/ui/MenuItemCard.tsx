@@ -11,21 +11,39 @@ interface MenuItemCardProps {
     onOpenDetail?: (item: SearchableItem) => void;
 }
 
-const formatPrice = (price: number) => `GHS ${price.toFixed(2)}`;
+const formatPrice = (price: number) => `GHS ${price.toFixed(0)}`;
 
 export default function MenuItemCard({ item, onOpenDetail }: MenuItemCardProps) {
     const { addToCart, removeFromCart, getCartItem } = useCart();
 
-    const sizes: { key: string; label: string; price: number }[] = item.sizes ?? [];
+    // Handle sizes
+    const sizes = item.sizes ?? [];
     const hasSizes = sizes.length > 0;
-    const [selectedSize, setSelectedSize] = useState<string>(hasSizes ? sizes[0].key : 'regular');
+
+    // Handle variants (Plain/Assorted)
+    const hasVariants = item.hasVariants && item.variants;
+    const variantOptions = hasVariants ? Object.keys(item.variants!) : [];
+
+    const [selectedSize, setSelectedSize] = useState<string>(
+        hasSizes ? sizes[0].key : 'regular'
+    );
+    const [selectedVariant, setSelectedVariant] = useState<string>(
+        hasVariants ? variantOptions[0] : 'regular'
+    );
     const [imgError, setImgError] = useState(false);
 
-    const activePrice = hasSizes
-        ? sizes.find((s) => s.key === selectedSize)?.price ?? item.price ?? 0
-        : item.price ?? 0;
+    // Calculate active price
+    let activePrice = 0;
+    if (hasVariants && item.variants) {
+        activePrice = item.variants[selectedVariant as 'plain' | 'assorted'] ?? 0;
+    } else if (hasSizes) {
+        activePrice = sizes.find((s) => s.key === selectedSize)?.price ?? 0;
+    } else {
+        activePrice = item.price ?? 0;
+    }
 
-    const cartItem = getCartItem(item.id, selectedSize);
+    const cartItemId = hasVariants ? selectedVariant : selectedSize;
+    const cartItem = getCartItem(item.id, cartItemId);
     const inCart = !!cartItem;
 
     const handleToggle = (e: React.MouseEvent) => {
@@ -33,7 +51,7 @@ export default function MenuItemCard({ item, onOpenDetail }: MenuItemCardProps) 
         if (inCart) {
             removeFromCart(cartItem.cartItemId);
         } else {
-            addToCart(item, selectedSize);
+            addToCart(item, cartItemId);
         }
     };
 
@@ -46,15 +64,15 @@ export default function MenuItemCard({ item, onOpenDetail }: MenuItemCardProps) 
             <div className="relative w-full aspect-4/3 bg-primary/20 dark:bg-brand-dark overflow-hidden shrink-0">
                 {item.image && !imgError ? (
                     <Image
-                        src={item.image} alt={item.name} fill
+                        src={item.image}
+                        alt={item.name}
+                        fill
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                         className="object-cover transition-transform duration-300 group-hover:scale-105"
                         onError={() => setImgError(true)}
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-5xl select-none">
-                        {item.icon ?? '🍽️'}
-                    </div>
+                    <div className="w-full h-full" />
                 )}
 
                 <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -89,6 +107,25 @@ export default function MenuItemCard({ item, onOpenDetail }: MenuItemCardProps) 
                         </p>
                     )}
                 </div>
+
+                {/* Variant pills (Plain/Assorted) */}
+                {hasVariants && (
+                    <div className="flex gap-1 flex-wrap" onClick={e => e.stopPropagation()}>
+                        {variantOptions.map((variant) => (
+                            <button
+                                key={variant}
+                                onClick={(e) => { e.stopPropagation(); setSelectedVariant(variant); }}
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium border transition-colors duration-150 capitalize
+                                    ${selectedVariant === variant
+                                        ? 'bg-neutral-gray text-white border-neutral-gray'
+                                        : 'border-neutral-gray/30 text-neutral-gray hover:border-primary/60'
+                                    }`}
+                            >
+                                {variant}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* Size pills */}
                 {hasSizes && (

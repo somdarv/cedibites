@@ -1,550 +1,347 @@
+// lib/data/SampleMenu.ts
+
 // ============================================
-// CediBites Sample Menu Data
-// Structure: KFC-style bundled meals with size variants
-// Categories: Main Dishes | Combos | Starters & Sides | Appetizers | Desserts | Drinks
+// CediBites Menu Data - Client's Actual Menu
+// Categories: Basic Meals | Budget Bowls | Combos | Top Ups | Drinks
 // ============================================
 
+export type MenuVariant = 'plain' | 'assorted';
+export type SizeKey = 'small' | 'large' | 'full' | 'half' | 'quarter' | '10pc' | '15pc' | 'fried-rice' | 'jollof';
+
 export interface MenuItemSize {
-    key: 'small' | 'medium' | 'large';
+    key: SizeKey;
     label: string;
     price: number;
+}
+
+export interface MenuAddOn {
+    id: string;
+    name: string;
+    price: number;
+    perPiece?: boolean; // true for Drumsticks (price per piece)
 }
 
 export interface MenuItem {
     id: string;
     name: string;
     description: string;
-    category: 'Main Dishes' | 'Combos' | 'Starters & Sides' | 'Appetizers' | 'Desserts' | 'Drinks';
-    sizes: MenuItemSize[];
-    icon: string;
+    category: 'Basic Meals' | 'Budget Bowls' | 'Combos' | 'Top Ups' | 'Drinks';
+
+    // Pricing
+    price?: number; // For items without sizes (basic single price)
+    sizes?: MenuItemSize[]; // For items with size variants
+
+    // Variants (Plain vs Assorted for rice/jollof/noodles)
+    hasVariants?: boolean;
+    variants?: {
+        plain?: number;
+        assorted?: number;
+    };
+
+    // Available add-ons for this item
+    availableAddOns?: string[]; // Array of add-on IDs
+
     image?: string;
     url: string;
     popular?: boolean;
     isNew?: boolean;
 }
 
+// ============================================
+// ADD-ONS (can be purchased standalone or with meals)
+// ============================================
+export const menuAddOns: Record<string, MenuAddOn> = {
+    drumsticks: {
+        id: 'drumsticks',
+        name: 'Drumsticks',
+        price: 12,
+        perPiece: true,
+    },
+    tilapia: {
+        id: 'tilapia',
+        name: 'Charcoal Grilled Tilapia',
+        price: 60,
+    },
+};
+
+// ============================================
+// MENU ITEMS
+// ============================================
 export const sampleMenuItems: MenuItem[] = [
 
     // ============================================
-    // MAIN DISHES
+    // BASIC MEALS (Plain or Assorted + Chicken Drumsticks)
     // ============================================
     {
-        id: '1',
-        name: 'Jollof Pro Max',
-        description: 'Smoky party jollof rice with grilled chicken, coleslaw & fried plantain',
-        category: 'Main Dishes',
-        sizes: [
-            { key: 'small', label: 'Small', price: 45 },
-            { key: 'medium', label: 'Medium', price: 65 },
-            { key: 'large', label: 'Large', price: 85 },
-        ],
-        icon: '🍚',
+        id: 'fried-rice',
+        name: 'Fried Rice with Chicken Drumsticks',
+        description: 'Mixed vegetable fried rice with chicken Drumsticks - choose Plain or Assorted.',
+        category: 'Basic Meals',
+        hasVariants: true,
+        variants: {
+            plain: 65,
+            assorted: 85,
+        },
+        image: '/images/menu/7.webp',
+        url: '/menu?item=fried-rice',
+        popular: true,
+    },
+    {
+        id: 'jollof',
+        name: 'Jollof Rice with Chicken Drumsticks',
+        description: 'Smoky party jollof rice with chicken Drumsticks - choose Plain or Assorted.',
+        category: 'Basic Meals',
+        hasVariants: true,
+        variants: {
+            plain: 65,
+            assorted: 85,
+        },
         image: '/images/menu/1.webp',
-        url: '/menu?item=jollof-pro-max',
+        url: '/menu?item=jollof',
         popular: true,
     },
     {
-        id: '2',
-        name: 'Banku & Tilapia',
-        description: 'Fermented banku with whole fried tilapia & garden eggs pepper',
-        category: 'Main Dishes',
-        sizes: [
-            { key: 'small', label: 'Small', price: 55 },
-            { key: 'medium', label: 'Medium', price: 75 },
-            { key: 'large', label: 'Large', price: 95 },
-        ],
-        icon: '🐟',
+        id: 'noodles',
+        name: 'Assorted Noodles with Chicken Drumsticks',
+        description: 'Assorted noodles with mixed proteins and chicken Drumsticks.',
+        category: 'Basic Meals',
+        price: 90,
+        url: '/menu?item=noodles',
+    },
+    {
+        id: 'banku',
+        name: 'Banku with Tilapia',
+        description: 'Fermented corn & cassava dough. Add grilled tilapia for the full experience!',
+        category: 'Basic Meals',
+        price: 60,
+        availableAddOns: ['tilapia'],
         image: '/images/menu/2.webp',
-        url: '/menu?item=banku-tilapia',
+        url: '/menu?item=banku',
         popular: true,
     },
+
+    // ============================================
+    // BUDGET BOWLS (Small or Large)
+    // ============================================
     {
-        id: '3',
-        name: 'Waakye Gala',
-        description: 'Rice & beans with beef sausage, spaghetti, fried fish & shito',
-        category: 'Main Dishes',
+        id: 'jollof-bowl',
+        name: 'Jollof Bowl',
+        description: 'Plain jollof rice bowl - perfect for a quick meal',
+        category: 'Budget Bowls',
         sizes: [
-            { key: 'small', label: 'Small', price: 40 },
-            { key: 'medium', label: 'Medium', price: 58 },
-            { key: 'large', label: 'Large', price: 75 },
-        ],
-        icon: '🍛',
-        image: '/images/menu/3.webp',
-        url: '/menu?item=waakye-gala',
-        popular: true,
-    },
-    {
-        id: '4',
-        name: 'Fufu & Light Soup',
-        description: 'Pounded fufu with goat meat light soup & garden eggs',
-        category: 'Main Dishes',
-        sizes: [
-            { key: 'small', label: 'Small', price: 50 },
-            { key: 'medium', label: 'Medium', price: 70 },
+            { key: 'small', label: 'Small', price: 60 },
             { key: 'large', label: 'Large', price: 90 },
         ],
-        icon: '🍲',
-        image: '/images/menu/4.webp',
-        url: '/menu?item=fufu-light-soup',
+        url: '/menu?item=jollof-bowl',
+        popular: true,
     },
     {
-        id: '5',
-        name: 'Red Red Box',
-        description: 'Black-eyed peas stew with fried plantain & fried fish',
-        category: 'Main Dishes',
+        id: 'fried-rice-bowl',
+        name: 'Fried Rice Bowl',
+        description: 'Plain fried rice bowl - quick and satisfying',
+        category: 'Budget Bowls',
         sizes: [
-            { key: 'small', label: 'Small', price: 35 },
-            { key: 'medium', label: 'Medium', price: 50 },
-            { key: 'large', label: 'Large', price: 65 },
+            { key: 'small', label: 'Small', price: 60 },
+            { key: 'large', label: 'Large', price: 90 },
         ],
-        icon: '🫘',
-        image: '/images/menu/5.webp',
-        url: '/menu?item=red-red-box',
+        url: '/menu?item=fried-rice-bowl',
     },
     {
-        id: '6',
-        name: 'Kenkey & Grilled Fish',
-        description: 'Fante kenkey with grilled tilapia, pepper sauce & onion salad',
-        category: 'Main Dishes',
+        id: 'assorted-jollof-bowl',
+        name: 'Assorted Jollof Bowl',
+        description: 'Jollof rice with mixed proteins',
+        category: 'Budget Bowls',
         sizes: [
-            { key: 'small', label: 'Small', price: 45 },
-            { key: 'medium', label: 'Medium', price: 62 },
-            { key: 'large', label: 'Large', price: 80 },
+            { key: 'small', label: 'Small', price: 60 },
+            { key: 'large', label: 'Large', price: 90 },
         ],
-        icon: '🌽',
-        image: '/images/menu/6.webp',
-        url: '/menu?item=kenkey-grilled-fish',
+        url: '/menu?item=assorted-jollof-bowl',
     },
     {
-        id: '7',
-        name: 'Fried Rice Special',
-        description: 'Mixed vegetable fried rice with grilled chicken & spring rolls',
-        category: 'Main Dishes',
+        id: 'assorted-fried-rice-bowl',
+        name: 'Assorted Fried Rice Bowl',
+        description: 'Fried rice with mixed proteins',
+        category: 'Budget Bowls',
         sizes: [
-            { key: 'small', label: 'Small', price: 40 },
-            { key: 'medium', label: 'Medium', price: 58 },
-            { key: 'large', label: 'Large', price: 75 },
+            { key: 'small', label: 'Small', price: 60 },
+            { key: 'large', label: 'Large', price: 90 },
         ],
-        icon: '🍚',
-        image: '/images/menu/7.webp',
-        url: '/menu?item=fried-rice-special',
+        url: '/menu?item=assorted-fried-rice-bowl',
     },
     {
-        id: '8',
-        name: 'Tuo Zaafi',
-        description: 'TZ with ayoyo soup, smoked fish & dried okra',
-        category: 'Main Dishes',
+        id: 'assorted-noodles-bowl',
+        name: 'Assorted Noodles Bowl',
+        description: 'Noodles with mixed proteins',
+        category: 'Budget Bowls',
         sizes: [
-            { key: 'small', label: 'Small', price: 40 },
-            { key: 'medium', label: 'Medium', price: 55 },
-            { key: 'large', label: 'Large', price: 70 },
+            { key: 'small', label: 'Small', price: 60 },
+            { key: 'large', label: 'Large', price: 90 },
         ],
-        icon: '🥣',
-        image: '/images/menu/8.webp',
-        url: '/menu?item=tuo-zaafi',
+        url: '/menu?item=assorted-noodles-bowl',
+    },
+
+    // ============================================
+    // COMBOS (Fixed pricing - complete meals)
+    // ============================================
+    {
+        id: 'banku-tilapia-combo',
+        name: 'Banku × Charcoal Grilled Tilapia',
+        description: 'Fermented banku with whole charcoal grilled tilapia & garden eggs pepper',
+        category: 'Combos',
+        price: 120,
+        image: '/images/menu/2.webp',
+        url: '/menu?item=banku-tilapia-combo',
+        popular: true,
+    },
+    {
+        id: 'street-budget-fr-jollof',
+        name: 'Street Budget: FR/Jollof + 3 Drumsticks',
+        description: 'Choose Fried Rice or Jollof Rice with 3 drumsticks',
+        category: 'Combos',
+        sizes: [
+            { key: 'fried-rice', label: 'Fried Rice', price: 99 },
+            { key: 'jollof', label: 'Jollof Rice', price: 99 },
+        ],
+        url: '/menu?item=street-budget-fr-jollof',
+        popular: true,
         isNew: true,
     },
     {
-        id: '9',
-        name: 'Kontomire Stew Plate',
-        description: 'Cocoyam leaves stew with boiled yam, egg & fried plantain',
-        category: 'Main Dishes',
-        sizes: [
-            { key: 'small', label: 'Small', price: 38 },
-            { key: 'medium', label: 'Medium', price: 52 },
-            { key: 'large', label: 'Large', price: 68 },
-        ],
-        icon: '🥬',
-        image: '/images/menu/kk.webp',
-        url: '/menu?item=kontomire-stew',
+        id: 'street-budget-assorted',
+        name: 'Street Budget: Assorted + 3 Drumsticks',
+        description: 'Assorted Noodles, Fried Rice, or Jollof with 3 Drumsticks',
+        category: 'Combos',
+        price: 119,
+        url: '/menu?item=street-budget-assorted',
+        popular: true,
     },
-
-    // ============================================
-    // COMBOS
-    // ============================================
     {
-        id: '10',
-        name: 'CediBites Classic Combo',
-        description: 'Jollof rice + grilled chicken + kelewele + sobolo',
+        id: 'big-budget-fr-jollof',
+        name: 'Big Budget: FR/Jollof + 5 Drumsticks',
+        description: 'Choose Fried Rice or Jollof Rice with 5 drumsticks - serious value!',
         category: 'Combos',
         sizes: [
-            { key: 'small', label: 'Solo', price: 75 },
-            { key: 'medium', label: 'Duo', price: 130 },
-            { key: 'large', label: 'Family', price: 240 },
+            { key: 'fried-rice', label: 'Fried Rice', price: 129 },
+            { key: 'jollof', label: 'Jollof Rice', price: 129 },
         ],
-        icon: '🍱',
-        image: '/images/menu/10.webp',
-        url: '/menu?item=cedibites-classic-combo',
-        popular: true,
+        url: '/menu?item=big-budget-fr-jollof',
     },
     {
-        id: '11',
-        name: 'The Waakye Pack',
-        description: 'Waakye + sausage + fried fish + egg + sobolo',
+        id: 'big-budget-assorted',
+        name: 'Big Budget: Assorted + 5 Drumsticks',
+        description: 'Assorted Noodles, Fried Rice, or Jollof with 5 Drumsticks',
         category: 'Combos',
-        sizes: [
-            { key: 'small', label: 'Solo', price: 70 },
-            { key: 'medium', label: 'Duo', price: 120 },
-            { key: 'large', label: 'Family', price: 220 },
-        ],
-        icon: '🥡',
-        image: '/images/menu/11.webp',
+        price: 149,
+        url: '/menu?item=big-budget-assorted',
+    },
 
-        url: '/menu?item=waakye-pack',
+    // ============================================
+    // TOP UPS (Standalone or add to any meal)
+    // ============================================
+    {
+        id: 'rotisserie-full',
+        name: 'Rotisserie Chicken - Full',
+        description: 'Whole rotisserie chicken, perfectly seasoned and roasted',
+        category: 'Top Ups',
+        price: 300,
+        url: '/menu?item=rotisserie-full',
         popular: true,
     },
     {
-        id: '12',
-        name: 'Fish Lover Combo',
-        description: 'Banku + tilapia + kenkey + pepper sauce + asaana',
-        category: 'Combos',
-        sizes: [
-            { key: 'small', label: 'Solo', price: 80 },
-            { key: 'medium', label: 'Duo', price: 145 },
-            { key: 'large', label: 'Family', price: 265 },
-        ],
-        icon: '🐠',
-        url: '/menu?item=fish-lover-combo',
-    },
-    {
-        id: '13',
-        name: 'Office Lunch Box',
-        description: 'Fried rice + grilled chicken + plantain + drink of choice',
-        category: 'Combos',
-        sizes: [
-            { key: 'small', label: 'Solo', price: 72 },
-            { key: 'medium', label: 'Duo', price: 128 },
-            { key: 'large', label: 'Family', price: 230 },
-        ],
-        icon: '💼',
-        url: '/menu?item=office-lunch-box',
-        isNew: true,
-    },
-    {
-        id: '14',
-        name: 'Weekend Special',
-        description: 'Fufu + goat light soup + oxtail + garden eggs + cold sobolo',
-        category: 'Combos',
-        sizes: [
-            { key: 'small', label: 'Solo', price: 95 },
-            { key: 'medium', label: 'Duo', price: 170 },
-            { key: 'large', label: 'Family', price: 310 },
-        ],
-        icon: '🎉',
-        url: '/menu?item=weekend-special',
-    },
-
-    // ============================================
-    // STARTERS & SIDES
-    // ============================================
-    {
-        id: '15',
-        name: 'Kelewele',
-        description: 'Spicy fried plantains seasoned with ginger & pepper',
-        category: 'Starters & Sides',
-        sizes: [
-            { key: 'small', label: 'Small', price: 20 },
-            { key: 'medium', label: 'Medium', price: 32 },
-            { key: 'large', label: 'Large', price: 45 },
-        ],
-        icon: '🍠',
-        url: '/menu?item=kelewele',
-        image: '/images/menu/12.webp',
+        id: 'rotisserie-half',
+        name: 'Rotisserie Chicken - Half',
+        description: 'Half rotisserie chicken, juicy and flavorful',
+        category: 'Top Ups',
+        price: 160,
+        url: '/menu?item=rotisserie-half',
         popular: true,
     },
     {
-        id: '16',
-        name: 'Fried Plantain',
-        description: 'Sweet ripe plantains, golden fried to perfection',
-        category: 'Starters & Sides',
-        sizes: [
-            { key: 'small', label: 'Small', price: 18 },
-            { key: 'medium', label: 'Medium', price: 28 },
-            { key: 'large', label: 'Large', price: 40 },
-        ],
-        icon: '🍌',
-        image: '/images/menu/17.webp',
-
-        url: '/menu?item=fried-plantain',
+        id: 'rotisserie-quarter',
+        name: 'Rotisserie Chicken - Quarter',
+        description: 'Quarter rotisserie chicken, perfect single serving',
+        category: 'Top Ups',
+        price: 90,
+        url: '/menu?item=rotisserie-quarter',
     },
     {
-        id: '17',
-        name: 'Coleslaw',
-        description: 'Creamy shredded cabbage with carrots & sweet dressing',
-        category: 'Starters & Sides',
-        sizes: [
-            { key: 'small', label: 'Small', price: 15 },
-            { key: 'medium', label: 'Medium', price: 22 },
-            { key: 'large', label: 'Large', price: 32 },
-        ],
-        icon: '🥗',
-        image: '/images/menu/18.webp',
-
-        url: '/menu?item=coleslaw',
+        id: 'chicken-basket-10',
+        name: 'Chicken Basket - 10 Drumsticks',
+        description: '10 crispy chicken Drumsticks - perfect for sharing',
+        category: 'Top Ups',
+        price: 110,
+        url: '/menu?item=chicken-basket-10',
     },
     {
-        id: '18',
-        name: 'Shito Rice',
-        description: 'Steamed rice drizzled with homemade black pepper shito',
-        category: 'Starters & Sides',
-        sizes: [
-            { key: 'small', label: 'Small', price: 22 },
-            { key: 'medium', label: 'Medium', price: 35 },
-            { key: 'large', label: 'Large', price: 48 },
-        ],
-        icon: '🍙',
-        image: '/images/menu/19.webp',
-
-        url: '/menu?item=shito-rice',
-    },
-    {
-        id: '19',
-        name: 'Garden Egg Salad',
-        description: 'Roasted garden eggs with onions, tomatoes & fish',
-        category: 'Starters & Sides',
-        sizes: [
-            { key: 'small', label: 'Small', price: 18 },
-            { key: 'medium', label: 'Medium', price: 28 },
-            { key: 'large', label: 'Large', price: 40 },
-        ],
-        icon: '🍆',
-
-
-        url: '/menu?item=garden-egg-salad',
-    },
-
-    // ============================================
-    // APPETIZERS
-    // ============================================
-    {
-        id: '20',
-        name: 'Chin Chin Bites',
-        description: 'Crispy fried dough bites lightly sweetened',
-        category: 'Appetizers',
-        sizes: [
-            { key: 'small', label: 'Small', price: 15 },
-            { key: 'medium', label: 'Medium', price: 25 },
-            { key: 'large', label: 'Large', price: 38 },
-        ],
-        icon: '🍘',
-        image: '/images/menu/13.webp',
-
-        url: '/menu?item=chin-chin-bites',
-        popular: true,
-    },
-    {
-        id: '21',
-        name: 'Meat Pie',
-        description: 'Flaky pastry filled with spiced minced beef & vegetables',
-        category: 'Appetizers',
-        sizes: [
-            { key: 'small', label: '1 piece', price: 18 },
-            { key: 'medium', label: '3 pieces', price: 48 },
-            { key: 'large', label: '6 pieces', price: 90 },
-        ],
-        icon: '🥧',
-        image: '/images/menu/10.webp',
-        url: '/menu?item=meat-pie',
-        popular: true,
-    },
-    {
-        id: '22',
-        name: 'Spring Rolls',
-        description: 'Crispy rolls stuffed with seasoned chicken & vegetables',
-        category: 'Appetizers',
-        sizes: [
-            { key: 'small', label: '2 pieces', price: 22 },
-            { key: 'medium', label: '4 pieces', price: 40 },
-            { key: 'large', label: '8 pieces', price: 75 },
-        ],
-        icon: '🥢',
-        url: '/menu?item=spring-rolls',
-    },
-    {
-        id: '23',
-        name: 'Bofrot',
-        description: 'Ghanaian puff puff — soft, fluffy fried dough balls',
-        category: 'Appetizers',
-        sizes: [
-            { key: 'small', label: '3 pieces', price: 12 },
-            { key: 'medium', label: '6 pieces', price: 22 },
-            { key: 'large', label: '12 pieces', price: 40 },
-        ],
-        icon: '🧆',
-        url: '/menu?item=bofrot',
-        isNew: true,
-    },
-    {
-        id: '24',
-        name: 'Fried Yam Fries',
-        description: 'Golden fried yam sticks served with pepper sauce',
-        category: 'Appetizers',
-        sizes: [
-            { key: 'small', label: 'Small', price: 20 },
-            { key: 'medium', label: 'Medium', price: 32 },
-            { key: 'large', label: 'Large', price: 48 },
-        ],
-        icon: '🍟',
-        url: '/menu?item=fried-yam-fries',
-    },
-
-    // ============================================
-    // DESSERTS
-    // ============================================
-    {
-        id: '25',
-        name: 'Pineapple Fritters',
-        description: 'Battered fresh pineapple rings, fried golden with cinnamon sugar',
-        category: 'Desserts',
-        sizes: [
-            { key: 'small', label: '2 pieces', price: 18 },
-            { key: 'medium', label: '4 pieces', price: 32 },
-            { key: 'large', label: '6 pieces', price: 45 },
-        ],
-        icon: '🍍',
-        image: '/images/menu/14.webp',
-        url: '/menu?item=pineapple-fritters',
-
-        popular: true,
-    },
-    {
-        id: '26',
-        name: 'Coconut Ice Cream',
-        description: 'Homemade coconut ice cream with toasted coconut flakes',
-        category: 'Desserts',
-        sizes: [
-            { key: 'small', label: '1 scoop', price: 22 },
-            { key: 'medium', label: '2 scoops', price: 38 },
-            { key: 'large', label: '3 scoops', price: 52 },
-        ],
-        icon: '🍦',
-        url: '/menu?item=coconut-ice-cream',
-    },
-    {
-        id: '27',
-        name: 'Banana Cake',
-        description: 'Moist banana loaf cake with caramel drizzle',
-        category: 'Desserts',
-        sizes: [
-            { key: 'small', label: '1 slice', price: 20 },
-            { key: 'medium', label: '2 slices', price: 35 },
-            { key: 'large', label: '4 slices', price: 65 },
-        ],
-        icon: '🍰',
-        url: '/menu?item=banana-cake',
-        isNew: true,
-    },
-    {
-        id: '28',
-        name: 'Ofam',
-        description: 'Traditional Ghanaian sweet fried plantain cake',
-        category: 'Desserts',
-        sizes: [
-            { key: 'small', label: 'Small', price: 18 },
-            { key: 'medium', label: 'Medium', price: 28 },
-            { key: 'large', label: 'Large', price: 42 },
-        ],
-        icon: '🫓',
-        url: '/menu?item=ofam',
+        id: 'chicken-basket-15',
+        name: 'Chicken Basket - 15 Drumsticks',
+        description: '15 crispy chicken Drumsticks - party size!',
+        category: 'Top Ups',
+        price: 150,
+        url: '/menu?item=chicken-basket-15',
     },
 
     // ============================================
     // DRINKS
     // ============================================
     {
-        id: '29',
+        id: 'sobolo',
         name: 'Sobolo',
         description: 'Chilled hibiscus flower drink with ginger & cloves',
         category: 'Drinks',
         sizes: [
             { key: 'small', label: '350ml', price: 15 },
-            { key: 'medium', label: '500ml', price: 22 },
-            { key: 'large', label: '1L', price: 38 },
+            { key: 'large', label: '500ml', price: 22 },
         ],
-        icon: '🥤',
         image: '/images/menu/9.webp',
         url: '/menu?item=sobolo',
         popular: true,
     },
     {
-        id: '30',
+        id: 'asaana',
         name: 'Asaana',
         description: 'Fermented roasted corn drink — sweet, tangy & refreshing',
         category: 'Drinks',
         sizes: [
             { key: 'small', label: '350ml', price: 15 },
-            { key: 'medium', label: '500ml', price: 22 },
-            { key: 'large', label: '1L', price: 38 },
+            { key: 'large', label: '500ml', price: 22 },
         ],
-        icon: '🍶',
         url: '/menu?item=asaana',
     },
     {
-        id: '31',
-        name: 'Bissap Juice',
-        description: 'Fresh hibiscus & baobab blend with a citrus twist',
-        category: 'Drinks',
-        sizes: [
-            { key: 'small', label: '350ml', price: 18 },
-            { key: 'medium', label: '500ml', price: 25 },
-            { key: 'large', label: '1L', price: 42 },
-        ],
-        icon: '🍹',
-        url: '/menu?item=bissap-juice',
-        isNew: true,
-    },
-    {
-        id: '32',
+        id: 'pineapple-ginger',
         name: 'Pineapple Ginger Juice',
         description: 'Freshly blended pineapple with Ghanaian ginger & lime',
         category: 'Drinks',
         sizes: [
             { key: 'small', label: '350ml', price: 20 },
-            { key: 'medium', label: '500ml', price: 28 },
-            { key: 'large', label: '1L', price: 45 },
+            { key: 'large', label: '500ml', price: 28 },
         ],
-        icon: '🍍',
-        url: '/menu?item=pineapple-ginger-juice',
         image: '/images/menu/15.webp',
+        url: '/menu?item=pineapple-ginger',
         popular: true,
     },
     {
-        id: '33',
-        name: 'Malt Drink',
-        description: 'Chilled Malta Guinness or Alvaro — your choice',
-        category: 'Drinks',
-        sizes: [
-            { key: 'small', label: '330ml', price: 12 },
-            { key: 'medium', label: '500ml', price: 18 },
-            { key: 'large', label: '2-Pack', price: 30 },
-        ],
-        icon: '🍺',
-        url: '/menu?item=malt-drink',
-    },
-    {
-        id: '34',
+        id: 'bottled-water',
         name: 'Bottled Water',
         description: 'Pure chilled still water',
         category: 'Drinks',
         sizes: [
             { key: 'small', label: '500ml', price: 7 },
-            { key: 'medium', label: '1L', price: 12 },
-            { key: 'large', label: '1.5L', price: 18 },
+            { key: 'large', label: '1L', price: 12 },
         ],
-        icon: '💧',
         url: '/menu?item=bottled-water',
     },
 ];
 
 // ============================================
-// CATEGORY CONFIG — matches nav pill order
+// CATEGORY CONFIG
 // ============================================
 export const menuCategories = [
     { id: 'all', label: 'Most Popular' },
-    { id: 'Main Dishes', label: 'Main Dishes' },
+    { id: 'Basic Meals', label: 'Basic Meals' },
+    { id: 'Budget Bowls', label: 'Budget Bowls' },
     { id: 'Combos', label: 'Combos' },
-    { id: 'Starters & Sides', label: 'Starters & Sides' },
-    { id: 'Appetizers', label: 'Appetizers' },
-    { id: 'Desserts', label: 'Desserts' },
+    { id: 'Top Ups', label: 'Top Ups' },
     { id: 'Drinks', label: 'Drinks' },
 ];

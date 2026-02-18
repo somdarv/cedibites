@@ -1,134 +1,126 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
-import { sampleMenuItems } from '@/lib/data/SampleMenu';
-import { useBranch } from './BranchProvider';
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
+import type { MenuItem } from '@/lib/data/SampleMenu';
 
-export interface SearchableItem {
-    id: string;
-    name: string;
-    description?: string;
-    category?: string;
-    price?: number;
-    icon?: string;
-    image?: string;
-    url?: string;
-    [key: string]: any;
-}
+// Export the type that matches our MenuItem exactly
+export type SearchableItem = MenuItem;
+
+const RECENT_SEARCHES_KEY = 'cedibites-recent-searches';
+const MAX_RECENT = 8;
 
 interface MenuDiscoveryContextType {
-    searchQuery: string;
-    setSearchQuery: (query: string) => void;
+    allItems: SearchableItem[];
+    filteredItems: SearchableItem[];
     searchResults: SearchableItem[];
     isSearching: boolean;
-    clearSearch: () => void;
+    searchQuery: string;
+    setSearchQuery: (query: string) => void;
     selectedCategory: string | null;
-    setSelectedCategory: (categoryId: string | null) => void;
-    filteredItems: SearchableItem[];
+    setSelectedCategory: (category: string | null) => void;
     recentSearches: string[];
-    addRecentSearch: (query: string) => void;
+    addRecentSearch: (term: string) => void;
     clearRecentSearches: () => void;
-    allItems: SearchableItem[];         // all items regardless of branch
-    branchItems: SearchableItem[];      // items available at selected branch only
 }
 
-const MenuDiscoveryContext = createContext<MenuDiscoveryContextType | undefined>(undefined);
+const MenuDiscoveryContext = createContext<MenuDiscoveryContextType | null>(null);
 
-export function MenuDiscoveryProvider({ children }: { children: ReactNode }) {
-    const { selectedBranch } = useBranch();
+interface MenuDiscoveryProviderProps {
+    children: React.ReactNode;
+    items: SearchableItem[];
+}
 
-    const [searchQuery, setSearchQueryState] = useState('');
-    const [selectedCategory, setSelectedCategoryState] = useState<string | null>(null);
+export function MenuDiscoveryProvider({ children, items }: MenuDiscoveryProviderProps) {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
 
-    const allItems: SearchableItem[] = sampleMenuItems;
-
-    // ── Branch-filtered items — the source of truth for the menu grid ──
-    const branchItems = useMemo((): SearchableItem[] => {
-        if (!selectedBranch) return allItems; // no branch selected yet → show all
-        const ids = new Set(selectedBranch.menuItemIds);
-        return allItems.filter(item => ids.has(item.id));
-    }, [selectedBranch, allItems]);
-
-    // ── Load recent searches from localStorage ──
+    // Load recent searches from localStorage on mount
     useEffect(() => {
-        const saved = localStorage.getItem('cedibites-recent-searches');
-        if (saved) {
-            try { setRecentSearches(JSON.parse(saved)); } catch { /* ignore */ }
+        try {
+            const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+            if (stored) setRecentSearches(JSON.parse(stored));
+        } catch {
+            // ignore
         }
     }, []);
 
-    const setSearchQuery = useCallback((query: string) => {
-        setSearchQueryState(query);
-        setIsSearching(query.trim().length > 0);
+    const filteredItems = useMemo(() => {
+        let result = items;
+
+        // Filter by category
+        if (selectedCategory) {
+            if (selectedCategory === 'Most Popular') {
+                result = result.filter(item => item.popular);
+            } else {
+                result = result.filter(item => item.category === selectedCategory);
+            }
+        }
+
+        // Filter by search query
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            result = result.filter(item => {
+                // Search in name
+                if (item.name.toLowerCase().includes(query)) return true;
+
+                // Search in description
+                if (item.description?.toLowerCase().includes(query)) return true;
+
+                // Search in category
+                if (item.category.toLowerCase().includes(query)) return true;
+
+                return false;
+            });
+        }
+
+        return result;
+    }, [items, searchQuery, selectedCategory]);
+
+    // searchResults: only populated when there's an active query
+    const searchResults = useMemo(() => {
+        if (!searchQuery.trim()) return [];
+        return filteredItems;
+    }, [searchQuery, filteredItems]);
+
+    const handleSetSearchQuery = useCallback((query: string) => {
+        setSearchQuery(query);
+        // Clear category when searching
+        if (query.trim()) {
+            setSelectedCategory(null);
+        }
     }, []);
 
-    const setSelectedCategory = useCallback((categoryId: string | null) => {
-        setSelectedCategoryState(categoryId);
-    }, []);
-
-    const clearSearch = useCallback(() => {
-        setSearchQueryState('');
-        setIsSearching(false);
-    }, []);
-
-    const addRecentSearch = useCallback((query: string) => {
-        if (!query.trim()) return;
+    const addRecentSearch = useCallback((term: string) => {
+        if (!term.trim()) return;
         setRecentSearches(prev => {
-            const updated = [query, ...prev.filter(s => s !== query)].slice(0, 10);
-            localStorage.setItem('cedibites-recent-searches', JSON.stringify(updated));
-            return updated;
+            const deduped = [term, ...prev.filter(s => s.toLowerCase() !== term.toLowerCase())].slice(0, MAX_RECENT);
+            try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(deduped)); } catch { /* ignore */ }
+            return deduped;
         });
     }, []);
 
     const clearRecentSearches = useCallback(() => {
         setRecentSearches([]);
-        localStorage.removeItem('cedibites-recent-searches');
+        try { localStorage.removeItem(RECENT_SEARCHES_KEY); } catch { /* ignore */ }
     }, []);
 
-    // ── Search results — searches within branch items only ──
-    const searchResults = useMemo((): SearchableItem[] => {
-        if (!searchQuery.trim()) return [];
-        const lower = searchQuery.toLowerCase();
-        return branchItems.filter(item =>
-            item.name.toLowerCase().includes(lower) ||
-            item.description?.toLowerCase().includes(lower) ||
-            item.category?.toLowerCase().includes(lower)
-        );
-    }, [searchQuery, branchItems]);
-
-    // ── Filtered items — category + search applied to branch items ──
-    const filteredItems = useMemo((): SearchableItem[] => {
-        let results = branchItems;
-
-        if (selectedCategory === 'Most Popular') {
-            results = results.filter(item => item.popular === true);
-        } else if (selectedCategory) {
-            results = results.filter(
-                item => item.category?.toLowerCase() === selectedCategory.toLowerCase()
-            );
-        }
-
-        if (searchQuery.trim()) {
-            const lower = searchQuery.toLowerCase();
-            results = results.filter(item =>
-                item.name.toLowerCase().includes(lower) ||
-                item.description?.toLowerCase().includes(lower) ||
-                item.category?.toLowerCase().includes(lower)
-            );
-        }
-
-        return results;
-    }, [selectedCategory, searchQuery, branchItems]);
+    const value: MenuDiscoveryContextType = {
+        allItems: items,
+        filteredItems,
+        searchResults,
+        isSearching: false, // filtering is synchronous
+        searchQuery,
+        setSearchQuery: handleSetSearchQuery,
+        selectedCategory,
+        setSelectedCategory,
+        recentSearches,
+        addRecentSearch,
+        clearRecentSearches,
+    };
 
     return (
-        <MenuDiscoveryContext.Provider value={{
-            searchQuery, setSearchQuery, searchResults, isSearching, clearSearch,
-            selectedCategory, setSelectedCategory, filteredItems,
-            recentSearches, addRecentSearch, clearRecentSearches,
-            allItems, branchItems,
-        }}>
+        <MenuDiscoveryContext.Provider value={value}>
             {children}
         </MenuDiscoveryContext.Provider>
     );
@@ -136,6 +128,8 @@ export function MenuDiscoveryProvider({ children }: { children: ReactNode }) {
 
 export function useMenuDiscovery() {
     const context = useContext(MenuDiscoveryContext);
-    if (!context) throw new Error('useMenuDiscovery must be used within MenuDiscoveryProvider');
+    if (!context) {
+        throw new Error('useMenuDiscovery must be used within MenuDiscoveryProvider');
+    }
     return context;
 }

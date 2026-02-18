@@ -19,13 +19,19 @@ export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps)
     const sizes: { key: string; label: string; price: number }[] = item?.sizes ?? [];
     const hasSizes = sizes.length > 0;
 
+    const hasVariants = !!(item?.hasVariants && item?.variants);
+    const variantOptions = hasVariants ? Object.keys(item!.variants!) : [];
+
     const [selectedSize, setSelectedSize] = useState<string>(hasSizes ? sizes[0].key : 'regular');
+    const [selectedVariant, setSelectedVariant] = useState<string>(hasVariants ? variantOptions[0] : 'plain');
     const [imgError, setImgError] = useState(false);
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
         if (item) {
             setSelectedSize(item.sizes?.[0]?.key ?? 'regular');
+            const vOpts = item.hasVariants && item.variants ? Object.keys(item.variants) : [];
+            setSelectedVariant(vOpts[0] ?? 'plain');
             setImgError(false);
             requestAnimationFrame(() => setVisible(true));
         } else {
@@ -48,9 +54,18 @@ export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps)
 
     if (!item) return null;
 
-    const activeSize = hasSizes ? sizes.find(s => s.key === selectedSize) : null;
-    const activePrice = activeSize?.price ?? item.price ?? 0;
-    const cartItem = getCartItem(item.id, selectedSize);
+    let activePrice = 0;
+    if (hasVariants && item.variants) {
+        activePrice = item.variants[selectedVariant as 'plain' | 'assorted'] ?? 0;
+    } else if (hasSizes) {
+        const activeSize = sizes.find(s => s.key === selectedSize);
+        activePrice = activeSize?.price ?? 0;
+    } else {
+        activePrice = item.price ?? 0;
+    }
+
+    const cartItemId = hasVariants ? selectedVariant : selectedSize;
+    const cartItem = getCartItem(item.id, cartItemId);
     const qty = cartItem?.quantity ?? 0;
     const lineTotal = activePrice * qty;
 
@@ -73,7 +88,7 @@ export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps)
                     {item.image && !imgError ? (
                         <Image src={item.image} alt={item.name} fill sizes="(max-width: 640px) 100vw, 448px" className="object-cover" onError={() => setImgError(true)} priority />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-7xl">{item.icon ?? '🍽️'}</div>
+                        <div className="w-full h-full" />
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                     <div className="absolute top-3 left-3 flex gap-2">
@@ -106,6 +121,36 @@ export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps)
                             <p className="mt-1.5 text-sm text-neutral-gray leading-relaxed">{item.description}</p>
                         )}
                     </div>
+
+                    {/* Variant selector (Plain / Assorted) */}
+                    {hasVariants && (
+                        <div className="flex flex-col gap-2">
+                            <p className="text-xs font-semibold text-neutral-gray uppercase tracking-wide">Choose Type</p>
+                            <div className="flex gap-2 flex-wrap">
+                                {variantOptions.map((variant) => {
+                                    const vQty = getCartItem(item.id, variant)?.quantity ?? 0;
+                                    const isSelected = selectedVariant === variant;
+                                    const vPrice = item.variants?.[variant as 'plain' | 'assorted'] ?? 0;
+                                    return (
+                                        <button
+                                            key={variant}
+                                            onClick={() => setSelectedVariant(variant)}
+                                            className={`relative flex flex-col items-center px-5 py-2.5 rounded-2xl border-2 transition-all duration-150 min-w-[80px]
+                                                ${isSelected ? 'border-primary bg-primary/10' : 'border-neutral-gray/20 hover:border-primary/40'}`}
+                                        >
+                                            <span className={`text-sm font-semibold capitalize ${isSelected ? 'text-primary' : 'text-text-dark dark:text-text-light'}`}>{variant}</span>
+                                            <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-neutral-gray'}`}>GHS {vPrice}</span>
+                                            {vQty > 0 && (
+                                                <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-bold">
+                                                    {vQty}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Size selector */}
                     {hasSizes && (
@@ -164,7 +209,7 @@ export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps)
                             </div>
                         ) : (
                             <button
-                                onClick={() => addToCart(item, selectedSize)}
+                                onClick={() => addToCart(item, cartItemId)}
                                 className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white font-bold px-6 py-3 rounded-2xl transition-all active:scale-95"
                             >
                                 <ShoppingCartIcon weight="fill" size={18} />

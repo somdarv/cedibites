@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -6,9 +5,7 @@ import { useBranch } from '../providers/BranchProvider';
 import LocationBadge from './LocationBadge';
 import { useLocation } from '../providers/LocationProvider';
 import { useModal } from '../providers/ModalProvider';
-
-
-
+import { ClockIcon } from '@phosphor-icons/react';
 
 export default function DynamicGreeting() {
     const [greeting, setGreeting] = useState('Good Evening!');
@@ -25,7 +22,6 @@ export default function DynamicGreeting() {
     const { coordinates, permissionStatus } = useLocation();
     const [mounted, setMounted] = useState(false);
 
-
     const branchDistance = coordinates && selectedBranch
         ? getBranchesWithDistance(coordinates.latitude, coordinates.longitude)
             .find(b => b.id === selectedBranch.id)?.distance
@@ -36,36 +32,101 @@ export default function DynamicGreeting() {
         setMounted(true);
     }, []);
 
+    // Check if branch is currently open
+    const isBranchOpen = () => {
+        if (!selectedBranch?.hours) return null;
+        const now = new Date();
+        const hour = now.getHours();
+        return hour >= 9 && hour < 22;
+    };
 
+    const isOpen = isBranchOpen();
 
     return (
-        <div>
-            {/* Left: Greeting */}
-            <div className="shrink-0 flex bg-red-2 justify-cente py- rounded-xl ">
-                <div className='bg-red-2 '>
-                    <h2 className="text-4xl font-family-body md:text-2xl lg:text-3xl w-auto font-bold text-primary mb-">
+        <div className="relative overflow-hidden transition-all duration-300 rounded-2xl p-6 flex-1 flex flex-col">
+            {/* Gradient Background - Primary Color Gradient */}
+            <div
+                className="absolute inset-0"
+                style={{
+                    background: 'linear-gradient(135deg, #f1ab3e 0%, #e49925 50%, #c8821f 100%)',
+                }}
+            />
+
+            {/* Pattern Overlay */}
+            <div
+                className="absolute inset-0 opacity-[0.07]"
+                style={{
+                    backgroundImage: `repeating-linear-gradient(
+                        45deg,
+                        #fff 0px,
+                        #fff 1px,
+                        transparent 1px,
+                        transparent 18px
+                    )`,
+                }}
+            />
+
+            {/* Glow blob */}
+            <div
+                className="absolute -right-8 -top-8 w-32 h-32 rounded-full blur-2xl opacity-20 pointer-events-none"
+                style={{ backgroundColor: '#ffe2b5' }}
+            />
+
+            {/* Content */}
+            <div className="relative z-10 flex flex-col gap-3">
+                {/* Greeting */}
+                <div className="shrink-0">
+                    <h2 className="text-4xl font-family-body md:text-2xl lg:text-3xl font-bold text-brown">
                         {greeting}
                     </h2>
-                    <p className="text-xl md:text-base lg:text-lg font-medium text-text-dark dark:text-text-light">
-                        What Would you like?{' '}
+                    <p className="text-xl md:text-base lg:text-lg font-medium text-brown/80">
+                        What Would you like?
                     </p>
                 </div>
 
+                {/* Branch Location */}
+                <div className="shrink-0">
+                    <LocationBadge
+                        branch={selectedBranch}
+                        distance={branchDistance}
+                        onClick={openBranchSelector}
+                        fullWidth={false}
+                        isLoading={isLocationLoading}
+                    />
+                </div>
+
+                {/* Opening Hours */}
+                {selectedBranch && (
+                    <div className="hidde xl:flex flex-col justify-between pt-2 border-t border-brown/20">
+                        <div className="flex items-center gap-2">
+                            <ClockIcon
+                                size={16}
+                                weight="fill"
+                                className="text-brown/70"
+                            />
+                            <p className="text-sm font-semibold text-brown">
+                                Opening Hours
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm text-brown/70">
+                                {selectedBranch.hours || 'Mon - Sun: 9:00 AM - 10:00 PM'}
+                            </p>
+                            {isOpen !== null && (
+                                <span
+                                    className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isOpen
+                                        ? 'bg-secondary text-white'
+                                        : 'bg-brown/20 text-brown'
+                                        }`}
+                                >
+                                    {isOpen ? 'Open Now' : 'Closed'}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
-
-
-            <div className='hid my-1 shrink-0 lg:my- md:flex'>
-                <LocationBadge
-                    branch={selectedBranch}
-                    distance={branchDistance}
-                    onClick={openBranchSelector}
-                    fullWidth={false}
-                    isLoading={isLocationLoading}
-
-                />
-            </div>
-
-
         </div>
-    )
+    );
 }

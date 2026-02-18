@@ -1,19 +1,18 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { MagnifyingGlassIcon, SmileySadIcon, SparkleIcon, FireIcon } from '@phosphor-icons/react';
+import { MagnifyingGlassIcon, SmileySadIcon } from '@phosphor-icons/react';
 import { useMenuDiscovery } from '@/app/components/providers/MenuDiscoveryProvider';
 import type { SearchableItem } from '@/app/components/providers/MenuDiscoveryProvider';
 import MenuItemCard from './MenuItemCard';
 import ItemDetailModal from './ItemDetailModal';
 
 const MIX_CONFIG: { category: string; count: number }[] = [
-    { category: 'Main Dishes', count: 2 },
-    { category: 'Combos', count: 1 },
-    { category: 'Starters & Sides', count: 1 },
-    { category: 'Appetizers', count: 1 },
-    { category: 'Desserts', count: 1 },
-    { category: 'Drinks', count: 2 },
+    { category: 'Basic Meals', count: 2 },
+    { category: 'Combos', count: 2 },
+    { category: 'Budget Bowls', count: 2 },
+    { category: 'Top Ups', count: 1 },
+    { category: 'Drinks', count: 1 },
 ];
 
 function buildCediBitesMix(allItems: SearchableItem[]): SearchableItem[] {
@@ -55,7 +54,6 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 function MixHeader() {
     return (
         <div className="flex items-center gap-3 mb-6">
-            <SparkleIcon weight="fill" size={22} className="text-primary" />
             <h2 className="text-xl md:text-2xl font-bold text-text-dark dark:text-text-light">The CediBites Mix</h2>
             <span className="hidden sm:inline text-xs font-semibold px-3 py-1 rounded-full bg-primary/15 text-primary">A little of everything</span>
         </div>
@@ -65,7 +63,6 @@ function MixHeader() {
 function PopularHeader({ count }: { count: number }) {
     return (
         <div className="flex items-center gap-3 mb-6">
-            <FireIcon weight="fill" size={22} className="text-primary" />
             <h2 className="text-xl md:text-2xl font-bold text-text-dark dark:text-text-light">Most Popular</h2>
             <span className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/15 text-primary">
                 {count} item{count !== 1 ? 's' : ''}

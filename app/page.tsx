@@ -25,7 +25,7 @@ export default function page() {
 
 
   return (
-    <div className='  overflow-y-auto'>
+    <div className='bg-image  overflow-y-auto'>
       <div>
         <Navbar />
 
@@ -34,7 +34,6 @@ export default function page() {
         <HeroSearch />
       </div>
       <MenuGrid />
-      <PromoBanner />
       <Footer />
 
 

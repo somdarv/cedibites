@@ -4,41 +4,32 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
-    MapPinIcon, ClockIcon, UserIcon, PhoneIcon,
+    MapPinIcon, UserIcon, PhoneIcon,
     NoteIcon, TruckIcon, BagIcon, DeviceMobileIcon,
     MoneyIcon, CheckCircleIcon, ArrowRightIcon,
     ArrowLeftIcon, ShoppingBagIcon, PencilSimpleIcon,
     LockIcon, MagnifyingGlassIcon, XIcon, SpinnerGapIcon,
-    NavigationArrowIcon, StorefrontIcon,
+    NavigationArrowIcon, StorefrontIcon, WarningCircleIcon,
+    CaretRightIcon, SparkleIcon, UserCircleIcon,
 } from '@phosphor-icons/react';
-import { useCart } from '@/app/components/providers/CartProvider';
-import { useBranch } from '@/app/components/providers/BranchProvider';
-import { useModal } from '@/app/components/providers/ModalProvider';
+import { useCart, CartItem } from '@/app/components/providers/CartProvider';
+import { useBranch, Branch, BranchWithDistance } from '@/app/components/providers/BranchProvider';
 import { useLocation } from '@/app/components/providers/LocationProvider';
+import { useAuth } from '@/app/components/providers/AuthProvider';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type OrderType = 'delivery' | 'pickup';
 type PaymentMethod = 'momo' | 'cash_delivery' | 'cash_pickup';
 type Step = 1 | 2 | 3;
+type BranchSheetView = 'list' | 'conflict';
 
-interface ContactDetails {
-    name: string;
-    phone: string;
-    address: string;
-    note: string;
-}
+interface ContactDetails { name: string; phone: string; address: string; note: string; }
 
 const DELIVERY_FEE = 15;
 const TAX_RATE = 0.025;
 const formatPrice = (p: number) => `GHS ${p.toFixed(2)}`;
 
-// ─── Consistent Input Field ───────────────────────────────────────────────────
-// Matches UniversalSearch: same bg, border-2 border-neutral-gray/50, focus:border-primary
-function InputField({
-    icon, label, required, children,
-}: {
-    icon: React.ReactNode; label: string; required?: boolean; children: React.ReactNode;
-}) {
+// ─── Input Field ──────────────────────────────────────────────────────────────
+function InputField({ icon, label, required, children }: { icon: React.ReactNode; label: string; required?: boolean; children: React.ReactNode }) {
     return (
         <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-neutral-gray flex items-center gap-1.5">
@@ -46,35 +37,17 @@ function InputField({
             </label>
             <div className="relative flex items-center bg-neutral-light dark:bg-brand-dark border-2 border-neutral-gray/50 focus-within:border-primary rounded-xl transition-all overflow-hidden">
                 <span className="pl-3.5 text-neutral-gray shrink-0">{icon}</span>
-                <div className="flex-1 px-3 py-2.5 text-sm">
-                    {children}
-                </div>
+                <div className="flex-1 px-3 py-2.5 text-sm">{children}</div>
             </div>
         </div>
     );
 }
 
-// ─── Address Search with Google Places ───────────────────────────────────────
-declare global {
-    interface Window {
-        google: any;
-        initGooglePlaces: () => void;
-    }
-}
+// ─── Address Search ───────────────────────────────────────────────────────────
+declare global { interface Window { google: any; initGooglePlaces: () => void; } }
+interface AddressSuggestion { id: string; mainText: string; secondaryText: string; fullAddress: string; }
 
-// Normalised suggestion shape — works for both Google & Nominatim results
-interface AddressSuggestion {
-    id: string;
-    mainText: string;
-    secondaryText: string;
-    fullAddress: string;
-}
-
-function AddressSearchField({
-    value, onChange, placeholder,
-}: {
-    value: string; onChange: (v: string) => void; placeholder: string;
-}) {
+function AddressSearchField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
     const { coordinates } = useLocation();
     const [query, setQuery] = useState(value);
     const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
@@ -86,226 +59,270 @@ function AddressSearchField({
     const containerRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Try to load Google Places — but don't block if no key
     useEffect(() => {
         if (window.google?.maps?.places) { setGoogleReady(true); return; }
         const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-        if (!key) return; // No key → Nominatim takes over
-
+        if (!key) return;
         window.initGooglePlaces = () => setGoogleReady(true);
         if (!document.querySelector('script[data-google-places]')) {
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=initGooglePlaces`;
-            script.async = true;
-            script.defer = true;
-            script.dataset.googlePlaces = 'true';
-            document.head.appendChild(script);
+            const s = document.createElement('script');
+            s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=initGooglePlaces`;
+            s.async = true; s.defer = true; s.dataset.googlePlaces = 'true';
+            document.head.appendChild(s);
         }
     }, []);
 
     useEffect(() => {
-        if (googleReady && !autocompleteRef.current) {
+        if (googleReady && !autocompleteRef.current)
             autocompleteRef.current = new window.google.maps.places.AutocompleteService();
-        }
     }, [googleReady]);
 
-    // Close on outside click
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setShowSuggestions(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
+        const h = (e: MouseEvent) => { if (containerRef.current && !containerRef.current.contains(e.target as Node)) setShowSuggestions(false); };
+        document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
     }, []);
 
-    // ── Nominatim forward search (no API key needed) ──────────────────────────
     const fetchNominatim = useCallback(async (input: string) => {
         if (input.length < 3) { setSuggestions([]); return; }
         setSearching(true);
         try {
-            // Bias toward Ghana + user location if available
             let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(input + ', Ghana')}&format=json&limit=6&addressdetails=1`;
-            if (coordinates) {
-                url += `&viewbox=${coordinates.longitude - 0.3},${coordinates.latitude + 0.3},${coordinates.longitude + 0.3},${coordinates.latitude - 0.3}&bounded=0`;
-            }
+            if (coordinates) url += `&viewbox=${coordinates.longitude - 0.3},${coordinates.latitude + 0.3},${coordinates.longitude + 0.3},${coordinates.latitude - 0.3}&bounded=0`;
             const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
             const data: any[] = await res.json();
-            const mapped: AddressSuggestion[] = data.map(r => ({
-                id: r.place_id,
-                mainText: r.address?.road
-                    ? [r.address.house_number, r.address.road].filter(Boolean).join(' ')
-                    : r.display_name.split(',')[0],
-                secondaryText: [
-                    r.address?.suburb,
-                    r.address?.city ?? r.address?.town ?? r.address?.village,
-                    r.address?.state,
-                ].filter(Boolean).join(', '),
+            setSuggestions(data.map(r => ({
+                id: String(r.place_id),
+                mainText: r.address?.road ? [r.address.house_number, r.address.road].filter(Boolean).join(' ') : r.display_name.split(',')[0],
+                secondaryText: [r.address?.suburb, r.address?.city ?? r.address?.town ?? r.address?.village, r.address?.state].filter(Boolean).join(', '),
                 fullAddress: r.display_name,
-            }));
-            setSuggestions(mapped);
-        } catch {
-            setSuggestions([]);
-        } finally {
-            setSearching(false);
-        }
+            })));
+        } catch { setSuggestions([]); } finally { setSearching(false); }
     }, [coordinates]);
 
-    // ── Google Places forward search ──────────────────────────────────────────
     const fetchGoogle = useCallback((input: string) => {
         if (!autocompleteRef.current || input.length < 3) { setSuggestions([]); return; }
         setSearching(true);
-        const request: any = {
-            input,
-            componentRestrictions: { country: 'gh' },
-            types: ['geocode', 'establishment'],
-        };
-        if (coordinates) {
-            request.locationBias = {
-                center: { lat: coordinates.latitude, lng: coordinates.longitude },
-                radius: 20000,
-            };
-        }
-        autocompleteRef.current.getPlacePredictions(request, (preds: any[], status: string) => {
+        const req: any = { input, componentRestrictions: { country: 'gh' }, types: ['geocode', 'establishment'] };
+        if (coordinates) req.locationBias = { center: { lat: coordinates.latitude, lng: coordinates.longitude }, radius: 20000 };
+        autocompleteRef.current.getPlacePredictions(req, (preds: any[], status: string) => {
             setSearching(false);
-            if (status === 'OK' && preds) {
-                setSuggestions(preds.map(p => ({
-                    id: p.place_id,
-                    mainText: p.structured_formatting?.main_text ?? p.description,
-                    secondaryText: p.structured_formatting?.secondary_text ?? '',
-                    fullAddress: p.description,
-                })));
-            } else {
-                setSuggestions([]);
-            }
+            if (status === 'OK' && preds) setSuggestions(preds.map(p => ({ id: p.place_id, mainText: p.structured_formatting?.main_text ?? p.description, secondaryText: p.structured_formatting?.secondary_text ?? '', fullAddress: p.description })));
+            else setSuggestions([]);
         });
     }, [coordinates]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const v = e.target.value;
-        setQuery(v);
-        onChange(v);
-        setShowSuggestions(true);
-        // Debounce search calls
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const v = e.target.value; setQuery(v); onChange(v); setShowSuggestions(true);
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
-            if (googleReady && autocompleteRef.current) {
-                fetchGoogle(v);
-            } else {
-                fetchNominatim(v);
-            }
-        }, 300);
-    };
-
-    const handleSelect = (s: AddressSuggestion) => {
-        setQuery(s.fullAddress);
-        onChange(s.fullAddress);
-        setSuggestions([]);
-        setShowSuggestions(false);
+        debounceRef.current = setTimeout(() => googleReady && autocompleteRef.current ? fetchGoogle(v) : fetchNominatim(v), 300);
     };
 
     const handleUseMyLocation = async () => {
         if (!coordinates) return;
         setLocating(true);
         try {
-            if (window.google?.maps) {
-                const geocoder = new window.google.maps.Geocoder();
-                geocoder.geocode(
-                    { location: { lat: coordinates.latitude, lng: coordinates.longitude } },
-                    (results: any[], status: string) => {
-                        if (status === 'OK' && results[0]) {
-                            const addr = results[0].formatted_address;
-                            setQuery(addr);
-                            onChange(addr);
-                        }
-                        setLocating(false);
-                    }
-                );
-            } else {
-                // Fallback: OpenStreetMap Nominatim (no key needed)
-                const res = await fetch(
-                    `https://nominatim.openstreetmap.org/reverse?lat=${coordinates.latitude}&lon=${coordinates.longitude}&format=json`
-                );
-                const data = await res.json();
-                const addr = data.display_name ?? '';
-                setQuery(addr);
-                onChange(addr);
-                setLocating(false);
-            }
-        } catch {
-            setLocating(false);
-        }
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coordinates.latitude}&lon=${coordinates.longitude}&format=json`, { headers: { 'Accept-Language': 'en' } });
+            const data = await res.json();
+            const a = data.address ?? {};
+            const parts = [a.house_number && a.road ? `${a.house_number} ${a.road}` : a.road, a.suburb ?? a.neighbourhood, a.city ?? a.town ?? a.village].filter(Boolean);
+            const addr = parts.length > 0 ? parts.join(', ') : data.display_name;
+            setQuery(addr); onChange(addr);
+        } catch { } finally { setLocating(false); }
     };
 
     return (
         <div ref={containerRef} className="relative">
             <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-neutral-gray flex items-center gap-1.5">
-                    Delivery Address<span className="text-error">*</span>
-                </label>
+                <label className="text-xs font-semibold text-neutral-gray flex items-center gap-1.5">Delivery Address<span className="text-error">*</span></label>
                 <div className="relative flex items-center bg-neutral-light dark:bg-brand-dark border-2 border-neutral-gray/50 focus-within:border-primary rounded-xl transition-all overflow-hidden">
-                    <span className="pl-3.5 text-neutral-gray shrink-0">
-                        <MagnifyingGlassIcon size={15} weight="bold" />
-                    </span>
-                    <input
-                        type="text"
-                        value={query}
-                        onChange={handleInputChange}
-                        onFocus={() => query.length >= 3 && setShowSuggestions(true)}
-                        placeholder={placeholder}
-                        className="flex-1 px-3 py-3 text-sm bg-transparent outline-none text-text-dark dark:text-text-light placeholder:text-neutral-gray/60"
-                    />
-                    {query && (
-                        <button
-                            onClick={() => { setQuery(''); onChange(''); setSuggestions([]); }}
-                            className="pr-3 text-neutral-gray hover:text-text-dark transition-colors"
-                        >
-                            <XIcon size={14} weight="bold" />
-                        </button>
-                    )}
+                    <span className="pl-3.5 text-neutral-gray shrink-0"><MagnifyingGlassIcon size={15} weight="bold" /></span>
+                    <input type="text" value={query} onChange={handleChange} onFocus={() => query.length >= 3 && setShowSuggestions(true)} placeholder={placeholder}
+                        className="flex-1 px-3 py-3 text-sm bg-transparent outline-none text-text-dark dark:text-text-light placeholder:text-neutral-gray/60" />
+                    {query && <button onClick={() => { setQuery(''); onChange(''); setSuggestions([]); }} className="pr-3 cursor-pointer text-neutral-gray hover:text-text-dark transition-colors"><XIcon size={14} weight="bold" /></button>}
                 </div>
-
-                {/* Use my location */}
                 {coordinates && (
-                    <button
-                        onClick={handleUseMyLocation}
-                        disabled={locating}
-                        className="flex items-center gap-2 text-xs font-semibold text-primary hover:text-primary-hover transition-colors w-fit mt-0.5"
-                    >
-                        {locating
-                            ? <SpinnerGapIcon size={13} className="animate-spin" />
-                            : <NavigationArrowIcon size={13} weight="fill" />
-                        }
+                    <button onClick={handleUseMyLocation} disabled={locating} className="flex items-center gap-2 text-xs font-semibold text-primary hover:text-primary-hover transition-colors w-fit mt-0.5 cursor-pointer">
+                        {locating ? <SpinnerGapIcon size={13} className="animate-spin" /> : <NavigationArrowIcon size={13} weight="fill" />}
                         Use my current location
                     </button>
                 )}
             </div>
-
-            {/* Suggestions dropdown */}
             {showSuggestions && (searching || suggestions.length > 0) && (
                 <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white dark:bg-brand-dark rounded-2xl shadow-xl border border-neutral-gray/15 overflow-hidden">
-                    {searching && suggestions.length === 0 ? (
-                        <div className="flex items-center gap-2 px-4 py-3 text-sm text-neutral-gray">
-                            <SpinnerGapIcon size={14} className="animate-spin text-primary" /> Searching addresses...
-                        </div>
-                    ) : suggestions.map((s, i) => (
-                        <button
-                            key={s.id}
-                            onClick={() => handleSelect(s)}
-                            className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-primary/5 transition-colors
-                                ${i < suggestions.length - 1 ? 'border-b border-neutral-gray/8' : ''}`}
-                        >
-                            <MapPinIcon weight="fill" size={14} className="text-primary mt-0.5 shrink-0" />
-                            <div className="min-w-0">
-                                <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{s.mainText}</p>
-                                {s.secondaryText && <p className="text-xs text-neutral-gray truncate">{s.secondaryText}</p>}
-                            </div>
-                        </button>
-                    ))}
+                    {searching && suggestions.length === 0
+                        ? <div className="flex items-center gap-2 px-4 py-3 text-sm text-neutral-gray"><SpinnerGapIcon size={14} className="animate-spin text-primary" /> Searching addresses...</div>
+                        : suggestions.map((s, i) => (
+                            <button key={s.id} onClick={() => { setQuery(s.fullAddress); onChange(s.fullAddress); setSuggestions([]); setShowSuggestions(false); }}
+                                className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-primary/5 transition-colors cursor-pointer ${i < suggestions.length - 1 ? 'border-b border-neutral-gray/8' : ''}`}>
+                                <MapPinIcon weight="fill" size={14} className="text-primary mt-0.5 shrink-0" />
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{s.mainText}</p>
+                                    {s.secondaryText && <p className="text-xs text-neutral-gray truncate">{s.secondaryText}</p>}
+                                </div>
+                            </button>
+                        ))
+                    }
                 </div>
             )}
         </div>
+    );
+}
+
+// ─── Branch Selector Sheet (inline, not CartDrawer) ───────────────────────────
+function BranchSelectorSheet({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+    const { selectedBranch, setSelectedBranch, getBranchesWithDistance, branches } = useBranch();
+    const { coordinates } = useLocation();
+    const { validateCartForBranch, removeUnavailableItems, items } = useCart();
+
+    const [sheetView, setSheetView] = useState<BranchSheetView>('list');
+    const [pendingBranch, setPendingBranch] = useState<Branch | null>(null);
+    const [conflict, setConflict] = useState<{ available: CartItem[]; unavailable: CartItem[] } | null>(null);
+
+    useEffect(() => { if (!isOpen) setTimeout(() => { setSheetView('list'); setPendingBranch(null); setConflict(null); }, 300); }, [isOpen]);
+
+    useEffect(() => {
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+        return () => { document.body.style.overflow = ''; };
+    }, [isOpen]);
+
+    const sortedBranches: BranchWithDistance[] = coordinates
+        ? getBranchesWithDistance(coordinates.latitude, coordinates.longitude)
+        : branches.map(b => ({ ...b, distance: 0, deliveryTime: '–', isWithinRadius: true }));
+
+    const handleSelect = (branch: Branch) => {
+        if (branch.id === selectedBranch?.id) { onClose(); return; }
+        if (items.length === 0) { setSelectedBranch(branch); onClose(); return; }
+        const result = validateCartForBranch(branch.menuItemIds);
+        if (result.unavailable.length === 0) { setSelectedBranch(branch); onClose(); }
+        else { setPendingBranch(branch); setConflict(result); setSheetView('conflict'); }
+    };
+
+    const handleRemoveAndSwitch = () => {
+        if (!pendingBranch || !conflict) return;
+        removeUnavailableItems(conflict.unavailable.map(i => i.cartItemId));
+        setSelectedBranch(pendingBranch);
+        onClose();
+    };
+
+    return (
+        <>
+            <div className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
+            <div className={`fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-brand-darker rounded-t-3xl shadow-2xl flex flex-col transition-transform duration-300 ease-out max-h-[88dvh]
+                md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[500px] md:rounded-2xl md:max-h-[82vh]
+                ${isOpen ? 'translate-y-0' : 'translate-y-full md:opacity-0 md:scale-95 md:pointer-events-none'}`}>
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-neutral-gray/10 shrink-0">
+                    <div className="flex items-center gap-3">
+                        {sheetView === 'conflict' && (
+                            <button onClick={() => setSheetView('list')} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-gray/10 transition-colors cursor-pointer">
+                                <ArrowLeftIcon weight="bold" size={16} className="text-text-dark dark:text-text-light" />
+                            </button>
+                        )}
+                        <h3 className="font-bold text-text-dark dark:text-text-light">{sheetView === 'list' ? 'Change Branch' : 'Items Not Available'}</h3>
+                    </div>
+                    <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-neutral-gray/10 transition-colors cursor-pointer">
+                        <XIcon size={20} weight="bold" className="text-text-dark dark:text-text-light" />
+                    </button>
+                </div>
+
+                {/* Branch list */}
+                {sheetView === 'list' && (
+                    <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 flex flex-col gap-3">
+                        <p className="text-xs text-neutral-gray">Sorted by distance. Switching validates your cart automatically.</p>
+                        {sortedBranches.map(branch => {
+                            const isCurrent = branch.id === selectedBranch?.id;
+                            return (
+                                <button key={branch.id} onClick={() => handleSelect(branch)} disabled={!branch.isOpen}
+                                    className={`w-full flex items-start gap-3 p-4 rounded-2xl border-2 text-left transition-all
+                                        ${isCurrent ? 'border-primary bg-primary/8' : 'border-neutral-gray/15 hover:border-primary/30'}
+                                        ${!branch.isOpen ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${isCurrent ? 'bg-primary text-white' : 'bg-neutral-gray/10 text-neutral-gray'}`}>
+                                        <StorefrontIcon weight="fill" size={16} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className={`text-sm font-bold ${isCurrent ? 'text-primary' : 'text-text-dark dark:text-text-light'}`}>{branch.name} Branch</p>
+                                            {isCurrent && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary text-white">Current</span>}
+                                            {!branch.isOpen && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-neutral-gray/20 text-neutral-gray">Closed</span>}
+                                        </div>
+                                        <p className="text-xs text-neutral-gray mt-0.5 truncate">{branch.address}</p>
+                                        <div className="flex items-center gap-2 mt-1.5 text-xs text-neutral-gray flex-wrap">
+                                            {coordinates && <span>{branch.distance.toFixed(1)} km away</span>}
+                                            <span>·</span><span>{branch.deliveryTime}</span><span>·</span><span>GHS {branch.deliveryFee} delivery</span>
+                                        </div>
+                                    </div>
+                                    {!isCurrent && branch.isOpen && <CaretRightIcon size={16} className="text-neutral-gray shrink-0 mt-1" />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Conflict view */}
+                {sheetView === 'conflict' && conflict && pendingBranch && (
+                    <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 flex flex-col gap-5">
+                        <div className="flex items-start gap-3 bg-warning/10 border border-warning/25 rounded-2xl p-4">
+                            <WarningCircleIcon weight="fill" size={20} className="text-warning shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm font-bold text-text-dark dark:text-text-light">
+                                    {conflict.unavailable.length} item{conflict.unavailable.length !== 1 ? 's' : ''} not available at {pendingBranch.name} Branch
+                                </p>
+                                <p className="text-xs text-neutral-gray mt-1">Remove them to switch, or stay at your current branch.</p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                            <p className="text-xs font-semibold text-neutral-gray uppercase tracking-wide">Won't be available</p>
+                            {conflict.unavailable.map(ci => (
+                                <div key={ci.cartItemId} className="flex items-center gap-3 bg-error/5 border border-error/15 rounded-xl p-3">
+                                    <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-error/10 shrink-0">
+                                        {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
+                                        <p className="text-xs text-neutral-gray">{ci.sizeLabel} · Qty {ci.quantity}</p>
+                                    </div>
+                                    <XIcon size={14} weight="bold" className="text-error shrink-0" />
+                                </div>
+                            ))}
+                        </div>
+
+                        {conflict.available.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                                <p className="text-xs font-semibold text-neutral-gray uppercase tracking-wide">Still available</p>
+                                {conflict.available.map(ci => (
+                                    <div key={ci.cartItemId} className="flex items-center gap-3 bg-secondary/5 border border-secondary/15 rounded-xl p-3">
+                                        <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-secondary/10 shrink-0">
+                                            {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
+                                            <p className="text-xs text-neutral-gray">{ci.sizeLabel} · Qty {ci.quantity}</p>
+                                        </div>
+                                        <CheckCircleIcon size={14} weight="fill" className="text-secondary shrink-0" />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-3 pt-1 pb-2">
+                            <button onClick={handleRemoveAndSwitch} className="w-full flex items-center justify-between bg-primary hover:bg-primary-hover text-white font-bold px-5 py-4 rounded-2xl transition-all active:scale-[0.98] cursor-pointer">
+                                <span>Remove {conflict.unavailable.length} item{conflict.unavailable.length !== 1 ? 's' : ''} & switch</span>
+                                <ArrowRightIcon weight="bold" size={16} />
+                            </button>
+                            <button onClick={onClose} className="w-full border-2 border-neutral-gray/20 text-text-dark dark:text-text-light font-bold px-5 py-3.5 rounded-2xl hover:border-primary/40 hover:text-primary transition-all cursor-pointer">
+                                Keep {selectedBranch?.name} Branch
+                            </button>
+                            <button onClick={() => setSheetView('list')} className="w-full text-sm font-semibold text-neutral-gray hover:text-primary transition-colors py-2 cursor-pointer">
+                                Pick a different branch
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </>
     );
 }
 
@@ -315,23 +332,16 @@ function StepIndicator({ current }: { current: Step }) {
     return (
         <div className="flex items-center">
             {steps.map((s, i) => {
-                const done = current > s.n;
-                const active = current === s.n;
+                const done = current > s.n; const active = current === s.n;
                 return (
                     <React.Fragment key={s.n}>
                         <div className="flex items-center gap-1.5">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                                ${done ? 'bg-secondary text-white' : active ? 'bg-primary text-white' : 'bg-neutral-gray/20 text-neutral-gray'}`}>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${done ? 'bg-secondary text-white' : active ? 'bg-primary text-white' : 'bg-neutral-gray/20 text-neutral-gray'}`}>
                                 {done ? <CheckCircleIcon weight="fill" size={16} /> : s.n}
                             </div>
-                            <span className={`text-sm font-semibold hidden sm:inline transition-colors
-                                ${active ? 'text-text-dark dark:text-text-light' : done ? 'text-secondary' : 'text-neutral-gray'}`}>
-                                {s.label}
-                            </span>
+                            <span className={`text-sm font-semibold hidden sm:inline transition-colors ${active ? 'text-text-dark dark:text-text-light' : done ? 'text-secondary' : 'text-neutral-gray'}`}>{s.label}</span>
                         </div>
-                        {i < steps.length - 1 && (
-                            <div className={`h-px w-8 sm:w-12 mx-2 transition-colors ${current > s.n ? 'bg-secondary' : 'bg-neutral-gray/20'}`} />
-                        )}
+                        {i < steps.length - 1 && <div className={`h-px w-8 sm:w-12 mx-2 transition-colors ${current > s.n ? 'bg-secondary' : 'bg-neutral-gray/20'}`} />}
                     </React.Fragment>
                 );
             })}
@@ -346,23 +356,17 @@ function OrderSummary({ orderType }: { orderType: OrderType }) {
     const tax = subtotal * TAX_RATE;
     const delivery = orderType === 'delivery' ? (selectedBranch?.deliveryFee ?? DELIVERY_FEE) : 0;
     const total = subtotal + delivery + tax;
-
     return (
         <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 flex flex-col gap-4 shadow-sm">
             <div className="flex items-center justify-between">
                 <h3 className="font-bold text-text-dark dark:text-text-light">Order Summary</h3>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/15 text-primary">
-                    {items.length} item{items.length !== 1 ? 's' : ''}
-                </span>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/15 text-primary">{items.length} item{items.length !== 1 ? 's' : ''}</span>
             </div>
             <div className="flex flex-col gap-3">
                 {items.map(ci => (
                     <div key={ci.cartItemId} className="flex items-center gap-3">
                         <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-primary/10 shrink-0">
-                            {ci.item.image
-                                ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="48px" className="object-cover" />
-                                : <div className="w-full h-full flex items-center justify-center text-lg">{ci.item.icon ?? '🍽️'}</div>
-                            }
+                            {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="48px" className="object-cover" /> : <div className="w-full h-full" />}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -374,20 +378,9 @@ function OrderSummary({ orderType }: { orderType: OrderType }) {
             </div>
             <div className="h-px bg-neutral-gray/10" />
             <div className="flex flex-col gap-2 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-neutral-gray">Subtotal</span>
-                    <span className="font-semibold text-text-dark dark:text-text-light">{formatPrice(subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-neutral-gray">Delivery Fee</span>
-                    <span className="font-semibold text-text-dark dark:text-text-light">
-                        {orderType === 'delivery' ? formatPrice(delivery) : <span className="text-secondary">Free</span>}
-                    </span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-neutral-gray">Tax (2.5%)</span>
-                    <span className="font-semibold text-text-dark dark:text-text-light">{formatPrice(tax)}</span>
-                </div>
+                <div className="flex justify-between"><span className="text-neutral-gray">Subtotal</span><span className="font-semibold text-text-dark dark:text-text-light">{formatPrice(subtotal)}</span></div>
+                <div className="flex justify-between"><span className="text-neutral-gray">Delivery Fee</span><span className="font-semibold text-text-dark dark:text-text-light">{orderType === 'delivery' ? formatPrice(delivery) : <span className="text-secondary">Free</span>}</span></div>
+                <div className="flex justify-between"><span className="text-neutral-gray">Tax (2.5%)</span><span className="font-semibold text-text-dark dark:text-text-light">{formatPrice(tax)}</span></div>
             </div>
             <div className="h-px bg-neutral-gray/10" />
             <div className="flex justify-between items-center">
@@ -398,154 +391,106 @@ function OrderSummary({ orderType }: { orderType: OrderType }) {
     );
 }
 
-// ─── Step 1 — Details ─────────────────────────────────────────────────────────
-function StepDetails({
-    orderType, setOrderType, contact, setContact, onNext,
-}: {
+// ─── Step 1 ───────────────────────────────────────────────────────────────────
+function StepDetails({ orderType, setOrderType, contact, setContact, onNext }: {
     orderType: OrderType; setOrderType: (t: OrderType) => void;
-    contact: ContactDetails; setContact: (c: ContactDetails) => void;
-    onNext: () => void;
+    contact: ContactDetails; setContact: (c: ContactDetails) => void; onNext: () => void;
 }) {
     const { selectedBranch } = useBranch();
-    const { openBranchSelector } = useModal();
-
-    const update = (field: keyof ContactDetails) =>
-        (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-            setContact({ ...contact, [field]: e.target.value });
-
-    const canProceed = contact.name.trim() && contact.phone.trim() &&
-        (orderType === 'pickup' || contact.address.trim());
+    const [branchSheetOpen, setBranchSheetOpen] = useState(false);
+    const update = (f: keyof ContactDetails) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setContact({ ...contact, [f]: e.target.value });
+    const canProceed = contact.name.trim() && contact.phone.trim() && (orderType === 'pickup' || contact.address.trim());
 
     return (
-        <div className="flex flex-col gap-5">
-
-            {/* Delivery / Pickup toggle */}
-            <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 flex flex-col gap-4 shadow-sm">
-                <h2 className="font-bold text-text-dark dark:text-text-light">How do you want your order?</h2>
-                <div className="grid grid-cols-2 gap-3">
-                    {([
-                        { type: 'delivery' as const, icon: <TruckIcon weight="fill" size={22} />, label: 'Delivery', sub: 'Delivered to you' },
-                        { type: 'pickup' as const, icon: <BagIcon weight="fill" size={22} />, label: 'Pickup', sub: 'Pick up at branch' },
-                    ]).map(({ type, icon, label, sub }) => (
-                        <button
-                            key={type} onClick={() => setOrderType(type)}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-150
-                                ${orderType === type ? 'border-primary bg-primary/8 text-primary' : 'border-neutral-gray/15 text-neutral-gray hover:border-primary/30'}`}
-                        >
-                            <span className={orderType === type ? 'text-primary' : 'text-neutral-gray'}>{icon}</span>
-                            <span className="text-sm font-bold">{label}</span>
-                            <span className="text-xs opacity-70">{sub}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Branch info — clicking Change Branch opens the modal */}
-            {selectedBranch && (
-                <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 shadow-sm flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                        <h2 className="font-bold text-text-dark dark:text-text-light">
-                            {orderType === 'delivery' ? 'Delivering From' : 'Pickup Location'}
-                        </h2>
-                        <button
-                            onClick={openBranchSelector}
-                            className="text-xs font-semibold text-primary flex items-center gap-1 hover:underline"
-                        >
-                            <PencilSimpleIcon size={12} /> Change Branch
-                        </button>
+        <>
+            <div className="flex flex-col gap-5">
+                <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 flex flex-col gap-4 shadow-sm">
+                    <h2 className="font-bold text-text-dark dark:text-text-light">How do you want your order?</h2>
+                    <div className="grid grid-cols-2 gap-3">
+                        {([
+                            { type: 'delivery' as const, icon: <TruckIcon weight="fill" size={22} />, label: 'Delivery', sub: 'Delivered to you' },
+                            { type: 'pickup' as const, icon: <BagIcon weight="fill" size={22} />, label: 'Pickup', sub: 'Pick up at branch' },
+                        ]).map(({ type, icon, label, sub }) => (
+                            <button key={type} onClick={() => setOrderType(type)}
+                                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-150 cursor-pointer
+                                    ${orderType === type ? 'border-primary bg-primary/8 text-primary' : 'border-neutral-gray/15 text-neutral-gray hover:border-primary/30'}`}>
+                                <span className={orderType === type ? 'text-primary' : 'text-neutral-gray'}>{icon}</span>
+                                <span className="text-sm font-bold">{label}</span>
+                                <span className="text-xs opacity-70">{sub}</span>
+                            </button>
+                        ))}
                     </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-light dark:bg-brown/30">
-                        <StorefrontIcon weight="fill" size={18} className="text-primary mt-0.5 shrink-0" />
-                        <div>
-                            <p className="text-sm font-semibold text-text-dark dark:text-text-light">{selectedBranch.name} Branch</p>
-                            <p className="text-xs text-neutral-gray mt-0.5">{selectedBranch.address}</p>
-                            <p className="text-xs text-neutral-gray mt-0.5">{selectedBranch.phone}</p>
+                </div>
+
+                {selectedBranch && (
+                    <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 shadow-sm flex flex-col gap-3">
+                        <div className="flex items-center justify-between cursor-pointer">
+                            <h2 className="font-bold text-text-dark dark:text-text-light">{orderType === 'delivery' ? 'Delivering From' : 'Pickup Location'}</h2>
+                            <button onClick={() => setBranchSheetOpen(true)} className="text-xs font-semibold text-primary flex items-center gap-1 hover:underline cursor-pointer">
+                                <PencilSimpleIcon size={12} /> Change Branch
+                            </button>
                         </div>
+                        <div className="flex items-start gap-3 p-3 rounded-xl bg-neutral-light dark:bg-brown/30">
+                            <StorefrontIcon weight="fill" size={18} className="text-primary mt-0.5 shrink-0" />
+                            <div>
+                                <p className="text-sm font-semibold text-text-dark dark:text-text-light">{selectedBranch.name} Branch</p>
+                                <p className="text-xs text-neutral-gray mt-0.5">{selectedBranch.address}</p>
+                                <p className="text-xs text-neutral-gray mt-0.5">{selectedBranch.phone}</p>
+                            </div>
+                        </div>
+                        {orderType === 'delivery' && (
+                            <div className="flex items-center gap-2 text-sm text-neutral-gray">
+                                <span>Estimated: <strong className="text-text-dark dark:text-text-light">25 – 40 mins</strong></span>
+                                <span className="ml-auto text-xs font-semibold text-text-dark dark:text-text-light">GHS {selectedBranch.deliveryFee} delivery fee</span>
+                            </div>
+                        )}
                     </div>
-                    {orderType === 'delivery' && (
-                        <div className="flex items-center gap-2 text-sm text-neutral-gray">
-                            <ClockIcon weight="fill" size={15} className="text-primary" />
-                            <span>Estimated: <strong className="text-text-dark dark:text-text-light">25 – 40 mins</strong></span>
-                            <span className="ml-auto text-xs font-semibold text-primary">
-                                GHS {selectedBranch.deliveryFee} delivery fee
-                            </span>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Contact form */}
-            <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 shadow-sm flex flex-col gap-4">
-                <h2 className="font-bold text-text-dark dark:text-text-light">Your Details</h2>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <InputField icon={<UserIcon weight="fill" size={15} />} label="Full Name" required>
-                        <input
-                            type="text" placeholder="e.g. Kwame Mensah"
-                            value={contact.name} onChange={update('name')}
-                            className="w-full bg-transparent outline-none text-text-dark dark:text-text-light placeholder:text-neutral-gray/60"
-                        />
-                    </InputField>
-                    <InputField icon={<PhoneIcon weight="fill" size={15} />} label="Phone Number" required>
-                        <input
-                            type="tel" placeholder="+233 24 000 0000"
-                            value={contact.phone} onChange={update('phone')}
-                            className="w-full bg-transparent outline-none text-text-dark dark:text-text-light placeholder:text-neutral-gray/60"
-                        />
-                    </InputField>
-                </div>
-
-                {/* Address search — only for delivery */}
-                {orderType === 'delivery' && (
-                    <AddressSearchField
-                        value={contact.address}
-                        onChange={addr => setContact({ ...contact, address: addr })}
-                        placeholder="Search your delivery address..."
-                    />
                 )}
 
-                {/* Note */}
-                <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-neutral-gray flex items-center gap-1.5">
-                        <NoteIcon weight="fill" size={13} /> Note to Rider (Optional)
-                    </label>
-                    <div className="bg-neutral-light dark:bg-brand-dark border-2 border-neutral-gray/50 focus-within:border-primary rounded-xl transition-all overflow-hidden">
-                        <textarea
-                            rows={2} placeholder="e.g. Call me when you reach the gate..."
-                            value={contact.note} onChange={update('note')}
-                            className="w-full px-3.5 py-3 text-sm bg-transparent outline-none resize-none text-text-dark dark:text-text-light placeholder:text-neutral-gray/60"
-                        />
+                <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 shadow-sm flex flex-col gap-4">
+                    <h2 className="font-bold text-text-dark dark:text-text-light">Your Details</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <InputField icon={<UserIcon weight="fill" size={15} />} label="Full Name" required>
+                            <input type="text" placeholder="e.g. Kwame Mensah" value={contact.name} onChange={update('name')} className="w-full bg-transparent outline-none text-text-dark dark:text-text-light placeholder:text-neutral-gray/60" />
+                        </InputField>
+                        <InputField icon={<PhoneIcon weight="fill" size={15} />} label="Phone Number" required>
+                            <input type="tel" placeholder="+233 24 000 0000" value={contact.phone} onChange={update('phone')} className="w-full bg-transparent outline-none text-text-dark dark:text-text-light placeholder:text-neutral-gray/60" />
+                        </InputField>
+                    </div>
+                    {orderType === 'delivery' && (
+                        <AddressSearchField value={contact.address} onChange={addr => setContact({ ...contact, address: addr })} placeholder="Search your delivery address..." />
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-neutral-gray flex items-center gap-1.5"><NoteIcon weight="fill" size={13} /> Note to Rider (Optional)</label>
+                        <div className="bg-neutral-light dark:bg-brand-dark border-2 border-neutral-gray/50 focus-within:border-primary rounded-xl transition-all overflow-hidden">
+                            <textarea rows={2} placeholder="e.g. Call me when you reach the gate..." value={contact.note} onChange={update('note')}
+                                className="w-full px-3.5 py-3 text-sm bg-transparent outline-none resize-none text-text-dark dark:text-text-light placeholder:text-neutral-gray/60" />
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <button
-                onClick={onNext} disabled={!canProceed}
-                className={`flex items-center justify-center gap-2 w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98]
-                    ${canProceed ? 'bg-primary hover:bg-primary-hover text-white' : 'bg-neutral-gray/20 text-neutral-gray cursor-not-allowed'}`}
-            >
-                Continue to Payment <ArrowRightIcon weight="bold" size={18} />
-            </button>
-        </div>
+                <button onClick={onNext} disabled={!canProceed}
+                    className={`flex cursor-pointer items-center justify-center gap-2 w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98]
+                        ${canProceed ? 'bg-primary hover:bg-primary-hover text-white' : 'bg-neutral-gray/20 text-neutral-gray cursor-not-allowed'}`}>
+                    Continue to Payment <ArrowRightIcon weight="bold" size={18} />
+                </button>
+            </div>
+            <BranchSelectorSheet isOpen={branchSheetOpen} onClose={() => setBranchSheetOpen(false)} />
+        </>
     );
 }
 
-// ─── Step 2 — Payment ─────────────────────────────────────────────────────────
-function StepPayment({
-    paymentMethod, setPaymentMethod, orderType, contact, onBack, onPlace, placing,
-}: {
+// ─── Step 2 ───────────────────────────────────────────────────────────────────
+function StepPayment({ paymentMethod, setPaymentMethod, orderType, contact, onBack, onPlace, placing }: {
     paymentMethod: PaymentMethod; setPaymentMethod: (m: PaymentMethod) => void;
-    orderType: OrderType; contact: ContactDetails;
-    onBack: () => void; onPlace: () => void; placing: boolean;
+    orderType: OrderType; contact: ContactDetails; onBack: () => void; onPlace: () => void; placing: boolean;
 }) {
     const { subtotal } = useCart();
     const { selectedBranch } = useBranch();
-    const { openBranchSelector } = useModal();
-
+    const [branchSheetOpen, setBranchSheetOpen] = useState(false);
     const tax = subtotal * TAX_RATE;
     const delivery = orderType === 'delivery' ? (selectedBranch?.deliveryFee ?? DELIVERY_FEE) : 0;
     const total = subtotal + delivery + tax;
-
     const [momoPhone, setMomoPhone] = useState(contact.phone);
     const [momoNetwork, setMomoNetwork] = useState<'mtn' | 'telecel' | 'airteltigo'>('mtn');
 
@@ -556,120 +501,112 @@ function StepPayment({
     ].filter(m => !m.hide);
 
     return (
-        <div className="flex flex-col gap-5">
-
-            {/* Recap */}
-            <div className="bg-white dark:bg-brand-dark rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                        {orderType === 'delivery' ? <TruckIcon weight="fill" size={18} className="text-primary" /> : <BagIcon weight="fill" size={18} className="text-primary" />}
-                    </div>
-                    <div>
-                        <p className="text-sm font-bold text-text-dark dark:text-text-light">{orderType === 'delivery' ? 'Delivering to' : 'Pickup at'}</p>
-                        <p className="text-xs text-neutral-gray truncate max-w-[200px]">{orderType === 'delivery' ? contact.address : selectedBranch?.name + ' Branch'}</p>
-                    </div>
-                </div>
-                <button onClick={onBack} className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 shrink-0">
-                    <PencilSimpleIcon size={12} /> Edit
-                </button>
-            </div>
-
-            {/* Branch recap with change option */}
-            {selectedBranch && (
+        <>
+            <div className="flex flex-col gap-5">
                 <div className="bg-white dark:bg-brand-dark rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <StorefrontIcon weight="fill" size={18} className="text-primary" />
+                        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                            {orderType === 'delivery' ? <TruckIcon weight="fill" size={18} className="text-primary" /> : <BagIcon weight="fill" size={18} className="text-primary" />}
+                        </div>
                         <div>
-                            <p className="text-sm font-bold text-text-dark dark:text-text-light">{selectedBranch.name} Branch</p>
-                            <p className="text-xs text-neutral-gray">{selectedBranch.address}</p>
+                            <p className="text-sm font-bold text-text-dark dark:text-text-light">{orderType === 'delivery' ? 'Delivering to' : 'Pickup at'}</p>
+                            <p className="text-xs text-neutral-gray truncate max-w-[200px]">{orderType === 'delivery' ? contact.address : selectedBranch?.name + ' Branch'}</p>
                         </div>
                     </div>
-                    <button onClick={openBranchSelector} className="text-xs font-semibold text-primary hover:underline shrink-0">
-                        Change
+                    <button onClick={onBack} className="text-xs cursor-pointer font-semibold text-primary hover:underline flex items-center gap-1 shrink-0"><PencilSimpleIcon size={12} /> Edit</button>
+                </div>
+
+                {selectedBranch && (
+                    <div className="bg-white dark:bg-brand-dark rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <StorefrontIcon weight="fill" size={18} className="text-primary shrink-0" />
+                            <div>
+                                <p className="text-sm font-bold text-text-dark dark:text-text-light">{selectedBranch.name} Branch</p>
+                                <p className="text-xs text-neutral-gray">{selectedBranch.address}</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setBranchSheetOpen(true)} className="text-xs cursor-pointer font-semibold text-primary hover:underline shrink-0">Change</button>
+                    </div>
+                )}
+
+                <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 shadow-sm flex flex-col gap-3">
+                    <h2 className="font-bold text-text-dark dark:text-text-light">Payment Method</h2>
+                    {methods.map(m => (
+                        <div key={m.id}>
+                            <button onClick={() => setPaymentMethod(m.id)}
+                                className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left cursor-pointer ${paymentMethod === m.id ? 'border-primary bg-primary/5' : 'border-neutral-gray/15 hover:border-primary/30'}`}>
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${paymentMethod === m.id ? 'border-primary' : 'border-neutral-gray/40'}`}>
+                                    {paymentMethod === m.id && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                                </div>
+                                <span className={`${m.color} shrink-0`}>{m.icon}</span>
+                                <div className="flex-1">
+                                    <p className="text-sm font-semibold text-text-dark dark:text-text-light">{m.label}</p>
+                                    <p className="text-xs text-neutral-gray">{m.sub}</p>
+                                </div>
+                            </button>
+                            {m.id === 'momo' && paymentMethod === 'momo' && (
+                                <div className="mt-2 ml-4 flex flex-col gap-3 p-4 rounded-xl bg-neutral-light dark:bg-brown/30">
+                                    <div>
+                                        <label className="text-xs font-semibold text-neutral-gray mb-1.5 block">Mobile Network</label>
+                                        <div className="flex gap-2">
+                                            {(['mtn', 'telecel', 'airteltigo'] as const).map(net => (
+                                                <button key={net} onClick={() => setMomoNetwork(net)}
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all cursor-pointer ${momoNetwork === net ? 'border-primary bg-primary text-white' : 'border-neutral-gray/20 text-neutral-gray hover:border-primary/40'}`}>
+                                                    {net === 'airteltigo' ? 'AirtelTigo' : net.toUpperCase()}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <InputField icon={<PhoneIcon weight="fill" size={13} />} label="MoMo Number" required>
+                                        <input type="tel" placeholder="+233 24 000 0000" value={momoPhone} onChange={e => setMomoPhone(e.target.value)} className="w-full bg-transparent outline-none placeholder:text-neutral-gray/60 text-text-dark dark:text-text-light" />
+                                    </InputField>
+                                    <p className="text-xs text-neutral-gray flex items-center gap-1"><LockIcon size={11} /> You'll receive a prompt on your phone to confirm payment</p>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
+                <div className="flex gap-3">
+                    <button onClick={onBack} className="flex cursor-pointer items-center gap-2 px-5 py-4 rounded-2xl border-2 border-neutral-gray/20 font-bold text-neutral-gray hover:border-primary/40 hover:text-primary transition-all">
+                        <ArrowLeftIcon weight="bold" size={16} /> Back
+                    </button>
+                    <button onClick={onPlace} disabled={placing}
+                        className="flex-1 flex cursor-pointer items-center justify-between bg-brown dark:bg-brand-dark hover:bg-brown-light disabled:opacity-70 text-white font-bold px-6 py-4 rounded-2xl transition-all active:scale-[0.98] group">
+                        <span>{placing ? 'Placing Order...' : paymentMethod === 'momo' ? 'Pay & Place Order' : 'Place Order'}</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-primary font-bold">{formatPrice(total)}</span>
+                            <ArrowRightIcon weight="bold" size={18} className="group-hover:translate-x-1 transition-transform" />
+                        </div>
                     </button>
                 </div>
-            )}
-
-            {/* Payment methods */}
-            <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 shadow-sm flex flex-col gap-3">
-                <h2 className="font-bold text-text-dark dark:text-text-light">Payment Method</h2>
-                {methods.map(m => (
-                    <div key={m.id}>
-                        <button
-                            onClick={() => setPaymentMethod(m.id)}
-                            className={`w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left
-                                ${paymentMethod === m.id ? 'border-primary bg-primary/5' : 'border-neutral-gray/15 hover:border-primary/30'}`}
-                        >
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0
-                                ${paymentMethod === m.id ? 'border-primary' : 'border-neutral-gray/40'}`}>
-                                {paymentMethod === m.id && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                            </div>
-                            <span className={`${m.color} shrink-0`}>{m.icon}</span>
-                            <div className="flex-1">
-                                <p className="text-sm font-semibold text-text-dark dark:text-text-light">{m.label}</p>
-                                <p className="text-xs text-neutral-gray">{m.sub}</p>
-                            </div>
-                        </button>
-
-                        {m.id === 'momo' && paymentMethod === 'momo' && (
-                            <div className="mt-2 ml-4 flex flex-col gap-3 p-4 rounded-xl bg-neutral-light dark:bg-brown/30">
-                                <div>
-                                    <label className="text-xs font-semibold text-neutral-gray mb-1.5 block">Mobile Network</label>
-                                    <div className="flex gap-2">
-                                        {(['mtn', 'telecel', 'airteltigo'] as const).map(net => (
-                                            <button key={net} onClick={() => setMomoNetwork(net)}
-                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all
-                                                    ${momoNetwork === net ? 'border-primary bg-primary text-white' : 'border-neutral-gray/20 text-neutral-gray hover:border-primary/40'}`}
-                                            >
-                                                {net === 'airteltigo' ? 'AirtelTigo' : net.toUpperCase()}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <InputField icon={<PhoneIcon weight="fill" size={13} />} label="MoMo Number" required>
-                                    <input
-                                        type="tel" placeholder="+233 24 000 0000"
-                                        value={momoPhone} onChange={e => setMomoPhone(e.target.value)}
-                                        className="w-full bg-transparent outline-none placeholder:text-neutral-gray/60 text-text-dark dark:text-text-light"
-                                    />
-                                </InputField>
-                                <p className="text-xs text-neutral-gray flex items-center gap-1">
-                                    <LockIcon size={11} /> You'll receive a prompt on your phone to confirm payment
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                ))}
+                <p className="text-xs text-center text-neutral-gray flex items-center justify-center gap-1"><LockIcon size={11} /> Secured · Encrypted · Powered by Hubtel</p>
             </div>
-
-            <div className="flex gap-3">
-                <button onClick={onBack} className="flex items-center gap-2 px-5 py-4 rounded-2xl border-2 border-neutral-gray/20 font-bold text-neutral-gray hover:border-primary/40 hover:text-primary transition-all">
-                    <ArrowLeftIcon weight="bold" size={16} /> Back
-                </button>
-                <button
-                    onClick={onPlace} disabled={placing}
-                    className="flex-1 flex items-center justify-between bg-brown dark:bg-brand-dark hover:bg-brown-light disabled:opacity-70 text-white font-bold px-6 py-4 rounded-2xl transition-all active:scale-[0.98] group"
-                >
-                    <span>{placing ? 'Placing Order...' : paymentMethod === 'momo' ? 'Pay & Place Order' : 'Place Order'}</span>
-                    <div className="flex items-center gap-2">
-                        <span className="text-primary font-bold">{formatPrice(total)}</span>
-                        <ArrowRightIcon weight="bold" size={18} className="group-hover:translate-x-1 transition-transform" />
-                    </div>
-                </button>
-            </div>
-            <p className="text-xs text-center text-neutral-gray flex items-center justify-center gap-1">
-                <LockIcon size={11} /> Secured · Encrypted · Powered by Hubtel
-            </p>
-        </div>
+            <BranchSelectorSheet isOpen={branchSheetOpen} onClose={() => setBranchSheetOpen(false)} />
+        </>
     );
 }
 
-// ─── Step 3 — Done ────────────────────────────────────────────────────────────
+// ─── Step 3 ───────────────────────────────────────────────────────────────────
 function StepDone({ orderNumber, orderType, contact }: {
     orderNumber: string; orderType: OrderType; contact: ContactDetails;
 }) {
+    const { isLoggedIn, saveFromCheckout } = useAuth();
+    const { selectedBranch } = useBranch();
+    const [promptState, setPromptState] = useState<'idle' | 'saving' | 'saved' | 'dismissed'>(
+        isLoggedIn ? 'saved' : 'idle'
+    );
+
+    const handleSave = async () => {
+        setPromptState('saving');
+        await new Promise(r => setTimeout(r, 600));
+        saveFromCheckout(contact.name, contact.phone);
+        setPromptState('saved');
+    };
+
     return (
         <div className="flex flex-col items-center gap-6 py-8 text-center">
+            {/* Success icon */}
             <div className="relative">
                 <div className="w-24 h-24 rounded-full bg-secondary/15 flex items-center justify-center">
                     <CheckCircleIcon weight="fill" size={52} className="text-secondary" />
@@ -678,20 +615,23 @@ function StepDone({ orderNumber, orderType, contact }: {
                     <ShoppingBagIcon weight="fill" size={16} className="text-white" />
                 </div>
             </div>
+
             <div>
                 <h2 className="text-2xl font-bold text-text-dark dark:text-text-light">Order Placed!</h2>
                 <p className="text-neutral-gray mt-1">Your delicious food is being prepared</p>
             </div>
-            <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 w-full shadow-sm flex flex-col gap-3">
+
+            {/* Order details card */}
+            <div className="bg-white dark:bg-brand-dark rounded-2xl p-5 w-full shadow-sm flex flex-col gap-3 text-left">
                 <div className="flex items-center justify-between">
                     <span className="text-sm text-neutral-gray">Order Number</span>
                     <span className="text-base font-bold text-primary font-mono">#{orderNumber}</span>
                 </div>
                 <div className="h-px bg-neutral-gray/10" />
-                <div className="flex items-center justify-between">
-                    <span className="text-sm text-neutral-gray">{orderType === 'delivery' ? 'Delivering to' : 'Pickup at'}</span>
-                    <span className="text-sm font-semibold text-text-dark dark:text-text-light text-right max-w-[60%]">
-                        {orderType === 'delivery' ? contact.address : 'Branch location'}
+                <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-neutral-gray shrink-0">{orderType === 'delivery' ? 'Delivering to' : 'Pickup at'}</span>
+                    <span className="text-sm font-semibold text-text-dark dark:text-text-light text-right truncate">
+                        {orderType === 'delivery' ? contact.address || 'Delivery address' : selectedBranch ? `${selectedBranch.name} Branch` : 'Branch'}
                     </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -701,14 +641,74 @@ function StepDone({ orderNumber, orderType, contact }: {
                     </span>
                 </div>
             </div>
-            <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 w-full text-sm text-text-dark dark:text-text-light">
-                A confirmation SMS has been sent to <strong>{contact.phone}</strong> with your tracking link.
+
+            {/* SMS confirmation */}
+            <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 w-full text-sm text-text-dark dark:text-text-light text-left">
+                Confirmation SMS sent to <strong>{contact.phone}</strong> with your tracking link.
             </div>
+
+            {/* ── Post-order save prompt ── */}
+            {promptState === 'idle' && (
+                <div className="w-full bg-white dark:bg-brand-dark rounded-2xl p-4 shadow-sm border border-primary/15 relative">
+                    <button onClick={() => setPromptState('dismissed')}
+                        className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full hover:bg-neutral-gray/10 transition-colors cursor-pointer">
+                        <XIcon size={13} weight="bold" className="text-neutral-gray" />
+                    </button>
+                    <div className="flex items-start gap-3 mb-4 text-left">
+                        <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
+                            <SparkleIcon weight="fill" size={18} className="text-primary" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-text-dark dark:text-text-light">Save your info for next time?</p>
+                            <p className="text-xs text-neutral-gray mt-0.5">Faster checkout — your name and number are pre-filled automatically.</p>
+                        </div>
+                    </div>
+                    {/* Pre-filled preview */}
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-light dark:bg-brown/30 mb-4">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <UserCircleIcon weight="fill" size={22} className="text-primary" />
+                        </div>
+                        <div className="text-left min-w-0">
+                            <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{contact.name}</p>
+                            <p className="text-xs text-neutral-gray">{contact.phone}</p>
+                        </div>
+                    </div>
+                    <button onClick={handleSave}
+                        className="w-full py-3 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold text-sm transition-all active:scale-[0.98] cursor-pointer">
+                        Yes, save my info
+                    </button>
+                </div>
+            )}
+
+            {promptState === 'saving' && (
+                <div className="w-full bg-white dark:bg-brand-dark rounded-2xl p-4 shadow-sm flex items-center justify-center gap-2 text-sm text-neutral-gray">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    Saving your details...
+                </div>
+            )}
+
+            {(promptState === 'saved' || promptState === 'dismissed') && promptState === 'saved' && (
+                <div className="w-full bg-secondary/10 border border-secondary/20 rounded-2xl p-4 flex items-center gap-3 text-left">
+                    <CheckCircleIcon weight="fill" size={20} className="text-secondary shrink-0" />
+                    <div>
+                        <p className="text-sm font-bold text-text-dark dark:text-text-light">
+                            {isLoggedIn ? "You're already signed in" : 'Details saved!'}
+                        </p>
+                        <p className="text-xs text-neutral-gray">
+                            {isLoggedIn ? 'Your info is pre-filled on every order.' : 'Your next checkout will be instant.'}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* CTA buttons */}
             <div className="flex flex-col gap-3 w-full">
-                <Link href="/orders" className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98]">
+                <Link href="/orders"
+                    className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98]">
                     Track My Order <ArrowRightIcon weight="bold" size={16} />
                 </Link>
-                <Link href="/" className="flex items-center justify-center text-sm font-semibold text-neutral-gray hover:text-primary transition-colors py-2">
+                <Link href="/"
+                    className="flex items-center justify-center text-sm font-semibold text-neutral-gray hover:text-primary transition-colors py-2">
                     Back to Menu
                 </Link>
             </div>
@@ -727,9 +727,7 @@ function EmptyCartGuard() {
                 <h2 className="text-xl font-bold text-text-dark dark:text-text-light">Your cart is empty</h2>
                 <p className="text-neutral-gray mt-1">Add some items before checking out</p>
             </div>
-            <Link href="/" className="bg-primary text-white font-bold px-8 py-3 rounded-2xl hover:bg-primary-hover transition-all">
-                Browse Menu
-            </Link>
+            <Link href="/" className="bg-primary text-white font-bold px-8 py-3 rounded-2xl hover:bg-primary-hover transition-all">Browse Menu</Link>
         </div>
     );
 }
@@ -737,7 +735,6 @@ function EmptyCartGuard() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CheckoutPage() {
     const { items, clearCart } = useCart();
-
     const [step, setStep] = useState<Step>(1);
     const [orderType, setOrderType] = useState<OrderType>('delivery');
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('momo');
@@ -749,9 +746,7 @@ export default function CheckoutPage() {
         setPlacing(true);
         await new Promise(r => setTimeout(r, 1800));
         setOrderNumber(`CB${Date.now().toString().slice(-6)}`);
-        clearCart();
-        setPlacing(false);
-        setStep(3);
+        clearCart(); setPlacing(false); setStep(3);
     }, [clearCart]);
 
     if (items.length === 0 && step !== 3) return <EmptyCartGuard />;
@@ -759,12 +754,9 @@ export default function CheckoutPage() {
     return (
         <div className="min-h-screen bg-neutral-light dark:bg-brand-darker pt-20 pb-12">
             <div className="w-[95%] md:w-[85%] xl:w-[75%] max-w-5xl mx-auto">
-
                 <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-text-dark dark:text-text-light">
-                            {step === 3 ? 'Order Confirmed' : 'Checkout'}
-                        </h1>
+                        <h1 className="text-2xl md:text-3xl font-bold text-text-dark dark:text-text-light">{step === 3 ? 'Order Confirmed' : 'Checkout'}</h1>
                         {step !== 3 && <p className="text-sm text-neutral-gray mt-1">Complete your order details below</p>}
                     </div>
                     {step !== 3 && <StepIndicator current={step} />}
@@ -777,26 +769,10 @@ export default function CheckoutPage() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
                         <div>
-                            {step === 1 && (
-                                <StepDetails
-                                    orderType={orderType} setOrderType={setOrderType}
-                                    contact={contact} setContact={setContact}
-                                    onNext={() => setStep(2)}
-                                />
-                            )}
-                            {step === 2 && (
-                                <StepPayment
-                                    paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod}
-                                    orderType={orderType} contact={contact}
-                                    onBack={() => setStep(1)}
-                                    onPlace={handlePlaceOrder}
-                                    placing={placing}
-                                />
-                            )}
+                            {step === 1 && <StepDetails orderType={orderType} setOrderType={setOrderType} contact={contact} setContact={setContact} onNext={() => setStep(2)} />}
+                            {step === 2 && <StepPayment paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} orderType={orderType} contact={contact} onBack={() => setStep(1)} onPlace={handlePlaceOrder} placing={placing} />}
                         </div>
-                        <div className="lg:sticky lg:top-24 h-fit">
-                            <OrderSummary orderType={orderType} />
-                        </div>
+                        <div className="lg:sticky lg:top-24 h-fit"><OrderSummary orderType={orderType} /></div>
                     </div>
                 )}
             </div>
