@@ -96,14 +96,14 @@ export default function DynamicGreeting() {
 
                 {/* Open/Closed badge */}
                 {selectedBranch && isOpen !== null && (
-                    <div className="pt-2 border-t border-brown/20">
+                    <div className="pt-4 border-t border-brown/20">
                         <span
                             className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${isOpen
                                 ? 'bg-secondary text-white'
-                                : 'bg-brown/20 text-brown'
+                                : 'bg-error/30 text-brown'
                                 }`}
                         >
-                            <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-white animate-pulse' : 'bg-brown/60'}`} />
+                            <span className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-white animate-pulse' : 'bg-error'}`} />
                             {isOpen ? 'Open Now' : 'Closed'}
                         </span>
                     </div>

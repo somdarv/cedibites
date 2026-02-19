@@ -389,7 +389,7 @@ export default function MenuPage() {
                         <div>
                             <h1 className="text-xl md:text-2xl font-bold text-text-dark dark:text-text-light flex items-center gap-2.5">
                                 {activeCategory === 'All'
-                                    ? <> <h1 className='text-2xl'>Our Full Menu</h1></>
+                                    ? <> <span className='text-2xl'>Our Full Menu</span></>
                                     : <><span className="text-xl">{CATEGORY_ICONS[activeCategory] ?? ''}</span> {activeCategory}</>
                                 }
                             </h1>
