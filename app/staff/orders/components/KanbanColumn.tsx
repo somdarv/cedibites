@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { KanbanColumn as KanbanColumnType, StaffOrder, OrderStatus } from '../types';
+import { STATUS_CONFIG } from '../constants';
 import OrderCard from './OrderCard';
 
 // ─── Kanban column ────────────────────────────────────────────────────────────
@@ -42,8 +43,8 @@ export default function KanbanColumn({
             onDrop={e => { setIsOver(false); onDrop(e, column.statuses[0]); }}
         >
             {/* Column header */}
-            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3 border ${column.color} bg-brown/60`}>
-                <span className={`h-2 w-2 rounded-full shrink-0 ${column.dot}`} />
+            <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3 bg-brown dark:bg-brand-dark border-2 ${STATUS_CONFIG[column.statuses[0]]?.color ?? column.color}`}>
+                <span className={`h-2 w-2 rounded-full shrink-0 ${STATUS_CONFIG[column.statuses[0]]?.dot ?? column.dot} ${STATUS_CONFIG[column.statuses[0]]?.pulse ? 'animate-pulse' : ''}`} />
                 <span className="text-text-light text-sm font-semibold font-body flex-1">{column.label}</span>
                 <span className="text-neutral-gray text-xs font-body bg-brand-dark px-2 py-0.5 rounded-full">
                     {orders.length}

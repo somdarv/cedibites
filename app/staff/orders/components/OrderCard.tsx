@@ -38,17 +38,17 @@ export default function OrderCard({
             onDragEnd={onDragEnd}
             onClick={() => onClick(order)}
             className={`
-        bg-brown border rounded-2xl p-3.5 cursor-pointer select-none
+        bg-white/5 dark:bg-brand-dark transparent border border-brown/25  rounded-2xl p-3.5 cursor-pointer select-none
         transition-all duration-150 group
         ${isDragging ? 'opacity-40 scale-95' : 'hover:border-brown-light/40'}
         ${col.color}
       `}
         >
             {/* Top row */}
-            <div className="flex items-start justify-between gap-2 mb-2.5">
+            <div className="flex items-start  justify-between gap-2 mb-2.5">
                 <div className="flex items-center gap-1.5 min-w-0">
                     <SourceIcon size={13} weight="fill" className="text-neutral-gray shrink-0" />
-                    <span className="text-text-light text-xs font-bold font-body tracking-wide">
+                    <span className="text-text-dark dark:text-text-light text-xs font-bold font-body tracking-wide">
                         #{order.id}
                     </span>
                 </div>
@@ -58,10 +58,10 @@ export default function OrderCard({
             </div>
 
             {/* Customer */}
-            <p className="text-text-light text-sm font-semibold font-body leading-none mb-0.5 truncate">
+            <p className="text-text-dark dark:text-text-light text-sm font-semibold font-body leading-none mb-0.5 truncate">
                 {order.customer.name}
             </p>
-            <p className="text-neutral-gray text-xs font-body mb-2.5 truncate">
+            <p className="text-neutral-gray text-xs line-clamp-2 leading-snug font-semibold font-body mb-2.5 truncate">
                 {order.branch} · {order.type === 'delivery' ? 'Delivery' : 'Pickup'}
             </p>
 
@@ -80,7 +80,7 @@ export default function OrderCard({
                     onClick={e => { e.stopPropagation(); onAdvance(order.id, simpleNext[0].status); }}
                     className="
             mt-3 w-full flex items-center justify-center gap-1.5
-            bg-brand-darker hover:bg-brown-light/10
+            bg-transparent cursor-pointer hover:bg-primary/10
             border border-brown-light/20 hover:border-primary/40
             text-neutral-gray hover:text-primary
             text-[11px] font-semibold font-body

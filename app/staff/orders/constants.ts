@@ -8,6 +8,19 @@ import {
 } from '@phosphor-icons/react';
 import type { KanbanColumn, OrderSource, PaymentMethod, StaffOrder } from './types';
 
+// ─── Status config ────────────────────────────────────────────────────────────
+
+export const STATUS_CONFIG: Record<string, { label: string; dot: string; color: string; pulse?: boolean }> = {
+    received:         { label: 'Received',        dot: 'bg-neutral-gray', color: 'border-neutral-gray/40'              },
+    preparing:        { label: 'Preparing',        dot: 'bg-primary',     color: 'border-primary/40',    pulse: true   },
+    ready:            { label: 'Ready',            dot: 'bg-secondary',   color: 'border-secondary/40'                 },
+    out_for_delivery: { label: 'Out for Delivery', dot: 'bg-teal-600',    color: 'border-teal-600/40',   pulse: true   },
+    ready_for_pickup: { label: 'Ready for Pickup', dot: 'bg-teal-600',    color: 'border-teal-600/40'                  },
+    delivered:        { label: 'Delivered',        dot: 'bg-secondary',   color: 'border-secondary/40'                 },
+    completed:        { label: 'Completed',        dot: 'bg-secondary',   color: 'border-secondary/40'                 },
+    cancelled:        { label: 'Cancelled',        dot: 'bg-error',       color: 'border-error/40'                     },
+};
+
 // ─── Kanban columns ───────────────────────────────────────────────────────────
 
 export const COLUMNS: KanbanColumn[] = [

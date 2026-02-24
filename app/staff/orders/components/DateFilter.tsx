@@ -93,11 +93,11 @@ export default function DateFilter({ value, onChange }: DateFilterProps) {
                 type="button"
                 onClick={() => setOpen(o => !o)}
                 className={`
-          flex items-center gap-2 px-3.5 py-2.5 rounded-full border text-sm font-body
+          flex items-center gap-2 px-3.5 py-2.5 rounded-full border-2 text-sm font-body
           transition-all duration-150 cursor-pointer whitespace-nowrap
           ${value
                         ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-brown-light/25 text-neutral-gray hover:text-text-light hover:border-brown-light/40'
+                        : 'border-brown-light/20 hover:text-text-dark dark:hover:text-text-light dark:text-text-light/75 hover:border-brown-light/40'
                     }
         `}
             >
@@ -123,7 +123,7 @@ export default function DateFilter({ value, onChange }: DateFilterProps) {
                     {/* Backdrop */}
                     <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
 
-                    <div className="absolute left-0 top-full mt-2 z-30 w-64 bg-brown border border-brown-light/20 rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 z-30 w-64 bg-brown border border-brown-light/20 rounded-2xl shadow-2xl overflow-hidden">
 
                         {/* Preset list */}
                         <div className="p-2 flex flex-col gap-0.5">
