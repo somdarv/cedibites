@@ -41,7 +41,7 @@ export default function OrderCard({
             onDragEnd={onDragEnd}
             onClick={() => onClick(order)}
             className={`
-         dark:bg-brand-dark m-2 bg-neutral-card/50 border border-brown/25  rounded-2xl p-3.5 cursor-pointer select-none
+         dark:bg-brand-dark w-full mb-2 bg-neutral-card/50 border border-brown/25  rounded-2xl p-3.5 cursor-pointer select-none
         transition-all duration-150 group
         ${isDragging ? 'opacity-40 scale-95' : 'hover:border-brown-light/40'}
         

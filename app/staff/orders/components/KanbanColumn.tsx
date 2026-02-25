@@ -55,7 +55,7 @@ export default function KanbanColumn({
 
             {/* Drop zone */}
             <div className={`
-        flex-1 flex flex-col gap-2.5 rounded-2xl p-2 min-h-[120px]
+        flex-1 flex flex-col gap-2.5 w-full rounded-2xl p-2 min-h-[120px]
         transition-all duration-150
         ${isOver && draggingId
                     ? 'bg-primary/5 border-2 border-primary/30 border-dashed'
@@ -67,7 +67,7 @@ export default function KanbanColumn({
                         <p className="text-neutral-gray/40 text-xs font-body">Empty</p>
                     </div>
                 )}
-                <div className='overflow-y-auto custom-scrollbar'>
+                <div className='overflow-y-auto bg-red-20 w-full     custom-scrollbar'>
                     {orders.map(order => (
                         <OrderCard
                             key={order.id}

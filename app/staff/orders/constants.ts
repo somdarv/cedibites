@@ -11,14 +11,14 @@ import type { KanbanColumn, OrderSource, PaymentMethod, StaffOrder } from './typ
 // ─── Status config ────────────────────────────────────────────────────────────
 
 export const STATUS_CONFIG: Record<string, { label: string; dot: string; color: string; pulse?: boolean }> = {
-    received:         { label: 'Received',        dot: 'bg-neutral-gray', color: 'border-neutral-gray/40'              },
-    preparing:        { label: 'Preparing',        dot: 'bg-primary',     color: 'border-primary/40',    pulse: true   },
-    ready:            { label: 'Ready',            dot: 'bg-warning',     color: 'border-warning/40'                   },
-    out_for_delivery: { label: 'Out for Delivery', dot: 'bg-teal-600',    color: 'border-teal-600/40',   pulse: true   },
-    ready_for_pickup: { label: 'Ready for Pickup', dot: 'bg-teal-600',    color: 'border-teal-600/40'                  },
-    delivered:        { label: 'Delivered',        dot: 'bg-secondary',   color: 'border-secondary/40'                 },
-    completed:        { label: 'Completed',        dot: 'bg-secondary',   color: 'border-secondary/40'                 },
-    cancelled:        { label: 'Cancelled',        dot: 'bg-error',       color: 'border-error/40'                     },
+    received: { label: 'Received', dot: 'bg-neutral-gray', color: 'border-neutral-gray/40' },
+    preparing: { label: 'Preparing', dot: 'bg-primary', color: 'border-primary/40', pulse: true },
+    ready: { label: 'Ready', dot: 'bg-secondary', color: 'border-secondary/40' },
+    out_for_delivery: { label: 'Out for Delivery', dot: 'bg-teal-600', color: 'border-teal-600/40', pulse: true },
+    ready_for_pickup: { label: 'Ready for Pickup', dot: 'bg-teal-600', color: 'border-teal-600/40' },
+    delivered: { label: 'Delivered', dot: 'bg-secondary', color: 'border-secondary/40' },
+    completed: { label: 'Completed', dot: 'bg-secondary', color: 'border-secondary/40' },
+    cancelled: { label: 'Cancelled', dot: 'bg-error', color: 'border-error/40' },
 };
 
 // ─── Kanban columns ───────────────────────────────────────────────────────────
@@ -109,11 +109,11 @@ function minsAgo(m: number) { return new Date(Date.now() - m * 60000); }
 
 export const BRANCH_COORDS: Record<string, { latitude: number; longitude: number }> = {
     'East Legon': { latitude: 5.6465, longitude: -0.1549 },
-    'Osu':        { latitude: 5.5557, longitude: -0.1769 },
-    'Tema':       { latitude: 5.6636, longitude: -0.0166 },
-    'Madina':     { latitude: 5.6681, longitude: -0.1769 },
-    'La Paz':     { latitude: 5.6150, longitude: -0.2350 },
-    'Dzorwulu':   { latitude: 5.6050, longitude: -0.1920 },
+    'Osu': { latitude: 5.5557, longitude: -0.1769 },
+    'Tema': { latitude: 5.6636, longitude: -0.0166 },
+    'Madina': { latitude: 5.6681, longitude: -0.1769 },
+    'La Paz': { latitude: 5.6150, longitude: -0.2350 },
+    'Dzorwulu': { latitude: 5.6050, longitude: -0.1920 },
 };
 
 export const MOCK_ORDERS: StaffOrder[] = [
@@ -163,9 +163,9 @@ export const MOCK_ORDERS: StaffOrder[] = [
         total: 117, payment: 'momo', placedAt: minsAgo(62),
         address: 'Cantonments, Accra',
         coords: {
-            branch:   BRANCH_COORDS['Osu'],
+            branch: BRANCH_COORDS['Osu'],
             customer: { latitude: 5.5745, longitude: -0.1690 },
-            rider:    { latitude: 5.5651, longitude: -0.1730 }, // ~halfway
+            rider: { latitude: 5.5651, longitude: -0.1730 }, // ~halfway
         },
     },
     {
