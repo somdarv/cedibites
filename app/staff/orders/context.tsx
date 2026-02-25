@@ -71,10 +71,10 @@ const DEMO_CUSTOMERS = [
 ];
 const DEMO_BRANCHES = ['East Legon', 'Osu', 'Tema', 'Madina'];
 const DEMO_ITEMS   = [
-    [{ name: 'Jollof Rice', quantity: 2, price: 35 }, { name: 'Coke', quantity: 2, price: 10 }],
-    [{ name: 'Waakye Special', quantity: 1, price: 30 }],
-    [{ name: 'Banku & Tilapia', quantity: 1, price: 55 }, { name: 'Sobolo', quantity: 1, price: 10 }],
-    [{ name: 'Fufu & Goat Light Soup', quantity: 2, price: 50 }],
+    [{ name: 'Jollof Rice', qty: 2, unitPrice: 35 }, { name: 'Coke', qty: 2, unitPrice: 10 }],
+    [{ name: 'Waakye Special', qty: 1, unitPrice: 30 }],
+    [{ name: 'Banku & Tilapia', qty: 1, unitPrice: 55 }, { name: 'Sobolo', qty: 1, unitPrice: 10 }],
+    [{ name: 'Fufu & Goat Light Soup', qty: 2, unitPrice: 50 }],
 ];
 // Customer delivery coords paired with each demo branch
 const DEMO_CUSTOMER_COORDS = [
@@ -89,7 +89,7 @@ function createTestOrder(): StaffOrder {
     const idx  = Math.floor(Math.random() * DEMO_CUSTOMERS.length);
     const type = Math.random() > 0.5 ? 'delivery' : 'pickup';
     const items = DEMO_ITEMS[idx];
-    const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+    const total = items.reduce((s, i) => s + i.unitPrice * i.qty, 0);
     const branchName = DEMO_BRANCHES[idx];
     const branchCoords = BRANCH_COORDS[branchName] ?? { latitude: 5.6465, longitude: -0.1549 };
     return {
