@@ -11,15 +11,27 @@ import {
     SignOutIcon,
     UserCircleIcon,
     CaretRightIcon,
+    ChartBarIcon,
+    ForkKnifeIcon,
+    UsersThreeIcon,
 } from '@phosphor-icons/react';
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
-const NAV_ITEMS = [
-    { href: '/staff/dashboard', label: 'Dashboard', icon: SquaresFourIcon },
-    { href: '/staff/new-order', label: 'New Order', icon: PlusCircleIcon  },
-    { href: '/staff/orders',    label: 'Orders',    icon: ListIcon        },
-    { href: '/staff/my-sales',  label: 'My Sales',  icon: ReceiptIcon     },
+const STAFF_NAV = [
+    { href: '/staff/dashboard',         label: 'Dashboard',  icon: SquaresFourIcon },
+    { href: '/staff/new-order',         label: 'New Order',  icon: PlusCircleIcon  },
+    { href: '/staff/orders',            label: 'Orders',     icon: ListIcon        },
+    { href: '/staff/my-sales',          label: 'My Sales',   icon: ReceiptIcon     },
+];
+
+const MANAGER_NAV = [
+    { href: '/staff/manager/dashboard', label: 'Dashboard',  icon: SquaresFourIcon },
+    { href: '/staff/new-order',         label: 'New Order',  icon: PlusCircleIcon  },
+    { href: '/staff/orders',            label: 'Orders',     icon: ListIcon        },
+    { href: '/staff/manager/analytics', label: 'Analytics',  icon: ChartBarIcon    },
+    { href: '/staff/manager/menu',      label: 'Menu',       icon: ForkKnifeIcon   },
+    { href: '/staff/manager/staff',     label: 'Staff',      icon: UsersThreeIcon  },
 ];
 
 // ─── Sidebar link ─────────────────────────────────────────────────────────────
@@ -79,7 +91,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     if (pathname === '/staff/login') return <>{children}</>;
 
     // TODO: replace with real staff auth context
-    const staff = { name: 'Kofi Mensah', role: 'Sales Staff', branch: 'East Legon' };
+    const staff = { name: 'Ama Boateng', role: 'Branch Manager', branch: 'East Legon' };
+    const isManager = staff.role === 'Branch Manager';
+    const NAV_ITEMS = isManager ? MANAGER_NAV : STAFF_NAV;
 
     return (
         <div className="h-screen overflow-hidden bg-neutral-light dark:bg-brand-darker w-full flex">
@@ -97,16 +111,43 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                 </div>
 
                 {/* Nav */}
-                <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-                    {NAV_ITEMS.map(item => (
-                        <SidebarLink
-                            key={item.href}
-                            href={item.href}
-                            label={item.label}
-                            icon={item.icon}
-                            active={pathname.startsWith(item.href)}
-                        />
-                    ))}
+                <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto">
+                    {isManager ? (
+                        <>
+                            {MANAGER_NAV.slice(0, 3).map(item => (
+                                <SidebarLink
+                                    key={item.href}
+                                    href={item.href}
+                                    label={item.label}
+                                    icon={item.icon}
+                                    active={pathname.startsWith(item.href)}
+                                />
+                            ))}
+                            <div className="my-2 border-t border-brown-light/15" />
+                            <p className="text-[10px] font-body font-medium text-neutral-gray/60 uppercase tracking-wider px-3 pb-1">
+                                Manager
+                            </p>
+                            {MANAGER_NAV.slice(3).map(item => (
+                                <SidebarLink
+                                    key={item.href}
+                                    href={item.href}
+                                    label={item.label}
+                                    icon={item.icon}
+                                    active={pathname.startsWith(item.href)}
+                                />
+                            ))}
+                        </>
+                    ) : (
+                        STAFF_NAV.map(item => (
+                            <SidebarLink
+                                key={item.href}
+                                href={item.href}
+                                label={item.label}
+                                icon={item.icon}
+                                active={pathname.startsWith(item.href)}
+                            />
+                        ))
+                    )}
                 </nav>
 
                 {/* Staff info + logout */}
@@ -170,11 +211,11 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             <nav className="
         md:hidden
         fixed bottom-0 left-0 right-0 z-30
-        flex items-center
+        flex items-center overflow-x-auto
         bg-brown border-t border-brown-light/15
         px-2 pb-safe
       ">
-                {NAV_ITEMS.map(item => (
+                {(isManager ? MANAGER_NAV : STAFF_NAV).map(item => (
                     <BottomNavLink
                         key={item.href}
                         href={item.href}

@@ -21,46 +21,30 @@ import {
   CreditCardIcon,
   SpinnerIcon,
   ShoppingBagIcon,
-  ForkKnifeIcon
+  ForkKnifeIcon,
+  ClipboardTextIcon,
+  PrinterIcon,
 } from '@phosphor-icons/react';
+import Link from 'next/link';
 import { usePOS } from '../context';
 import { formatGHS } from '@/lib/utils/currency';
 import { PaymentMethod, POSOrder } from '../types';
+import { sampleMenuItems, menuCategories, MenuItem } from '@/lib/data/SampleMenu';
+import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { printReceipt } from '@/lib/utils/printReceipt';
 
-// Mock menu data - replace with real data from your menu provider
-const MENU_CATEGORIES = [
-  { id: 'all', name: 'All' },
-  { id: 'meals', name: 'Meals' },
-  { id: 'drinks', name: 'Drinks' },
-  { id: 'combos', name: 'Combos' },
-  { id: 'sides', name: 'Sides' },
-];
-
-const MOCK_MENU_ITEMS = [
-  { id: '1', name: 'Jollof Rice', price: 25, category: 'meals', image: '/menu/jollof.jpg' },
-  { id: '2', name: 'Waakye', price: 20, category: 'meals', image: '/menu/waakye.jpg' },
-  { id: '3', name: 'Banku & Tilapia', price: 45, category: 'meals', image: '/menu/banku.jpg' },
-  { id: '4', name: 'Fried Rice', price: 28, category: 'meals', image: '/menu/friedrice.jpg' },
-  { id: '5', name: 'Fufu & Light Soup', price: 35, category: 'meals', image: '/menu/fufu.jpg' },
-  { id: '6', name: 'Kenkey & Fish', price: 22, category: 'meals', image: '/menu/kenkey.jpg' },
-  { id: '7', name: 'Coca Cola', price: 8, category: 'drinks', image: '/menu/coke.jpg' },
-  { id: '8', name: 'Fanta Orange', price: 8, category: 'drinks', image: '/menu/fanta.jpg' },
-  { id: '9', name: 'Malta Guinness', price: 10, category: 'drinks', image: '/menu/malta.jpg' },
-  { id: '10', name: 'Water (500ml)', price: 3, category: 'drinks', image: '/menu/water.jpg' },
-  { id: '11', name: 'Jollof Combo', price: 40, category: 'combos', image: '/menu/combo1.jpg' },
-  { id: '12', name: 'Waakye Combo', price: 35, category: 'combos', image: '/menu/combo2.jpg' },
-  { id: '13', name: 'Kelewele', price: 12, category: 'sides', image: '/menu/kelewele.jpg' },
-  { id: '14', name: 'Fried Plantain', price: 10, category: 'sides', image: '/menu/plantain.jpg' },
-  { id: '15', name: 'Coleslaw', price: 8, category: 'sides', image: '/menu/coleslaw.jpg' },
-];
-
-// Branch data
-const BRANCHES: Record<string, { name: string; address: string }> = {
-  'osu': { name: 'Osu Branch', address: 'Oxford Street' },
-  'eastlegon': { name: 'East Legon', address: 'A&C Mall' },
-  'labone': { name: 'Labone', address: 'Labone Junction' },
-  'airport': { name: 'Airport City', address: 'Airport Residential' },
-};
+// Get the lowest price of an item (for display on the card)
+function getDisplayPrice(item: MenuItem): { price: number; hasOptions: boolean } {
+  if (item.price) return { price: item.price, hasOptions: false };
+  if (item.sizes && item.sizes.length > 0) {
+    return { price: item.sizes[0].price, hasOptions: true };
+  }
+  if (item.hasVariants && item.variants) {
+    const prices = [item.variants.plain, item.variants.assorted].filter((p): p is number => p !== undefined);
+    return { price: Math.min(...prices), hasOptions: true };
+  }
+  return { price: 0, hasOptions: false };
+}
 
 export default function POSTerminalPage() {
   const router = useRouter();
@@ -77,6 +61,8 @@ export default function POSTerminalPage() {
     clearCart,
     customerName,
     setCustomerName,
+    customerPhone,
+    setCustomerPhone,
     orderNotes,
     setOrderNotes,
     orderType,
@@ -93,32 +79,87 @@ export default function POSTerminalPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<POSOrder | null>(null);
+  const [pickerItem, setPickerItem] = useState<MenuItem | null>(null);
+  const [showCart, setShowCart] = useState(false);
 
-  // Redirect if no session (wait until session is loaded from storage first)
+  // Redirect if no session
   useEffect(() => {
     if (isSessionLoaded && !isSessionValid) {
       router.replace('/pos');
     }
   }, [isSessionLoaded, isSessionValid, router]);
 
-  // Filter menu items
+  // Get branch info and its allowed menu item IDs
+  const branchInfo = useMemo(
+    () => session ? BRANCHES.find(b => b.id === session.branchId) ?? null : null,
+    [session]
+  );
+
+  // Fallback to all items if branchInfo is null (e.g. stale session with old branch IDs)
+  const branchMenuIds = useMemo(
+    () => branchInfo?.menuItemIds ?? sampleMenuItems.map(i => i.id),
+    [branchInfo]
+  );
+
+  // All menu items available at this branch
+  const branchMenuItems = useMemo(
+    () => sampleMenuItems.filter(item => branchMenuIds.includes(item.id)),
+    [branchMenuIds]
+  );
+
+  // Filter by active category and search
   const filteredItems = useMemo(() => {
-    return MOCK_MENU_ITEMS.filter(item => {
-      const matchesCategory = activeCategory === 'all' || item.category === activeCategory;
+    return branchMenuItems.filter(item => {
+      const matchesCategory = activeCategory === 'all'
+        ? item.popular  // "All" tab shows popular items
+        : item.category === activeCategory;
       const matchesSearch = !searchQuery ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, searchQuery]);
+  }, [branchMenuItems, activeCategory, searchQuery]);
 
-  // Handle item tap
-  const handleItemTap = useCallback((item: typeof MOCK_MENU_ITEMS[0]) => {
+  // When searching, ignore category filter
+  const displayedItems = useMemo(() => {
+    if (searchQuery) {
+      return branchMenuItems.filter(item =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    return filteredItems;
+  }, [searchQuery, branchMenuItems, filteredItems]);
+
+  // Handle item tap - direct add or open picker
+  const handleItemTap = useCallback((item: MenuItem) => {
+    if (item.sizes || item.hasVariants) {
+      setPickerItem(item);
+      return;
+    }
+    if (item.price) {
+      addToCart({
+        menuItemId: item.id,
+        name: item.name,
+        price: item.price,
+        image: item.image,
+      });
+    }
+  }, [addToCart]);
+
+  // Handle variant/size selection from picker modal
+  const handlePickerSelect = useCallback((
+    item: MenuItem,
+    label: string,
+    price: number,
+    variantKey: string
+  ) => {
     addToCart({
       menuItemId: item.id,
-      name: item.name,
-      price: item.price,
+      name: `${item.name} (${label})`,
+      price,
       image: item.image,
+      variantKey,
     });
+    setPickerItem(null);
   }, [addToCart]);
 
   // Handle payment complete
@@ -131,15 +172,14 @@ export default function POSTerminalPage() {
     }
   };
 
-  // Get branch info
-  const branchInfo = session ? BRANCHES[session.branchId] : null;
-
   // Today's stats
   const todayStats = useMemo(() => {
     const completed = todayOrders.filter(o => o.paymentStatus === 'completed');
+    const activeCount = todayOrders.filter(o => o.status === 'received' || o.status === 'preparing').length;
     return {
       orderCount: completed.length,
       revenue: completed.reduce((sum, o) => sum + o.total, 0),
+      activeCount,
     };
   }, [todayOrders]);
 
@@ -156,20 +196,20 @@ export default function POSTerminalPage() {
       {/* Main Content - Menu Grid */}
       <div className="flex-1 flex flex-col min-h-0">
         {/* Header */}
-        <header className="flex-shrink-0 px-4 py-3 border-b border-neutral-gray/20 flex items-center justify-between gap-4 bg-white">
+        <header className="shrink-0 px-4 py-3 border-b border-neutral-gray/20 flex items-center justify-between gap-4 bg-white">
           {/* Left - Branch & Staff */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
               <StorefrontIcon className="w-5 h-5 text-primary" />
             </div>
-            <div className="hidden sm:block">
-              <p className="text-text-dark font-medium text-sm">{branchInfo?.name}</p>
+            <div>
+              <p className="text-text-dark font-medium text-sm">{branchInfo?.name ?? 'Branch'}</p>
               <p className="text-neutral-gray text-xs">{session.staffName}</p>
             </div>
           </div>
 
           {/* Center - Search */}
-          <div className="flex-1 max-w-md">
+          <div className="flex-1">
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-gray" />
               <input
@@ -189,7 +229,7 @@ export default function POSTerminalPage() {
 
           {/* Right - Stats & Actions */}
           <div className="flex items-center gap-2">
-            <div className="hidden md:flex items-center gap-4 px-4 py-2 rounded-xl bg-neutral-gray/10">
+            <div className="hidden lg:flex items-center gap-4 px-4 py-2 rounded-xl bg-neutral-gray/10">
               <div className="text-center">
                 <p className="text-xs text-neutral-gray">Orders</p>
                 <p className="text-lg font-medium text-text-dark">{todayStats.orderCount}</p>
@@ -200,6 +240,20 @@ export default function POSTerminalPage() {
                 <p className="text-lg font-medium text-primary">{formatGHS(todayStats.revenue)}</p>
               </div>
             </div>
+
+            {/* Orders link with active badge */}
+            <Link
+              href="/pos/orders"
+              className="relative w-10 h-10 rounded-xl bg-neutral-gray/10 flex items-center justify-center text-neutral-gray hover:text-primary hover:bg-primary/10 transition-colors"
+              title="Today's Orders"
+            >
+              <ClipboardTextIcon className="w-5 h-5" />
+              {todayStats.activeCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-0.5 rounded-full bg-primary text-brown text-[10px] font-bold flex items-center justify-center">
+                  {todayStats.activeCount}
+                </span>
+              )}
+            </Link>
 
             <button
               onClick={() => {
@@ -217,9 +271,9 @@ export default function POSTerminalPage() {
         </header>
 
         {/* Category Tabs */}
-        <div className="flex-shrink-0 px-4 py-3 border-b border-neutral-gray/15 bg-white">
+        <div className="shrink-0 px-4 py-3 border-b border-neutral-gray/15 bg-white">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {MENU_CATEGORIES.map(cat => (
+            {menuCategories.map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
@@ -232,45 +286,76 @@ export default function POSTerminalPage() {
                   }
                 `}
               >
-                {cat.name}
+                {cat.id === 'all' ? 'Popular' : cat.label}
               </button>
             ))}
           </div>
         </div>
 
         {/* Menu Grid */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-            {filteredItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => handleItemTap(item)}
-                className="
-                  bg-white rounded-2xl p-3 text-left border border-neutral-gray/15 shadow-sm
-                  hover:border-primary/30 hover:shadow-md active:scale-[0.97]
-                  transition-all duration-100
-                  group
-                "
-              >
-                {/* Image placeholder */}
-                <div className="aspect-square rounded-xl bg-neutral-gray/10 mb-3 overflow-hidden relative">
-                  <div className="absolute inset-0 flex items-center justify-center text-neutral-gray/30">
-                    <ForkKnifeIcon className="w-10 h-10" />
+        <div className="flex-1 overflow-y-auto p-4 pb-24 lg:pb-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {displayedItems.map(item => {
+              const { price, hasOptions } = getDisplayPrice(item);
+              const cartQty = cart
+                .filter(c => c.menuItemId === item.id)
+                .reduce((sum, c) => sum + c.quantity, 0);
+              const isSelected = cartQty > 0;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleItemTap(item)}
+                  className={`
+                    rounded-2xl p-3 text-left shadow-sm
+                    active:scale-[0.97] transition-all duration-100
+                    group
+                    ${isSelected
+                      ? 'bg-primary/8 border-2 border-primary/60 shadow-primary/10'
+                      : 'bg-white border border-neutral-gray/15 hover:border-primary/30 hover:shadow-md'
+                    }
+                  `}
+                >
+                  {/* Image */}
+                  <div className="aspect-square rounded-xl bg-neutral-gray/10 mb-3 overflow-hidden relative">
+                    {item.image ? (
+                      <Image
+                        src={item.image}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-neutral-gray/30">
+                        <ForkKnifeIcon className="w-10 h-10" />
+                      </div>
+                    )}
+                    {/* New badge */}
+                    {item.isNew && !isSelected && (
+                      <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-primary text-brown text-[10px] font-semibold">
+                        NEW
+                      </span>
+                    )}
+                    {/* Quantity badge */}
+                    {isSelected && (
+                      <span className="absolute top-1.5 right-1.5 min-w-5.5 h-5.5 px-1 rounded-full bg-primary text-brown text-[11px] font-bold flex items-center justify-center">
+                        {cartQty}
+                      </span>
+                    )}
                   </div>
-                  {/* Uncomment when you have real images */}
-                  {/* <Image src={item.image} alt={item.name} fill className="object-cover" /> */}
-                </div>
-                <p className="text-text-dark font-medium text-sm line-clamp-2 mb-1 group-hover:text-primary transition-colors">
-                  {item.name}
-                </p>
-                <p className="text-primary font-semibold">
-                  {formatGHS(item.price)}
-                </p>
-              </button>
-            ))}
+                  <p className={`font-medium text-sm line-clamp-2 mb-1 transition-colors ${isSelected ? 'text-primary' : 'text-text-dark group-hover:text-primary'}`}>
+                    {item.name}
+                  </p>
+                  <p className="text-primary font-semibold text-sm">
+                    {hasOptions && <span className="text-neutral-gray font-normal text-xs mr-0.5">from</span>}
+                    {formatGHS(price)}
+                  </p>
+                </button>
+              );
+            })}
           </div>
 
-          {filteredItems.length === 0 && (
+          {displayedItems.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-neutral-gray">
               <MagnifyingGlassIcon className="w-12 h-12 mb-4 opacity-40" />
               <p>No items found</p>
@@ -279,10 +364,24 @@ export default function POSTerminalPage() {
         </div>
       </div>
 
-      {/* Cart Sidebar */}
-      <div className="w-full lg:w-96 xl:w-[420px] border-t lg:border-t-0 lg:border-l border-neutral-gray/20 flex flex-col bg-white">
+      {/* Cart backdrop - tablet only */}
+      {showCart && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          onClick={() => setShowCart(false)}
+        />
+      )}
+
+      {/* Cart — overlay on tablet (<lg), inline sidebar on desktop (lg+) */}
+      <div className={`
+        flex flex-col bg-white
+        fixed inset-y-0 right-0 w-80 z-40 shadow-2xl
+        transition-transform duration-300 ease-in-out
+        lg:relative lg:inset-auto lg:w-80 lg:shadow-none lg:z-auto lg:border-l lg:border-neutral-gray/20
+        ${showCart ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+      `}>
         {/* Cart Header */}
-        <div className="flex-shrink-0 px-4 py-3 border-b border-neutral-gray/15 flex items-center justify-between">
+        <div className="shrink-0 px-4 py-3 border-b border-neutral-gray/15 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ReceiptIcon className="w-5 h-5 text-primary" />
             <span className="font-medium text-text-dark">Current Order</span>
@@ -293,18 +392,27 @@ export default function POSTerminalPage() {
             )}
           </div>
 
-          {cart.length > 0 && (
+          <div className="flex items-center gap-2">
+            {cart.length > 0 && (
+              <button
+                onClick={clearCart}
+                className="text-sm text-error/80 hover:text-error transition-colors"
+              >
+                Clear
+              </button>
+            )}
+            {/* Close button — tablet only */}
             <button
-              onClick={clearCart}
-              className="text-sm text-error/80 hover:text-error transition-colors"
+              onClick={() => setShowCart(false)}
+              className="lg:hidden w-8 h-8 rounded-lg flex items-center justify-center text-neutral-gray hover:bg-neutral-gray/10 transition-colors"
             >
-              Clear
+              <XIcon className="w-4 h-4" />
             </button>
-          )}
+          </div>
         </div>
 
         {/* Order Type Toggle */}
-        <div className="flex-shrink-0 px-4 py-3 border-b border-neutral-gray/15">
+        <div className="shrink-0 px-4 py-3 border-b border-neutral-gray/15">
           <div className="flex gap-2">
             <button
               onClick={() => setOrderType('dine_in')}
@@ -336,7 +444,7 @@ export default function POSTerminalPage() {
         </div>
 
         {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-neutral-gray">
               <ShoppingBagIcon className="w-16 h-16 mb-4 opacity-30" />
@@ -347,57 +455,50 @@ export default function POSTerminalPage() {
             cart.map(item => (
               <div
                 key={item.id}
-                className="flex items-center gap-3 p-3 rounded-xl bg-neutral-light"
+                className="flex flex-col px-3 py-2.5 rounded-xl bg-neutral-light gap-2"
               >
-                {/* Item image placeholder */}
-                <div className="w-14 h-14 rounded-lg bg-neutral-gray/10 flex-shrink-0 flex items-center justify-center">
-                  <ForkKnifeIcon className="w-6 h-6 text-neutral-gray/40" />
-                </div>
+                {/* Name & price */}
+                <p className="text-text-dark font-medium text-sm leading-snug">
+                  {item.name}
+                </p>
 
-                {/* Item details */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-text-dark font-medium text-sm truncate">
-                    {item.name}
-                  </p>
-                  <p className="text-primary font-semibold text-sm">
+                {/* Controls row */}
+                <div className="flex items-center justify-between">
+                  <p className="text-primary font-semibold text-xs">
                     {formatGHS(item.price * item.quantity)}
                   </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      className="w-7 h-7 rounded-lg bg-neutral-gray/10 flex items-center justify-center text-text-dark hover:bg-neutral-gray/20 active:scale-95 transition-all"
+                    >
+                      <MinusIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-6 text-center text-text-dark font-semibold text-sm">
+                      {item.quantity}
+                    </span>
+                    <button
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      className="w-7 h-7 rounded-lg bg-neutral-gray/10 flex items-center justify-center text-text-dark hover:bg-neutral-gray/20 active:scale-95 transition-all"
+                    >
+                      <PlusIcon className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => removeFromCart(item.id)}
+                      className="w-7 h-7 ml-1 rounded-lg flex items-center justify-center text-neutral-gray hover:text-error hover:bg-error/10 transition-all"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-
-                {/* Quantity controls */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                    className="w-8 h-8 rounded-lg bg-neutral-gray/10 flex items-center justify-center text-text-dark hover:bg-neutral-gray/20 active:scale-95 transition-all"
-                  >
-                    <MinusIcon className="w-4 h-4" />
-                  </button>
-                  <span className="w-8 text-center text-text-dark font-medium">
-                    {item.quantity}
-                  </span>
-                  <button
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                    className="w-8 h-8 rounded-lg bg-neutral-gray/10 flex items-center justify-center text-text-dark hover:bg-neutral-gray/20 active:scale-95 transition-all"
-                  >
-                    <PlusIcon className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Remove button */}
-                <button
-                  onClick={() => removeFromCart(item.id)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-gray hover:text-error hover:bg-error/10 transition-all"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
               </div>
             ))
           )}
         </div>
 
-        {/* Order Details Toggle */}
+        {/* Customer Details Toggle */}
         {cart.length > 0 && (
-          <div className="flex-shrink-0 px-4 py-2 border-t border-neutral-gray/15">
+          <div className="shrink-0 px-4 py-2 border-t border-neutral-gray/15">
             <button
               onClick={() => setShowOrderDetails(!showOrderDetails)}
               className="w-full flex items-center justify-between py-2 text-neutral-gray hover:text-text-dark transition-colors"
@@ -415,6 +516,21 @@ export default function POSTerminalPage() {
                     placeholder="Customer name (optional)"
                     value={customerName}
                     onChange={e => setCustomerName(e.target.value)}
+                    className="
+                      w-full h-10 pl-9 pr-3 rounded-lg
+                      bg-neutral-light text-text-dark placeholder:text-neutral-gray/60
+                      border border-neutral-gray/20 focus:border-primary/50
+                      outline-none text-sm transition-colors
+                    "
+                  />
+                </div>
+                <div className="relative">
+                  <DeviceMobileIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-gray" />
+                  <input
+                    type="tel"
+                    placeholder="Phone number (optional)"
+                    value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)}
                     className="
                       w-full h-10 pl-9 pr-3 rounded-lg
                       bg-neutral-light text-text-dark placeholder:text-neutral-gray/60
@@ -444,7 +560,7 @@ export default function POSTerminalPage() {
         )}
 
         {/* Total & Pay Button */}
-        <div className="flex-shrink-0 p-4 border-t border-neutral-gray/20 bg-neutral-light">
+        <div className="shrink-0 p-4 border-t border-neutral-gray/20 bg-neutral-light">
           <div className="flex items-center justify-between mb-4">
             <span className="text-neutral-gray">Total</span>
             <span className="text-2xl font-bold text-primary">
@@ -470,6 +586,37 @@ export default function POSTerminalPage() {
         </div>
       </div>
 
+      {/* Bottom bar — tablet only (< lg) */}
+      <div className="fixed bottom-0 inset-x-0 z-20 lg:hidden px-4 py-3 bg-white border-t border-neutral-gray/20 shadow-lg">
+        <button
+          onClick={() => setShowCart(true)}
+          className="
+            w-full h-14 rounded-2xl font-semibold
+            bg-primary text-brown
+            hover:bg-primary-hover active:scale-[0.98]
+            transition-all duration-150
+            flex items-center justify-between px-5
+          "
+        >
+          <div className="flex items-center gap-2">
+            <ShoppingBagIcon className="w-5 h-5" />
+            <span>
+              {cartCount > 0 ? `${cartCount} item${cartCount !== 1 ? 's' : ''}` : 'Cart'}
+            </span>
+          </div>
+          <span>{cartCount > 0 ? formatGHS(cartTotal) : 'Empty'}</span>
+        </button>
+      </div>
+
+      {/* Item Picker Modal (sizes / variants) */}
+      {pickerItem && (
+        <ItemPickerModal
+          item={pickerItem}
+          onSelect={handlePickerSelect}
+          onClose={() => setPickerItem(null)}
+        />
+      )}
+
       {/* Payment Modal */}
       {isPaymentOpen && (
         <PaymentModal
@@ -483,6 +630,7 @@ export default function POSTerminalPage() {
       {completedOrder && (
         <OrderSuccessModal
           order={completedOrder}
+          branchName={branchInfo?.name ?? 'CediBites'}
           onClose={() => setCompletedOrder(null)}
         />
       )}
@@ -490,7 +638,121 @@ export default function POSTerminalPage() {
   );
 }
 
-// Payment Modal Component
+// ─── Item Picker Modal ────────────────────────────────────────────────────────
+
+interface ItemPickerModalProps {
+  item: MenuItem;
+  onSelect: (item: MenuItem, label: string, price: number, variantKey: string) => void;
+  onClose: () => void;
+}
+
+function ItemPickerModal({ item, onSelect, onClose }: ItemPickerModalProps) {
+  const [tappedKey, setTappedKey] = useState<string | null>(null);
+
+  const handlePillTap = (label: string, price: number, variantKey: string) => {
+    setTappedKey(variantKey);
+    setTimeout(() => onSelect(item, label, price, variantKey), 180);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40">
+      <div className="w-full max-w-sm bg-white rounded-3xl overflow-hidden shadow-2xl">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-neutral-gray/20 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-text-dark line-clamp-1">{item.name}</h2>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-gray hover:text-text-dark hover:bg-neutral-gray/10 transition-all"
+          >
+            <XIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Options */}
+        <div className="p-6 space-y-5">
+          {/* Size pills */}
+          {item.sizes && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold text-neutral-gray uppercase tracking-wide">Choose Size</p>
+              <div className="flex gap-2 flex-wrap">
+                {item.sizes.map(size => {
+                  const tapped = tappedKey === size.key;
+                  return (
+                    <button
+                      key={size.key}
+                      onClick={() => handlePillTap(size.label, size.price, size.key)}
+                      className={`
+                        relative flex flex-col items-center px-5 py-2.5 rounded-2xl border-2
+                        active:scale-95 transition-all duration-150 min-w-20
+                        ${tapped
+                          ? 'border-primary bg-primary/10'
+                          : 'border-neutral-gray/20 hover:border-primary/40 hover:bg-primary/5'
+                        }
+                      `}
+                    >
+                      <span className={`text-sm font-semibold ${tapped ? 'text-primary' : 'text-text-dark'}`}>{size.label}</span>
+                      <span className={`text-xs font-bold ${tapped ? 'text-primary' : 'text-neutral-gray'}`}>{formatGHS(size.price)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Variant pills (plain / assorted) */}
+          {item.hasVariants && item.variants && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold text-neutral-gray uppercase tracking-wide">Choose Type</p>
+              <div className="flex gap-2 flex-wrap">
+                {item.variants.plain !== undefined && (() => {
+                  const tapped = tappedKey === 'plain';
+                  return (
+                    <button
+                      onClick={() => handlePillTap('Plain', item.variants!.plain!, 'plain')}
+                      className={`
+                        relative flex flex-col items-center px-5 py-2.5 rounded-2xl border-2
+                        active:scale-95 transition-all duration-150 min-w-20
+                        ${tapped
+                          ? 'border-primary bg-primary/10'
+                          : 'border-neutral-gray/20 hover:border-primary/40 hover:bg-primary/5'
+                        }
+                      `}
+                    >
+                      <span className={`text-sm font-semibold ${tapped ? 'text-primary' : 'text-text-dark'}`}>Plain</span>
+                      <span className={`text-xs font-bold ${tapped ? 'text-primary' : 'text-neutral-gray'}`}>{formatGHS(item.variants!.plain!)}</span>
+                    </button>
+                  );
+                })()}
+                {item.variants.assorted !== undefined && (() => {
+                  const tapped = tappedKey === 'assorted';
+                  return (
+                    <button
+                      onClick={() => handlePillTap('Assorted', item.variants!.assorted!, 'assorted')}
+                      className={`
+                        relative flex flex-col items-center px-5 py-2.5 rounded-2xl border-2
+                        active:scale-95 transition-all duration-150 min-w-20
+                        ${tapped
+                          ? 'border-primary bg-primary/10'
+                          : 'border-neutral-gray/20 hover:border-primary/40 hover:bg-primary/5'
+                        }
+                      `}
+                    >
+                      <span className={`text-sm font-semibold ${tapped ? 'text-primary' : 'text-text-dark'}`}>Assorted</span>
+                      <span className={`text-xs font-bold ${tapped ? 'text-primary' : 'text-neutral-gray'}`}>{formatGHS(item.variants!.assorted!)}</span>
+                    </button>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Payment Modal ────────────────────────────────────────────────────────────
+
 interface PaymentModalProps {
   total: number;
   onClose: () => void;
@@ -702,13 +964,15 @@ function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
   );
 }
 
-// Order Success Modal
+// ─── Order Success Modal ──────────────────────────────────────────────────────
+
 interface OrderSuccessModalProps {
   order: POSOrder;
+  branchName: string;
   onClose: () => void;
 }
 
-function OrderSuccessModal({ order, onClose }: OrderSuccessModalProps) {
+function OrderSuccessModal({ order, branchName, onClose }: OrderSuccessModalProps) {
   // Auto close after 5 seconds
   useEffect(() => {
     const timer = setTimeout(onClose, 5000);
@@ -755,17 +1019,32 @@ function OrderSuccessModal({ order, onClose }: OrderSuccessModalProps) {
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="
-              w-full h-12 rounded-xl font-medium
-              bg-primary text-brown
-              hover:bg-primary-hover active:scale-[0.98]
-              transition-all duration-150
-            "
-          >
-            New Order
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => printReceipt(order, branchName)}
+              className="
+                flex-1 h-12 rounded-xl font-medium
+                bg-neutral-gray/10 text-text-dark
+                hover:bg-neutral-gray/20 active:scale-[0.98]
+                transition-all duration-150
+                flex items-center justify-center gap-2
+              "
+            >
+              <PrinterIcon className="w-4 h-4" />
+              Print
+            </button>
+            <button
+              onClick={onClose}
+              className="
+                flex-1 h-12 rounded-xl font-medium
+                bg-primary text-brown
+                hover:bg-primary-hover active:scale-[0.98]
+                transition-all duration-150
+              "
+            >
+              New Order
+            </button>
+          </div>
         </div>
 
         {/* Auto close indicator */}

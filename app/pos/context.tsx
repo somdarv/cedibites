@@ -33,6 +33,8 @@ interface POSContextValue {
   // Order details
   customerName: string;
   setCustomerName: (name: string) => void;
+  customerPhone: string;
+  setCustomerPhone: (phone: string) => void;
   orderNotes: string;
   setOrderNotes: (notes: string) => void;
   orderType: 'dine_in' | 'takeaway';
@@ -46,6 +48,8 @@ interface POSContextValue {
 
   // Order history (today)
   todayOrders: POSOrder[];
+  updateOrderStatus: (orderId: string, status: POSOrder['status']) => void;
+  seedTestOrders: () => void;
 
   // Logout
   logout: () => void;
@@ -73,6 +77,7 @@ export function POSProvider({ children }: POSProviderProps) {
 
   // Order details
   const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [orderType, setOrderType] = useState<'dine_in' | 'takeaway'>('dine_in');
 
@@ -182,6 +187,7 @@ export function POSProvider({ children }: POSProviderProps) {
   const clearCart = useCallback(() => {
     setCart([]);
     setCustomerName('');
+    setCustomerPhone('');
     setOrderNotes('');
     setOrderType('dine_in');
   }, []);
@@ -214,6 +220,7 @@ export function POSProvider({ children }: POSProviderProps) {
       subtotal: cartTotal,
       total: cartTotal, // Add tax/discounts here if needed
       customerName: customerName || undefined,
+      customerPhone: customerPhone || undefined,
       notes: orderNotes || undefined,
       paymentMethod: method,
       paymentStatus: 'completed',
@@ -230,7 +237,65 @@ export function POSProvider({ children }: POSProviderProps) {
     setIsPaymentOpen(false);
 
     return order;
-  }, [cart, cartTotal, customerName, orderNotes, orderType, clearCart]);
+  }, [cart, cartTotal, customerName, customerPhone, orderNotes, orderType, clearCart]);
+
+  const updateOrderStatus = useCallback((orderId: string, status: POSOrder['status']) => {
+    setTodayOrders(prev =>
+      prev.map(o => o.id === orderId ? { ...o, status } : o)
+    );
+  }, []);
+
+  const seedTestOrders = useCallback(() => {
+    const now = Date.now();
+    const mockOrders: POSOrder[] = [
+      {
+        id: `CB${(now - 2400000).toString().slice(-6)}`,
+        items: [
+          { id: generateId(), menuItemId: 'm1', name: 'Jollof Rice with Chicken', price: 85, quantity: 2 },
+          { id: generateId(), menuItemId: 'm2', name: 'Pineapple Ginger Juice', price: 28, quantity: 1 },
+        ],
+        subtotal: 198, total: 198,
+        customerName: 'Ama Darko', customerPhone: '0244123456',
+        paymentMethod: 'cash', paymentStatus: 'completed',
+        orderType: 'dine_in', status: 'ready',
+        createdAt: new Date(now - 2400000),
+      },
+      {
+        id: `CB${(now - 1800000).toString().slice(-6)}`,
+        items: [
+          { id: generateId(), menuItemId: 'm3', name: 'Waakye Special', price: 65, quantity: 1 },
+        ],
+        subtotal: 65, total: 65,
+        customerName: 'Kweku Asante',
+        paymentMethod: 'momo', paymentStatus: 'completed',
+        orderType: 'takeaway', status: 'preparing',
+        createdAt: new Date(now - 1800000),
+      },
+      {
+        id: `CB${(now - 900000).toString().slice(-6)}`,
+        items: [
+          { id: generateId(), menuItemId: 'm4', name: 'Grilled Tilapia', price: 120, quantity: 1 },
+          { id: generateId(), menuItemId: 'm5', name: 'Fried Plantain', price: 25, quantity: 2 },
+        ],
+        subtotal: 170, total: 170,
+        notes: 'Extra pepper please',
+        paymentMethod: 'card', paymentStatus: 'completed',
+        orderType: 'dine_in', status: 'ready',
+        createdAt: new Date(now - 900000),
+      },
+      {
+        id: `CB${(now - 300000).toString().slice(-6)}`,
+        items: [
+          { id: generateId(), menuItemId: 'm6', name: 'Banku with Tilapia', price: 95, quantity: 1 },
+        ],
+        subtotal: 95, total: 95,
+        paymentMethod: 'cash', paymentStatus: 'completed',
+        orderType: 'takeaway', status: 'received',
+        createdAt: new Date(now - 300000),
+      },
+    ];
+    setTodayOrders(prev => [...mockOrders, ...prev]);
+  }, []);
 
   const logout = useCallback(() => {
     sessionStorage.removeItem('pos-session');
@@ -251,6 +316,8 @@ export function POSProvider({ children }: POSProviderProps) {
     clearCart,
     customerName,
     setCustomerName,
+    customerPhone,
+    setCustomerPhone,
     orderNotes,
     setOrderNotes,
     orderType,
@@ -260,6 +327,8 @@ export function POSProvider({ children }: POSProviderProps) {
     closePayment,
     processPayment,
     todayOrders,
+    updateOrderStatus,
+    seedTestOrders,
     logout,
   };
 

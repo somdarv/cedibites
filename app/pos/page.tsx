@@ -10,20 +10,15 @@ import {
   UserIcon,
   SpinnerIcon
 } from '@phosphor-icons/react';
-
-// Mock branches - replace with real data
-const BRANCHES = [
-  { id: 'osu', name: 'Osu Branch', address: 'Oxford Street, Osu' },
-  { id: 'eastlegon', name: 'East Legon', address: 'A&C Mall, East Legon' },
-  { id: 'labone', name: 'Labone', address: 'Labone Junction' },
-  { id: 'airport', name: 'Airport City', address: 'Airport Residential' },
-];
+import { BRANCHES, Branch } from '@/app/components/providers/BranchProvider';
 
 // Mock staff - replace with real auth
+// Branch IDs match BRANCHES: '1'=Osu, '2'=East Legon, '3'=Spintex, '4'=Tema, '5'=Madina, '6'=La Paz, '7'=Dzorwulu
 const MOCK_STAFF: Record<string, { name: string; pin: string; branches: string[] }> = {
-  '1234': { name: 'Kofi Mensah', pin: '1234', branches: ['osu', 'eastlegon'] },
-  '5678': { name: 'Ama Serwaa', pin: '5678', branches: ['labone', 'airport'] },
-  '0000': { name: 'Admin User', pin: '0000', branches: ['osu', 'eastlegon', 'labone', 'airport'] },
+  '1234': { name: 'Kofi Mensah', pin: '1234', branches: ['1', '2'] },
+  '5678': { name: 'Ama Serwaa', pin: '5678', branches: ['3', '4'] },
+  '0000': { name: 'Admin User', pin: '0000', branches: BRANCHES.map(b => b.id) },
+  '4321': { name: 'Chef Akua', pin: '4321', branches: ['1', '2'] },
 };
 
 type LoginStep = 'pin' | 'branch';
@@ -122,16 +117,16 @@ export default function POSLoginPage() {
   }, [step, handlePinInput, handleBackspace]);
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center p-6 bg-neutral-light">
+    <div className="min-h-dvh bg-neutral-card flex flex-col items-center justify-center p-6 bg-neutral-ligh">
       {/* Logo */}
       <div className="mb-8">
-        <Image
-          src="/cblogo.svg"
+        {/* <Image
+          src="/cblogo.webp"
           alt="CediBites"
-          width={180}
-          height={60}
+          width={120}
+          height={40}
           priority
-        />
+        /> */}
       </div>
 
       {step === 'pin' ? (
@@ -272,7 +267,7 @@ function PinEntryView({ pin, pinLength, error, isLoading, onPinInput, onBackspac
 // Branch Select Component
 interface BranchSelectProps {
   staffName: string;
-  branches: typeof BRANCHES;
+  branches: Branch[];
   selectedBranch: string | null;
   onSelect: (id: string) => void;
   onConfirm: () => void;

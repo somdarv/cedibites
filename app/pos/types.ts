@@ -23,6 +23,7 @@ export interface POSOrder {
   subtotal: number;
   total: number;
   customerName?: string;
+  customerPhone?: string;
   notes?: string;
   paymentMethod: PaymentMethod;
   paymentStatus: 'pending' | 'completed' | 'failed';
