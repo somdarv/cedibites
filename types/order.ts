@@ -1,7 +1,7 @@
 // lib/types/order.ts
 
 export type OrderStatus =
-    | 'received' | 'preparing' | 'ready'
+    | 'pending' | 'confirmed' | 'received' | 'preparing' | 'ready'
     | 'out_for_delivery' | 'delivered'
     | 'ready_for_pickup' | 'completed' | 'cancelled';
 
@@ -54,6 +54,8 @@ export interface Order {
 export const STATUS_CONFIG: Record<OrderStatus, {
     label: string; color: string; bg: string; textColor: string;
 }> = {
+    pending: { label: 'Pending', color: 'text-info', bg: 'bg-info/8', textColor: '#1976d2' },
+    confirmed: { label: 'Confirmed', color: 'text-info', bg: 'bg-info/8', textColor: '#1976d2' },
     received: { label: 'Received', color: 'text-info', bg: 'bg-info/8', textColor: '#1976d2' },
     preparing: { label: 'Preparing', color: 'text-warning', bg: 'bg-warning/8', textColor: '#f9a61a' },
     ready: { label: 'Ready', color: 'text-primary', bg: 'bg-primary/8', textColor: '#e49925' },
@@ -80,7 +82,11 @@ export const PAY_LABEL: Record<PaymentMethod, string> = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-export const formatPrice = (p: number) => `GHS ${p.toFixed(2)}`;
+export const formatPrice = (p: number | string | null | undefined): string => {
+    const n = typeof p === 'number' ? p : Number(p);
+    if (Number.isNaN(n)) return 'GHS 0.00';
+    return `GHS ${n.toFixed(2)}`;
+};
 
 export function timeAgo(ts: number): string {
     const d = Date.now() - ts;

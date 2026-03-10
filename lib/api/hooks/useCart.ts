@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cartService } from '../services/cart.service';
 import type { AddCartItemRequest, UpdateCartItemRequest } from '../services/cart.service';
+import { getGuestSessionId } from '../client';
+
+const hasCartIdentity = () =>
+  typeof window !== 'undefined' &&
+  (!!localStorage.getItem('cedibites_auth_token') || !!getGuestSessionId());
 
 export const useCart = () => {
   const queryClient = useQueryClient();
 
-  // Get cart
+  // Get cart (enabled for auth OR guest session)
   const {
     data: cartData,
     isLoading,
@@ -14,7 +19,7 @@ export const useCart = () => {
     queryKey: ['cart'],
     queryFn: cartService.getCart,
     retry: 1,
-    enabled: typeof window !== 'undefined' && !!localStorage.getItem('cedibites_auth_token'),
+    enabled: hasCartIdentity(),
   });
 
   // Add item mutation

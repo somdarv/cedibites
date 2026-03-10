@@ -53,4 +53,11 @@ export const cartService = {
   clearCart: (): Promise<{ data: null }> => {
     return apiClient.delete('/cart/clear');
   },
+
+  /**
+   * Claim guest cart for authenticated customer (call after login)
+   */
+  claimGuestCart: (guestSessionId: string): Promise<{ data: Cart | null }> => {
+    return apiClient.post('/cart/claim-guest', { guest_session_id: guestSessionId });
+  },
 };

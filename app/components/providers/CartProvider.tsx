@@ -5,7 +5,8 @@ import type { SearchableItem } from './MenuDiscoveryProvider';
 import { useCart as useApiCart } from '@/lib/api/hooks/useCart';
 import { useAuth } from './AuthProvider';
 import { useBranch } from './BranchProvider';
-import { transformApiCartToLocal, transformLocalToApiRequest } from '@/lib/api/transformers/cart.transformer';
+import { ensureGuestSessionId, getGuestSessionId } from '@/lib/api/client';
+import { transformApiCartToLocal } from '@/lib/api/transformers/cart.transformer';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,11 +55,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Get auth and branch context
     const { isLoggedIn } = useAuth();
     const { selectedBranch } = useBranch();
-    
-    // Determine mode based on auth status
-    const mode: 'api' | 'local' = isLoggedIn ? 'api' : 'local';
-    
-    // API cart hook (only enabled when authenticated)
+    const [guestSessionReady, setGuestSessionReady] = useState(false);
+
+    // Ensure guest session on mount so guests use backend cart
+    useEffect(() => {
+        if (!isLoggedIn && typeof window !== 'undefined') {
+            ensureGuestSessionId();
+            setGuestSessionReady(true);
+        }
+    }, [isLoggedIn]);
+
+    const hasGuestSession = guestSessionReady && !!getGuestSessionId();
+
+    // Use backend cart when: logged in OR has guest session (all carts in backend)
+    const mode: 'api' | 'local' = isLoggedIn || hasGuestSession ? 'api' : 'local';
+
+    // API cart hook (enabled for auth OR guest session)
     const apiCart = useApiCart();
     
     // Use API cart data when authenticated, otherwise use local state
@@ -68,7 +80,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     
     const isLoading = mode === 'api' ? apiCart.isLoading : false;
 
-    // Hydrate from localStorage
+    // Hydrate from localStorage (fallback for legacy local carts)
     useEffect(() => {
         try {
             const saved = localStorage.getItem(CART_KEY);
@@ -103,7 +115,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 for (const localItem of localCart) {
                     try {
                         await apiCart.addItem({
-                            branch_id: selectedBranch.id,
+                            branch_id: Number(selectedBranch.id),
                             menu_item_id: parseInt(localItem.item.id),
                             quantity: localItem.quantity,
                             unit_price: localItem.price,
@@ -140,14 +152,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const sizeLabel = sizeData?.label ?? sizeKey;
 
         if (mode === 'api' && selectedBranch) {
+            // Ensure guest has session ID before API call
+            if (!isLoggedIn) ensureGuestSessionId();
             // API mode: use backend
             try {
                 const existing = effectiveItems.find(i => i.cartItemId === cartItemId);
                 
                 if (existing) {
-                    // Update quantity
+                    // Update quantity (use cart_item id, not menu_item id)
+                    if (!existing.apiCartItemId) {
+                        console.error('No API cart item ID for update:', cartItemId);
+                        addToLocalCart(item, sizeKey, cartItemId, price, sizeLabel);
+                        return;
+                    }
                     await apiCart.updateItem({
-                        itemId: parseInt(item.id),
+                        itemId: existing.apiCartItemId,
                         data: { quantity: existing.quantity + 1 }
                     });
                 } else {
@@ -155,7 +174,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                     const menuItemSizeId = sizeData?.id ? parseInt(String(sizeData.id)) : undefined;
                     
                     await apiCart.addItem({
-                        branch_id: selectedBranch.id,
+                        branch_id: Number(selectedBranch.id),
                         menu_item_id: parseInt(item.id),
                         menu_item_size_id: menuItemSizeId,
                         quantity: 1,

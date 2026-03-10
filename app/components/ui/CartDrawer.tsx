@@ -18,6 +18,13 @@ const formatPrice = (p: number | undefined) => {
     if (p === undefined || p === null || typeof p !== 'number') return 'GHS 0.00';
     return `GHS ${p.toFixed(2)}`;
 };
+
+function CartItemImage({ src, alt, sizes, className }: { src?: string; alt: string; sizes: string; className?: string }) {
+    const [error, setError] = useState(false);
+    const imageSrc = !src || error ? '/menu_placeholder.png' : src;
+    return <Image src={imageSrc} alt={alt} fill sizes={sizes} className={className ?? 'object-cover'} onError={() => setError(true)} />;
+}
+
 const DELIVERY_FEE = 15;
 const TAX_RATE = 0.025;
 
@@ -280,7 +287,7 @@ export default function CartDrawer() {
                             {conflictResult.unavailable.map(ci => (
                                 <div key={ci.cartItemId} className="flex items-center gap-3 bg-error/5 border border-error/15 rounded-xl p-3">
                                     <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-error/10 shrink-0">
-                                        {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
+                                        <CartItemImage src={ci.item.image} alt={ci.item.name} sizes="40px" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -298,7 +305,7 @@ export default function CartDrawer() {
                                 {conflictResult.available.map(ci => (
                                     <div key={ci.cartItemId} className="flex items-center gap-3 bg-secondary/5 border border-secondary/15 rounded-xl p-3">
                                         <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-secondary/10 shrink-0">
-                                            {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
+                                            <CartItemImage src={ci.item.image} alt={ci.item.name} sizes="40px" />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -333,11 +340,10 @@ export default function CartDrawer() {
 function CartItemRow({ cartItem, onRemove, onIncrease, onDecrease, isOperating }: {
     cartItem: CartItem; onRemove: () => Promise<void>; onIncrease: () => Promise<void>; onDecrease: () => Promise<void>; isOperating?: boolean;
 }) {
-    const [imgError, setImgError] = React.useState(false);
     return (
         <div className={`flex items-center gap-3 bg-white/60 dark:bg-white/5 rounded-2xl p-3 transition-opacity ${isOperating ? 'opacity-50' : ''}`}>
             <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-primary/10 shrink-0">
-                {cartItem.item.image && !imgError ? <Image src={cartItem.item.image} alt={cartItem.item.name} fill sizes="64px" className="object-cover" onError={() => setImgError(true)} /> : <div className="w-full h-full" />}
+                <CartItemImage src={cartItem.item.image} alt={cartItem.item.name} sizes="64px" />
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-text-dark dark:text-text-light leading-tight truncate">{cartItem.item.name}</p>

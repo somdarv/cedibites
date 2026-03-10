@@ -9,7 +9,7 @@ import type { AddCartItemRequest } from '../services/cart.service';
  * Consolidates duplicate items (same menu_item + size) into single entries
  */
 export function transformApiCartToLocal(apiCart: Cart): LocalCartItem[] {
-  if (!apiCart.items || apiCart.items.length === 0) {
+  if (!apiCart?.items || apiCart.items.length === 0) {
     return [];
   }
 
@@ -18,7 +18,8 @@ export function transformApiCartToLocal(apiCart: Cart): LocalCartItem[] {
 
   apiCart.items.forEach((apiItem: ApiCartItem) => {
     const menuItem = apiItem.menu_item;
-    const sizeKey = apiItem.size_key || 'default';
+    if (!menuItem) return; // Skip items with missing menu_item (e.g. deleted)
+    const sizeKey = deriveSizeKey(apiItem);
     const cartItemId = `${menuItem.id}__${sizeKey}`;
 
     if (itemsMap.has(cartItemId)) {
@@ -54,12 +55,16 @@ export function transformLocalToApiRequest(
   cartItem: LocalCartItem,
   branchId: number
 ): AddCartItemRequest {
+  const sizeId = cartItem.selectedSize !== 'default' && cartItem.item.sizes
+    ? cartItem.item.sizes.find((s: { key: string; id?: number }) => s.key === cartItem.selectedSize)?.id
+    : undefined;
+
   return {
     branch_id: branchId,
     menu_item_id: parseInt(cartItem.item.id),
+    menu_item_size_id: sizeId,
     quantity: cartItem.quantity,
-    size_key: cartItem.selectedSize !== 'default' ? cartItem.selectedSize : undefined,
-    variant_key: undefined, // Not used in current implementation
+    unit_price: cartItem.price,
     special_instructions: undefined,
   };
 }
@@ -68,37 +73,57 @@ export function transformLocalToApiRequest(
  * Transform MenuItem to SearchableItem
  * Converts backend menu item to frontend searchable format
  */
+const VALID_CATEGORIES = ['Basic Meals', 'Budget Bowls', 'Combos', 'Top Ups', 'Drinks'] as const;
+
 export function transformMenuItemToSearchable(menuItem: MenuItem): SearchableItem {
-  const sizes = menuItem.sizes?.map((size) => ({
-    key: size.size_key,
-    label: size.size_label,
-    price: size.price,
-  })) || [];
+  const sizes = (menuItem.sizes?.map((size: { size_key?: string; size_label?: string; name?: string; price?: number; id?: number }) => ({
+    key: size.size_key ?? size.name?.toLowerCase().replace(/\s+/g, '_') ?? 'default',
+    label: size.size_label ?? size.name ?? 'Default',
+    price: size.price ?? 0,
+    id: size.id,
+  })) || []) as SearchableItem['sizes'];
+
+  const catName = menuItem.category?.name || 'Basic Meals';
+  const category = VALID_CATEGORIES.includes(catName as any) ? (catName as SearchableItem['category']) : 'Basic Meals';
 
   return {
     id: menuItem.id.toString(),
     name: menuItem.name,
     description: menuItem.description,
-    category: menuItem.category?.name || 'Other',
+    category,
     price: menuItem.base_price,
-    image: menuItem.image_url || '/placeholder-food.jpg',
-    isPopular: menuItem.is_popular,
+    image: menuItem.image_url || '/menu_placeholder.png',
+    url: `/menu?item=${menuItem.id}`,
+    popular: menuItem.is_popular,
     isNew: menuItem.is_new,
-    isAvailable: menuItem.is_available,
-    sizes: sizes.length > 0 ? sizes : undefined,
+    sizes: sizes && sizes.length > 0 ? sizes : undefined,
   };
+}
+
+/**
+ * Derive size_key from API cart item (backend may use menu_item_size.name or size_key)
+ */
+function deriveSizeKey(apiItem: ApiCartItem & { menu_item_size?: { size_key?: string; name?: string } }): string {
+  if (apiItem.size_key) return apiItem.size_key;
+  const size = apiItem.menu_item_size;
+  if (size?.size_key) return size.size_key;
+  if (size?.name) return size.name.toLowerCase().replace(/\s+/g, '_');
+  return 'default';
 }
 
 /**
  * Helper: Get size label from menu item
  */
 function getSizeLabel(menuItem: MenuItem, sizeKey: string): string {
-  if (!menuItem.sizes || menuItem.sizes.length === 0) {
+  if (!menuItem?.sizes || menuItem.sizes.length === 0) {
     return sizeKey;
   }
 
-  const size = menuItem.sizes.find((s) => s.size_key === sizeKey);
-  return size?.size_label || sizeKey;
+  const size = menuItem.sizes.find(
+    (s: { size_key?: string; size_label?: string; name?: string }) =>
+      (s.size_key ?? s.name?.toLowerCase().replace(/\s+/g, '_')) === sizeKey
+  );
+  return size?.size_label ?? (size as { name?: string })?.name ?? sizeKey;
 }
 
 /**

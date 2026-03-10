@@ -32,6 +32,14 @@ const formatPrice = (p: number | undefined) => {
     return `GHS ${p.toFixed(2)}`;
 };
 
+const PLACEHOLDER_IMAGE = '/menu_placeholder.png';
+
+function CartItemImage({ src, alt, sizes, className }: { src?: string; alt: string; sizes: string; className?: string }) {
+    const [error, setError] = useState(false);
+    const imageSrc = !src || error ? PLACEHOLDER_IMAGE : src;
+    return <Image src={imageSrc} alt={alt} fill sizes={sizes} className={className ?? 'object-cover'} onError={() => setError(true)} />;
+}
+
 // ─── Input Field ──────────────────────────────────────────────────────────────
 function InputField({ icon, label, required, children }: { icon: React.ReactNode; label: string; required?: boolean; children: React.ReactNode }) {
     return (
@@ -282,7 +290,7 @@ function BranchSelectorSheet({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                             {conflict.unavailable.map(ci => (
                                 <div key={ci.cartItemId} className="flex items-center gap-3 bg-error/5 border border-error/15 rounded-xl p-3">
                                     <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-error/10 shrink-0">
-                                        {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
+                                        <CartItemImage src={ci.item.image} alt={ci.item.name} sizes="40px" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -299,7 +307,7 @@ function BranchSelectorSheet({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                 {conflict.available.map(ci => (
                                     <div key={ci.cartItemId} className="flex items-center gap-3 bg-secondary/5 border border-secondary/15 rounded-xl p-3">
                                         <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-secondary/10 shrink-0">
-                                            {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
+                                            <CartItemImage src={ci.item.image} alt={ci.item.name} sizes="40px" />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -370,7 +378,7 @@ function OrderSummary({ orderType }: { orderType: OrderType }) {
                 {items.map(ci => (
                     <div key={ci.cartItemId} className="flex items-center gap-3">
                         <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-primary/10 shrink-0">
-                            {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="48px" className="object-cover" /> : <div className="w-full h-full" />}
+                            <CartItemImage src={ci.item.image} alt={ci.item.name} sizes="48px" />
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -487,7 +495,9 @@ function StepDetails({ orderType, setOrderType, contact, setContact, onNext }: {
 // ─── Step 2 ───────────────────────────────────────────────────────────────────
 function StepPayment({ paymentMethod, setPaymentMethod, orderType, contact, onBack, onPlace, placing, orderError }: {
     paymentMethod: PaymentMethod; setPaymentMethod: (m: PaymentMethod) => void;
-    orderType: OrderType; contact: ContactDetails; onBack: () => void; onPlace: () => void; placing: boolean; orderError?: string | null;
+    orderType: OrderType; contact: ContactDetails; onBack: () => void;
+    onPlace: (momoOverrides?: { momo_number: string; momo_network: string }) => void;
+    placing: boolean; orderError?: string | null;
 }) {
     const { subtotal } = useCart();
     const { selectedBranch } = useBranch();
@@ -585,7 +595,7 @@ function StepPayment({ paymentMethod, setPaymentMethod, orderType, contact, onBa
                     <button onClick={onBack} className="flex cursor-pointer items-center gap-2 px-5 py-4 rounded-2xl border-2 border-neutral-gray/20 font-bold text-neutral-gray hover:border-primary/40 hover:text-primary transition-all">
                         <ArrowLeftIcon weight="bold" size={16} /> Back
                     </button>
-                    <button onClick={onPlace} disabled={placing}
+                    <button onClick={() => onPlace(paymentMethod === 'momo' ? { momo_number: momoPhone, momo_network: momoNetwork } : undefined)} disabled={placing}
                         className="flex-1 flex cursor-pointer items-center justify-between bg-brown dark:bg-brand-dark hover:bg-brown-light disabled:opacity-70 text-white font-bold px-6 py-4 rounded-2xl transition-all active:scale-[0.98] group">
                         <span>{placing ? 'Placing Order...' : paymentMethod === 'momo' ? 'Pay & Place Order' : 'Place Order'}</span>
                         <div className="flex items-center gap-2">
@@ -717,7 +727,7 @@ function StepDone({ orderNumber, orderType, contact }: {
 
             {/* CTA buttons */}
             <div className="flex flex-col gap-3 w-full">
-                <Link href="/orders"
+                <Link href={`/orders/${orderNumber}`}
                     className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98]">
                     Track My Order <ArrowRightIcon weight="bold" size={16} />
                 </Link>
@@ -761,7 +771,7 @@ export default function CheckoutPage() {
     const [contact, setContact] = useState<ContactDetails>({ name: '', phone: '', address: '', note: '' });
     const [orderError, setOrderError] = useState<string | null>(null);
 
-    const handlePlaceOrder = useCallback(async () => {
+    const handlePlaceOrder = useCallback(async (momoOverrides?: { momo_number: string; momo_network: string }) => {
         if (!selectedBranch) {
             setOrderError('Please select a branch');
             return;
@@ -778,13 +788,18 @@ export default function CheckoutPage() {
             return;
         }
 
+        if (paymentMethod === 'momo' && momoOverrides && !momoOverrides.momo_number.trim()) {
+            setOrderError('Please enter your MoMo number');
+            return;
+        }
+
         setPlacing(true);
         setOrderError(null);
 
         try {
             // Create order via API
             const response = await createOrder({
-                branch_id: selectedBranch.id,
+                branch_id: Number(selectedBranch.id),
                 order_type: orderType,
                 customer_name: contact.name,
                 customer_phone: contact.phone,
@@ -793,8 +808,8 @@ export default function CheckoutPage() {
                 delivery_longitude: orderType === 'delivery' && coordinates ? coordinates.longitude : undefined,
                 special_instructions: contact.note || undefined,
                 payment_method: paymentMethod,
-                momo_number: paymentMethod === 'momo' ? contact.phone : undefined,
-                momo_network: paymentMethod === 'momo' ? 'mtn' : undefined,
+                momo_number: paymentMethod === 'momo' ? (momoOverrides?.momo_number ?? contact.phone) : undefined,
+                momo_network: paymentMethod === 'momo' ? (momoOverrides?.momo_network ?? 'mtn') : undefined,
             });
 
             // Set order number from response

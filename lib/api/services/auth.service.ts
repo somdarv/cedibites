@@ -3,6 +3,7 @@ import { AuthResponse, User } from '@/types/api';
 
 export interface SendOTPRequest {
   phone: string;
+  email?: string;
 }
 
 export interface VerifyOTPRequest {
@@ -13,6 +14,7 @@ export interface VerifyOTPRequest {
 export interface RegisterRequest {
   name: string;
   phone: string;
+  email?: string;
   otp: string;
 }
 

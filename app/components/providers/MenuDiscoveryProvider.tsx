@@ -25,6 +25,7 @@ function transformApiMenuItemToSearchable(apiItem: ApiMenuItem): SearchableItem 
         key: size.size_key as any,
         label: size.size_label,
         price: size.price,
+        id: size.id,
     }));
 
     // Determine pricing structure

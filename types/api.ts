@@ -76,6 +76,8 @@ export interface MenuItemSize {
 
 export interface MenuItem {
   id: number;
+  branch_id?: number;
+  slug?: string;
   name: string;
   description: string;
   category_id: number;
@@ -121,6 +123,7 @@ export interface Cart {
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
+  | 'received'
   | 'preparing'
   | 'ready'
   | 'ready_for_pickup'
@@ -133,13 +136,14 @@ export type OrderType = 'delivery' | 'pickup';
 
 export type PaymentMethod = 'momo' | 'cash_delivery' | 'cash_pickup';
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export type PaymentStatus = 'pending' | 'paid' | 'completed' | 'failed' | 'refunded';
 
 export interface OrderItem {
   id: number;
   order_id: number;
   menu_item_id: number;
   menu_item: MenuItem;
+  menu_item_size?: { size_key?: string; name?: string };
   quantity: number;
   size_key?: string;
   variant_key?: string;
@@ -171,16 +175,22 @@ export interface Order {
   status: OrderStatus;
   items: OrderItem[];
   payment?: Payment;
+  payments?: Payment[];
   subtotal: number;
   delivery_fee: number;
-  tax: number;
-  total: number;
-  customer_name: string;
-  customer_phone: string;
+  tax?: number;
+  tax_amount?: number;
+  total?: number;
+  total_amount?: number;
+  customer_name?: string;
+  contact_name?: string;
+  customer_phone?: string;
+  contact_phone?: string;
   delivery_address?: string;
   delivery_latitude?: number;
   delivery_longitude?: number;
   special_instructions?: string;
+  delivery_note?: string;
   estimated_ready_time?: string;
   estimated_delivery_time?: string;
   created_at: string;

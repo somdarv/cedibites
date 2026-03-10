@@ -21,12 +21,27 @@ import Button from '@/app/components/base/Button';
 import type { Order as ApiOrder } from '@/types/api';
 import type { Order as MockOrder, OrderTimelineEvent, OrderStatus as MockOrderStatus } from '@/types/order';
 
+function deriveSizeKey(item: ApiOrder['items'][0]): string {
+    if (item.size_key) return item.size_key;
+    const size = item.menu_item_size;
+    if (size?.size_key) return size.size_key;
+    if (size?.name) return size.name.toLowerCase().replace(/\s+/g, '_');
+    return 'default';
+}
+
+function mapApiStatusToTimeline(status: string): string {
+    return status === 'received' ? 'pending' : status;
+}
+
 // Transform API order to mock order format for components
 function transformApiOrderToMock(apiOrder: ApiOrder): MockOrder {
-    // Build timeline based on order type
+    const placedAt = new Date(apiOrder.created_at).getTime();
+    const mappedStatus = mapApiStatusToTimeline(apiOrder.status);
     const timeline: OrderTimelineEvent[] = apiOrder.order_type === 'delivery'
-        ? buildDeliveryTimeline(apiOrder.status, new Date(apiOrder.created_at).getTime())
-        : buildPickupTimeline(apiOrder.status, new Date(apiOrder.created_at).getTime());
+        ? buildDeliveryTimeline(mappedStatus, placedAt)
+        : buildPickupTimeline(mappedStatus, placedAt);
+
+    const payment = apiOrder.payment ?? apiOrder.payments?.[0];
 
     return {
         id: apiOrder.id.toString(),
@@ -34,25 +49,29 @@ function transformApiOrderToMock(apiOrder: ApiOrder): MockOrder {
         status: apiOrder.status as MockOrderStatus,
         source: 'online',
         orderType: apiOrder.order_type,
-        paymentMethod: apiOrder.payment?.payment_method || 'cash_delivery',
-        isPaid: apiOrder.payment?.payment_status === 'paid',
-        items: apiOrder.items.map(item => ({
-            id: item.id.toString(),
-            name: item.menu_item.name,
-            image: item.menu_item.image_url,
-            sizeLabel: item.size_key || 'Regular',
-            price: item.unit_price,
-            quantity: item.quantity,
-        })),
-        subtotal: apiOrder.subtotal,
-        deliveryFee: apiOrder.delivery_fee,
-        tax: apiOrder.tax,
-        total: apiOrder.total,
+        paymentMethod: (payment?.payment_method as MockOrder['paymentMethod']) || 'cash_delivery',
+        isPaid: payment?.payment_status === 'paid' || payment?.payment_status === 'completed',
+        items: apiOrder.items.map(item => {
+            const sizeKey = deriveSizeKey(item);
+            const sizeLabel = sizeKey === 'default' ? 'Regular' : sizeKey.replace(/_/g, ' ');
+            return {
+                id: item.id.toString(),
+                name: item.menu_item.name,
+                image: item.menu_item.image_url,
+                sizeLabel,
+                price: Number(item.unit_price) || 0,
+                quantity: item.quantity,
+            };
+        }),
+        subtotal: Number(apiOrder.subtotal) || 0,
+        deliveryFee: Number(apiOrder.delivery_fee) ?? 0,
+        tax: Number(apiOrder.tax_amount ?? apiOrder.tax) || 0,
+        total: Number(apiOrder.total_amount ?? apiOrder.total) || 0,
         contact: {
-            name: apiOrder.customer_name,
-            phone: apiOrder.customer_phone,
+            name: apiOrder.contact_name ?? apiOrder.customer_name ?? '',
+            phone: apiOrder.contact_phone ?? apiOrder.customer_phone ?? '',
             address: apiOrder.delivery_address,
-            note: apiOrder.special_instructions,
+            note: apiOrder.delivery_note ?? apiOrder.special_instructions,
         },
         branch: {
             id: apiOrder.branch_id.toString(),
@@ -60,12 +79,12 @@ function transformApiOrderToMock(apiOrder: ApiOrder): MockOrder {
             address: apiOrder.branch?.address || '',
             phone: apiOrder.branch?.phone || '',
             coordinates: {
-                latitude: apiOrder.branch?.latitude || 0,
-                longitude: apiOrder.branch?.longitude || 0,
+                latitude: Number(apiOrder.branch?.latitude) || 0,
+                longitude: Number(apiOrder.branch?.longitude) || 0,
             },
         },
-        placedAt: new Date(apiOrder.created_at).getTime(),
-        estimatedMinutes: 35, // Default estimate
+        placedAt,
+        estimatedMinutes: 35,
         timeline,
     };
 }

@@ -28,7 +28,7 @@ export default function MenuItemCard({ item, onOpenDetail }: MenuItemCardProps) 
     const variantOptions = hasVariants ? Object.keys(item.variants!) : [];
 
     const [selectedSize, setSelectedSize] = useState<string>(
-        hasSizes ? sizes[0].key : 'regular'
+        hasSizes ? sizes[0].key : 'default'
     );
     const [selectedVariant, setSelectedVariant] = useState<string>(
         hasVariants ? variantOptions[0] : 'regular'

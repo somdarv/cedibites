@@ -7,6 +7,7 @@ export interface MenuItemsParams {
   is_popular?: boolean;
   is_available?: boolean;
   branch_id?: number;
+  per_page?: number;
 }
 
 export const menuService = {

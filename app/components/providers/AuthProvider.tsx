@@ -1,7 +1,10 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/lib/api/services/auth.service';
+import { cartService } from '@/lib/api/services/cart.service';
+import { GUEST_SESSION_KEY } from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 import type { User } from '@/types/api';
 
@@ -26,18 +29,17 @@ interface AuthContextType {
     setAuthStep: (step: AuthStep) => void;
     pendingPhone: string;
     setPendingPhone: (phone: string) => void;
+    pendingEmail: string;
+    setPendingEmail: (email: string) => void;
 
     // Actions
-    sendOTP: (phone: string) => Promise<{ success: boolean; error?: string }>;
+    sendOTP: (phone: string, email?: string) => Promise<{ success: boolean; error?: string }>;
     verifyOTP: (code: string) => Promise<{ success: boolean; error?: string }>;
-    saveProfile: (name: string, phone: string) => Promise<void>;
+    saveProfile: (name: string, phone: string) => Promise<{ success: boolean; error?: string }>;
 
     // Post-order quick save (from checkout)
     saveFromCheckout: (name: string, phone: string) => void;
 
-    // Dev helpers
-    devOTP: string; // visible in dev mode only
-    
     // Loading states
     isLoading: boolean;
 }
@@ -58,10 +60,11 @@ function mapApiUserToAuthUser(apiUser: User): AuthUser {
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
+    const queryClient = useQueryClient();
     const [user, setUser] = useState<AuthUser | null>(null);
     const [authStep, setAuthStep] = useState<AuthStep>('idle');
     const [pendingPhone, setPendingPhone] = useState('');
-    const [devOTP, setDevOTP] = useState('');
+    const [pendingEmail, setPendingEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [requiresRegistration, setRequiresRegistration] = useState(false);
     const [hydrated, setHydrated] = useState(false);
@@ -88,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (error) {
                 // Token invalid or expired, clear it
                 localStorage.removeItem('cedibites_auth_token');
+                localStorage.removeItem(GUEST_SESSION_KEY);
                 localStorage.removeItem(STORAGE_KEY);
                 setHydrated(true);
             }
@@ -114,28 +118,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
             setUser(null);
             localStorage.removeItem('cedibites_auth_token');
+            localStorage.removeItem(GUEST_SESSION_KEY);
             localStorage.removeItem(STORAGE_KEY);
             setAuthStep('idle');
             setPendingPhone('');
+            setPendingEmail('');
         }
     }, []);
 
     // ── Send OTP ──────────────────────────────────────────────────────────────
-    const sendOTP = useCallback(async (phone: string): Promise<{ success: boolean; error?: string }> => {
+    const sendOTP = useCallback(async (phone: string, email?: string): Promise<{ success: boolean; error?: string }> => {
         setIsLoading(true);
         try {
-            // Call API to send OTP
-            await authService.sendOTP({ phone });
+            await authService.sendOTP({ phone, email: email?.trim() || undefined });
             setPendingPhone(phone);
-
-            // In development, the backend logs the OTP to console
-            // You can check the Laravel logs or backend console
-            if (process.env.NODE_ENV === 'development') {
-                console.log('%c[CediBites] OTP sent! Check backend logs for the code.', 'color: #e49925; font-size: 14px;');
-                // For dev convenience, set a placeholder
-                setDevOTP('Check backend logs');
-            }
-
+            setPendingEmail(email?.trim() ?? '');
             setAuthStep('otp');
             return { success: true };
         } catch (error) {
@@ -161,22 +158,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // New user - needs to provide name
                 setRequiresRegistration(true);
                 setAuthStep('naming');
-                setDevOTP('');
                 return { success: true };
             }
 
             // Existing user - login successful
             const { token, user: apiUser } = response.data as { token: string; user: User };
-            
-            // Store token (handled by API client interceptor)
+
+            const guestSession = localStorage.getItem(GUEST_SESSION_KEY);
             localStorage.setItem('cedibites_auth_token', token);
-            
+
+            if (guestSession) {
+                try {
+                    await cartService.claimGuestCart(guestSession);
+                    queryClient.invalidateQueries({ queryKey: ['cart'] });
+                } catch {
+                    // Ignore claim errors - cart may be empty or already claimed
+                }
+            }
+            localStorage.removeItem(GUEST_SESSION_KEY);
+
             // Convert and store user
             const authUser = mapApiUserToAuthUser(apiUser);
             persistUser(authUser);
-            
+
             setAuthStep('done');
-            setDevOTP('');
             return { success: true };
         } catch (error) {
             const errorMessage = getErrorMessage(error);
@@ -184,48 +189,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    }, [pendingPhone]);
+    }, [pendingPhone, queryClient]);
 
     // ── Save profile (after name entry) ──────────────────────────────────────
-    const saveProfile = useCallback(async (name: string, phone: string) => {
+    const saveProfile = useCallback(async (name: string, phone: string): Promise<{ success: boolean; error?: string }> => {
         if (!requiresRegistration) {
-            // Fallback for old flow
             const newUser: AuthUser = { name, phone, savedAddresses: [], createdAt: Date.now() };
             persistUser(newUser);
             setAuthStep('done');
-            return;
+            return { success: true };
         }
 
         setIsLoading(true);
         try {
-            // Register new user via API
-            const response = await authService.register({ 
-                name, 
+            const response = await authService.register({
+                name,
                 phone: pendingPhone,
-                otp: '' // OTP already verified in previous step
+                email: pendingEmail?.trim() || undefined,
+                otp: '',
             });
 
             const { token, user: apiUser } = response.data;
-            
-            // Store token
+
+            const guestSession = localStorage.getItem(GUEST_SESSION_KEY);
             localStorage.setItem('cedibites_auth_token', token);
-            
-            // Convert and store user
+
+            if (guestSession) {
+                try {
+                    await cartService.claimGuestCart(guestSession);
+                    queryClient.invalidateQueries({ queryKey: ['cart'] });
+                } catch {
+                    // Ignore claim errors - cart may be empty or already claimed
+                }
+            }
+            localStorage.removeItem(GUEST_SESSION_KEY);
+
             const authUser = mapApiUserToAuthUser(apiUser);
             persistUser(authUser);
-            
+
             setAuthStep('done');
             setRequiresRegistration(false);
+            return { success: true };
         } catch (error) {
             console.error('Registration error:', error);
-            // Fallback to local storage on error
-            const newUser: AuthUser = { name, phone, savedAddresses: [], createdAt: Date.now() };
-            persistUser(newUser);
-            setAuthStep('done');
+            const errorMessage = getErrorMessage(error);
+            return { success: false, error: errorMessage };
         } finally {
             setIsLoading(false);
         }
-    }, [requiresRegistration, pendingPhone]);
+    }, [requiresRegistration, pendingPhone, pendingEmail, queryClient]);
 
     // ── Quick save from checkout (no OTP needed — they just ordered) ──────────
     // Called from StepDone "Save for next time" prompt
@@ -237,18 +249,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return (
         <AuthContext.Provider value={{
-            user, 
-            isLoggedIn: !!user, 
+            user,
+            isLoggedIn: !!user,
             logout,
-            authStep, 
+            authStep,
             setAuthStep,
-            pendingPhone, 
+            pendingPhone,
             setPendingPhone,
-            sendOTP, 
-            verifyOTP, 
+            pendingEmail,
+            setPendingEmail,
+            sendOTP,
+            verifyOTP,
             saveProfile,
             saveFromCheckout,
-            devOTP,
             isLoading,
         }}>
             {children}

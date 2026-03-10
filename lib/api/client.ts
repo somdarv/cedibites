@@ -47,14 +47,43 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor - add auth token
+export const GUEST_SESSION_KEY = 'cedibites_guest_session';
+
+export function getGuestSessionId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(GUEST_SESSION_KEY);
+}
+
+export function setGuestSessionId(id: string): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(GUEST_SESSION_KEY, id);
+  }
+}
+
+export function ensureGuestSessionId(): string {
+  if (typeof window === 'undefined') {
+    return `guest-${Date.now()}-${Math.random().toString(36).slice(2, 15)}`;
+  }
+  let id = localStorage.getItem(GUEST_SESSION_KEY);
+  if (!id) {
+    id = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 15)}`;
+    localStorage.setItem(GUEST_SESSION_KEY, id);
+  }
+  return id;
+}
+
+// Request interceptor - add auth token or X-Guest-Session
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Get token from localStorage (client-side only)
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && config.headers) {
       const token = localStorage.getItem('cedibites_auth_token');
-      if (token && config.headers) {
+      if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        const guestSession = localStorage.getItem(GUEST_SESSION_KEY);
+        if (guestSession) {
+          config.headers['X-Guest-Session'] = guestSession;
+        }
       }
     }
     return config;

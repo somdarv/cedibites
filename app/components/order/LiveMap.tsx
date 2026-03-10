@@ -30,7 +30,7 @@ export default function LiveMap({
     }>({});
 
     useEffect(() => {
-        if (typeof window === 'undefined' || !window.google) {
+        if (typeof window === 'undefined' || (window as any).__MAPS_AUTH_FAILED || !(window as any).google?.maps) {
             setMapError(true);
             return;
         }
@@ -119,7 +119,7 @@ export default function LiveMap({
             if (riderLocation) bounds.extend(toLatLng(riderLocation));
             map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
         } catch (error) {
-            console.error('Map initialization error:', error);
+            if (typeof window !== 'undefined') (window as any).__MAPS_AUTH_FAILED = true;
             setMapError(true);
         }
 

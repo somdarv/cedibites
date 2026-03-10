@@ -25,14 +25,14 @@ export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps)
     const hasVariants = !!(item?.hasVariants && item?.variants);
     const variantOptions = hasVariants ? Object.keys(item!.variants!) : [];
 
-    const [selectedSize, setSelectedSize] = useState<string>(hasSizes ? sizes[0].key : 'regular');
+    const [selectedSize, setSelectedSize] = useState<string>(hasSizes ? sizes[0].key : 'default');
     const [selectedVariant, setSelectedVariant] = useState<string>(hasVariants ? variantOptions[0] : 'plain');
     const [imgError, setImgError] = useState(false);
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
         if (item) {
-            setSelectedSize(item.sizes?.[0]?.key ?? 'regular');
+            setSelectedSize(item.sizes?.[0]?.key ?? 'default');
             const vOpts = item.hasVariants && item.variants ? Object.keys(item.variants) : [];
             setSelectedVariant(vOpts[0] ?? 'plain');
             setImgError(false);

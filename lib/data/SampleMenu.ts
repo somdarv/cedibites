@@ -12,6 +12,7 @@ export interface MenuItemSize {
     key: SizeKey;
     label: string;
     price: number;
+    id?: number; // API menu_item_size.id when from API
 }
 
 export interface MenuAddOn {

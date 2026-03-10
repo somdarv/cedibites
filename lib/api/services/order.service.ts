@@ -38,10 +38,10 @@ export const orderService = {
   },
 
   /**
-   * Get single order by order number
+   * Get single order by order number (public, no auth required)
    */
   getOrderByNumber: (orderNumber: string): Promise<{ data: Order }> => {
-    return apiClient.get(`/orders/${orderNumber}`);
+    return apiClient.get(`/orders/by-number/${orderNumber}`);
   },
 
   /**
