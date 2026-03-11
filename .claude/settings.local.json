@@ -7,7 +7,9 @@
       "Bash(node -e:*)",
       "Bash(grep -n \"type mismatch\\\\|TODO\\\\|FIXME\\\\|XXX\" /c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites/app/components/providers/*.tsx /c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites/app/pos/*.tsx)",
       "Read(//mnt/c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites/app/staff/manager/menu/**)",
-      "Read(//c/Users/iamjn/AppData/Local/Temp/claude/c--Users-iamjn-Desktop-WEBZ-CediBites-cedibites/tasks/**)"
+      "Read(//c/Users/iamjn/AppData/Local/Temp/claude/c--Users-iamjn-Desktop-WEBZ-CediBites-cedibites/tasks/**)",
+      "Read(//c/Users/iamjn/.claude/projects/c--Users-iamjn-Desktop-WEBZ-CediBites-cedibites/87ef4c42-447d-4213-aae8-a47f4162f4ce/tool-results/**)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -1,7 +1,7 @@
 // app/order-history/page.tsx
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useModal } from '../components/providers/ModalProvider';
 import {
@@ -22,33 +22,32 @@ import {
 } from '@/types/order';
 import { STATUS_CONFIG } from '@/lib/constants/order.constants';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
-import { UserCheckIcon } from '@phosphor-icons/react/dist/ssr';
+import { useAuth } from '@/app/components/providers/AuthProvider';
 
 export default function OrderHistoryPage() {
     const router = useRouter();
     const { openAuth } = useModal();
     const { orders: storeOrders } = useOrderStore();
+    const { user, isLoggedIn } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
-    const [userIP, setUserIP] = useState<string | null>(null);
 
-    // TODO: Replace with actual user check and IP detection
-    const isLoggedIn = false; // Change this to your actual auth state
-
-    // Get user IP for guest orders
-    useEffect(() => {
-        if (!isLoggedIn) {
-            // TODO: Fetch actual IP from API
-            // For now, mock it
-            setUserIP('192.168.1.1');
-        }
-    }, [isLoggedIn]);
-
-    // Get orders from unified OrderStore
+    // Filter orders by customer phone when logged in, or show online orders for guests
     const allOrders = useMemo<Order[]>(() => {
-        // TODO: Filter by user ID when auth is connected
-        // For now, return all orders from the store
-        return storeOrders;
-    }, [storeOrders]);
+        // Show orders matching the customer's phone, or all online orders if not logged in
+        const filtered = storeOrders.filter(order => {
+            if (isLoggedIn && user?.phone) {
+                // Normalize phone for comparison (handle +233 vs 0 prefix)
+                const userPhone = user.phone.replace(/\s+/g, '');
+                const orderPhone = order.contact.phone.replace(/\s+/g, '');
+                return userPhone === orderPhone
+                    || userPhone.replace('+233', '0') === orderPhone.replace('+233', '0');
+            }
+            // Guest: show only online-sourced orders (placed from this browser)
+            return order.source === 'online';
+        });
+        // Most recent first
+        return filtered.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime());
+    }, [storeOrders, isLoggedIn, user]);
 
     // Filter orders by search
     const filteredOrders = useMemo(() => {
@@ -72,21 +71,6 @@ export default function OrderHistoryPage() {
         console.log('Reorder:', order);
         router.push('/');
     };
-
-    // Loading state while fetching IP
-    if (!isLoggedIn && !userIP) {
-        return (
-            <div className="min-h-screen bg-neutral-light dark:bg-brand-darker">
-                <Navbar />
-                <main className="w-[90%] md:w-[600px] mx-auto py-12 flex items-center justify-center">
-                    <div className="text-center">
-                        <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-                        <p className="text-neutral-gray">Loading your orders...</p>
-                    </div>
-                </main>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-neutral-light dark:bg-brand-darker">

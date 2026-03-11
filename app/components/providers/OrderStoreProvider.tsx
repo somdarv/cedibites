@@ -98,8 +98,9 @@ export function OrderStoreProvider({ children }: { children: ReactNode }) {
     const createOrder = useCallback(async (input: CreateOrderInput): Promise<Order> => {
         const service = getOrderService();
         const order = await service.create(input);
-        // Optimistic update
-        setOrders(prev => [order, ...prev]);
+        // Read authoritative list from storage — order is already written there by service.create()
+        const allOrders = await service.getAll();
+        setOrders(allOrders);
         return order;
     }, []);
 

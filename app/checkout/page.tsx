@@ -16,6 +16,8 @@ import { useCart, CartItem } from '@/app/components/providers/CartProvider';
 import { useBranch, Branch, BranchWithDistance } from '@/app/components/providers/BranchProvider';
 import { useLocation } from '@/app/components/providers/LocationProvider';
 import { useAuth } from '@/app/components/providers/AuthProvider';
+import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
+import type { PaymentMethod as UnifiedPaymentMethod, FulfillmentType, CreateOrderInput } from '@/types/order';
 
 type OrderType = 'delivery' | 'pickup';
 type PaymentMethod = 'momo' | 'cash_delivery' | 'cash_pickup';
@@ -703,7 +705,7 @@ function StepDone({ orderNumber, orderType, contact }: {
 
             {/* CTA buttons */}
             <div className="flex flex-col gap-3 w-full">
-                <Link href="/orders"
+                <Link href={`/orders/${orderNumber}`}
                     className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98]">
                     Track My Order <ArrowRightIcon weight="bold" size={16} />
                 </Link>
@@ -734,7 +736,10 @@ function EmptyCartGuard() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CheckoutPage() {
-    const { items, clearCart } = useCart();
+    const { items, clearCart, subtotal } = useCart();
+    const { selectedBranch } = useBranch();
+    const { coordinates } = useLocation();
+    const { createOrder } = useOrderStore();
     const [step, setStep] = useState<Step>(1);
     const [orderType, setOrderType] = useState<OrderType>('delivery');
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('momo');
@@ -743,11 +748,55 @@ export default function CheckoutPage() {
     const [contact, setContact] = useState<ContactDetails>({ name: '', phone: '', address: '', note: '' });
 
     const handlePlaceOrder = useCallback(async () => {
+        if (!selectedBranch) return;
         setPlacing(true);
-        await new Promise(r => setTimeout(r, 1800));
-        setOrderNumber(`CB${Date.now().toString().slice(-6)}`);
-        clearCart(); setPlacing(false); setStep(3);
-    }, [clearCart]);
+        try {
+            // Map checkout payment to unified PaymentMethod
+            const unifiedPayment: UnifiedPaymentMethod = paymentMethod === 'momo' ? 'momo' : 'cash';
+            const fulfillment: FulfillmentType = orderType === 'delivery' ? 'delivery' : 'pickup';
+            const deliveryFee = orderType === 'delivery' ? (selectedBranch.deliveryFee ?? DELIVERY_FEE) : 0;
+            const tax = subtotal * TAX_RATE;
+
+            const input: CreateOrderInput = {
+                source: 'online',
+                fulfillmentType: fulfillment,
+                paymentMethod: unifiedPayment,
+                items: items.map(ci => ({
+                    menuItemId: ci.item.id,
+                    name: ci.item.name,
+                    quantity: ci.quantity,
+                    unitPrice: ci.price,
+                    image: ci.item.image,
+                    sizeLabel: ci.sizeLabel || undefined,
+                    variantKey: ci.selectedSize || undefined,
+                    category: ci.item.category,
+                })),
+                contact: {
+                    name: contact.name,
+                    phone: contact.phone,
+                    address: orderType === 'delivery' ? contact.address : undefined,
+                    gpsCoords: coordinates ? `${coordinates.latitude},${coordinates.longitude}` : undefined,
+                    notes: contact.note || undefined,
+                },
+                branchId: String(selectedBranch.id),
+                branchName: selectedBranch.name,
+                branchAddress: selectedBranch.address,
+                branchPhone: selectedBranch.phone,
+                branchCoordinates: selectedBranch.coordinates,
+                deliveryFee,
+                tax,
+            };
+
+            const order = await createOrder(input);
+            setOrderNumber(order.orderNumber);
+            clearCart();
+            setStep(3);
+        } catch (err) {
+            console.error('Failed to place order:', err);
+        } finally {
+            setPlacing(false);
+        }
+    }, [selectedBranch, paymentMethod, orderType, subtotal, items, contact, coordinates, createOrder, clearCart]);
 
     if (items.length === 0 && step !== 3) return <EmptyCartGuard />;
 

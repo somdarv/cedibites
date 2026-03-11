@@ -10,7 +10,7 @@ import {
   useRef,
   ReactNode,
 } from 'react';
-import type { Order, OrderStatus, FulfillmentType, OrderSource, CreateOrderInput } from '@/types/order';
+import type { Order, FulfillmentType, OrderSource, CreateOrderInput } from '@/types/order';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 import { useKitchenOrders } from './hooks/useKitchenOrders';
 import { useKitchenSounds } from './hooks/useSounds';
@@ -56,7 +56,12 @@ export function useKitchen() {
 
 export function KitchenProvider({ children }: { children: ReactNode }) {
   const kitchenOrders = useKitchenOrders();
-  const { updateOrderStatus, createOrder } = useOrderStore();
+  const { updateOrderStatus, createOrder, refresh } = useOrderStore();
+
+  // Refresh from storage on mount to pick up orders placed in another tab
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);

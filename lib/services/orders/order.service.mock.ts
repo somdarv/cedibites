@@ -239,7 +239,9 @@ export class MockOrderService implements OrderService {
         if (typeof window === 'undefined') return;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
         this.channel?.postMessage('update');
-        this.notifyListeners();
+        // notifyListeners() intentionally omitted here:
+        // - same-tab state is managed by OrderStoreProvider's own state updates
+        // - cross-tab sync is handled by BroadcastChannel onmessage → notifyListeners()
     }
 
     private notifyListeners(): void {
