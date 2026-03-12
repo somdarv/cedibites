@@ -1,27 +1,12 @@
 // ─── Staff Service Interface ─────────────────────────────────────────────────
 // Swap MockStaffService → ApiStaffService when backend is ready.
 
-import type { StaffRole } from '@/types/order';
 import { MockStaffService } from './staff.service.mock';
 
-export type StaffStatus = 'active' | 'inactive' | 'archived';
-
-export interface StaffMember {
-    id: string;
-    name: string;
-    role: StaffRole;
-    branch: string | string[];
-    branchIds: string[];
-    status: StaffStatus;
-    email: string;
-    phone: string;
-    password: string;
-    pin: string;
-    posAccess: boolean;
-    joinedAt: string;
-    lastLogin: string;
-    ordersToday: number;
-}
+// Re-export types from the authoritative source so callers get the full type
+export type { StaffMember, StaffStatus } from '@/lib/data/mockStaff';
+import type { StaffMember, StaffStatus } from '@/lib/data/mockStaff';
+import type { StaffRole } from '@/types/order';
 
 export interface StaffUser {
     id: string;

@@ -15,16 +15,22 @@ import {
     ForkKnifeIcon,
     UsersThreeIcon,
     GearSixIcon,
+    ClockIcon,
 } from '@phosphor-icons/react';
 import { StaffAuthProvider, useStaffAuth, type StaffRole } from '@/app/components/providers/StaffAuthProvider';
 
 // ─── Nav configs per role ──────────────────────────────────────────────────────
 
 const SALES_NAV = [
-    { href: '/staff/sales/dashboard', label: 'Dashboard', icon: SquaresFourIcon },
-    { href: '/staff/sales/new-order', label: 'New Order', icon: PlusCircleIcon  },
-    { href: '/staff/sales/orders',    label: 'Orders',    icon: ListIcon        },
-    { href: '/staff/sales/my-sales',  label: 'My Sales',  icon: ReceiptIcon     },
+    { href: '/staff/sales/dashboard',  label: 'Dashboard', icon: SquaresFourIcon },
+    { href: '/staff/sales/new-order',  label: 'New Order', icon: PlusCircleIcon  },
+    { href: '/staff/sales/orders',     label: 'Orders',    icon: ListIcon        },
+    { href: '/staff/sales/my-sales',   label: 'My Sales',  icon: ReceiptIcon     },
+    { href: '/staff/sales/my-shifts',  label: 'My Shifts', icon: ClockIcon       },
+];
+
+const PARTNER_NAV = [
+    { href: '/staff/partner/dashboard', label: 'Dashboard', icon: SquaresFourIcon },
 ];
 
 const MANAGER_NAV_MAIN = [
@@ -34,14 +40,17 @@ const MANAGER_NAV_MAIN = [
 ];
 
 const MANAGER_NAV_TOOLS = [
-    { href: '/staff/manager/analytics', label: 'Analytics', icon: ChartBarIcon  },
-    { href: '/staff/manager/menu',      label: 'Menu',       icon: ForkKnifeIcon },
-    { href: '/staff/manager/staff',     label: 'Staff',      icon: UsersThreeIcon },
-    { href: '/staff/manager/settings',  label: 'Configure',  icon: GearSixIcon   },
+    { href: '/staff/manager/analytics',  label: 'Analytics', icon: ChartBarIcon   },
+    { href: '/staff/manager/menu',       label: 'Menu',       icon: ForkKnifeIcon  },
+    { href: '/staff/manager/staff',      label: 'Staff',      icon: UsersThreeIcon },
+    { href: '/staff/manager/shifts',     label: 'Shifts',     icon: ClockIcon      },
+    { href: '/staff/manager/my-shifts',  label: 'My Shifts',  icon: ReceiptIcon    },
+    { href: '/staff/manager/settings',   label: 'Configure',  icon: GearSixIcon    },
 ];
 
 function navItemsForRole(role: StaffRole) {
-    if (role === 'manager') return { main: MANAGER_NAV_MAIN, tools: MANAGER_NAV_TOOLS };
+    if (role === 'manager' || role === 'super_admin') return { main: MANAGER_NAV_MAIN, tools: MANAGER_NAV_TOOLS };
+    if (role === 'branch_partner') return { main: PARTNER_NAV, tools: [] };
     return { main: SALES_NAV, tools: [] };
 }
 
@@ -96,7 +105,15 @@ function BottomNavLink({
 // ─── Role label ───────────────────────────────────────────────────────────────
 
 function roleLabel(role: StaffRole): string {
-    return role === 'manager' ? 'Branch Manager' : 'Sales Staff';
+    const map: Partial<Record<StaffRole, string>> = {
+        super_admin:    'Super Admin',
+        branch_partner: 'Branch Partner',
+        manager:        'Branch Manager',
+        call_center:    'Call Center',
+        kitchen:        'Kitchen',
+        rider:          'Rider',
+    };
+    return map[role] ?? 'Staff';
 }
 
 // ─── Inner shell (consumes StaffAuthProvider) ─────────────────────────────────
@@ -119,7 +136,7 @@ function StaffLayoutShell({ children }: { children: React.ReactNode }) {
     }
 
     const { main: mainNav, tools: toolsNav } = navItemsForRole(staffUser.role);
-    const isManager = staffUser.role === 'manager';
+    const isManager = staffUser.role === 'manager' || staffUser.role === 'super_admin';
     const allMobileNav = [...mainNav, ...toolsNav];
 
     const handleLogout = () => {

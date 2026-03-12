@@ -18,7 +18,7 @@ function hoursAgo(h: number): number { return Date.now() - h * 3_600_000; }
 const SEED_ORDERS: Order[] = [
     // ── Staff / Customer orders ──────────────────────────────────────────
     {
-        id: 'CB847291', orderNumber: 'CB847291',
+        id: 'A001', orderNumber: 'A001',
         status: 'received', source: 'whatsapp', fulfillmentType: 'delivery',
         paymentMethod: 'momo', isPaid: true, paymentStatus: 'completed',
         items: [
@@ -32,7 +32,7 @@ const SEED_ORDERS: Order[] = [
         coords: { branch: BRANCH_COORDS['East Legon'], customer: { latitude: 5.6320, longitude: -0.1480 } },
     },
     {
-        id: 'CB391045', orderNumber: 'CB391045',
+        id: 'A002', orderNumber: 'A002',
         status: 'received', source: 'phone', fulfillmentType: 'pickup',
         paymentMethod: 'cash', isPaid: false, paymentStatus: 'pending',
         items: [
@@ -45,8 +45,8 @@ const SEED_ORDERS: Order[] = [
         placedAt: minsAgo(22),
     },
     {
-        id: 'CB204837', orderNumber: 'CB204837',
-        status: 'preparing', source: 'instagram', fulfillmentType: 'delivery',
+        id: 'A003', orderNumber: 'A003',
+        status: 'preparing', source: 'social_media', fulfillmentType: 'delivery',
         paymentMethod: 'momo', isPaid: true, paymentStatus: 'completed',
         items: [
             { id: '1', menuItemId: 'banku', name: 'Banku & Tilapia', quantity: 1, unitPrice: 55, sizeLabel: 'Regular' },
@@ -58,8 +58,8 @@ const SEED_ORDERS: Order[] = [
         coords: { branch: BRANCH_COORDS['Tema'], customer: { latitude: 5.6525, longitude: -0.0080 } },
     },
     {
-        id: 'CB173920', orderNumber: 'CB173920',
-        status: 'preparing', source: 'facebook', fulfillmentType: 'delivery',
+        id: 'A004', orderNumber: 'A004',
+        status: 'preparing', source: 'social_media', fulfillmentType: 'delivery',
         paymentMethod: 'cash', isPaid: false, paymentStatus: 'pending',
         items: [
             { id: '1', menuItemId: 'fufu', name: 'Fufu & Light Soup', quantity: 2, unitPrice: 45, sizeLabel: 'Regular' },
@@ -72,7 +72,7 @@ const SEED_ORDERS: Order[] = [
         coords: { branch: BRANCH_COORDS['Madina'], customer: { latitude: 5.6750, longitude: -0.1650 } },
     },
     {
-        id: 'CB998812', orderNumber: 'CB998812',
+        id: 'A005', orderNumber: 'A005',
         status: 'ready', source: 'phone', fulfillmentType: 'delivery',
         paymentMethod: 'momo', isPaid: true, paymentStatus: 'completed',
         items: [
@@ -86,7 +86,7 @@ const SEED_ORDERS: Order[] = [
         coords: { branch: BRANCH_COORDS['East Legon'], customer: { latitude: 5.6085, longitude: -0.1780 } },
     },
     {
-        id: 'CB774433', orderNumber: 'CB774433',
+        id: 'A006', orderNumber: 'A006',
         status: 'out_for_delivery', source: 'whatsapp', fulfillmentType: 'delivery',
         paymentMethod: 'momo', isPaid: true, paymentStatus: 'completed',
         items: [
@@ -103,7 +103,7 @@ const SEED_ORDERS: Order[] = [
         },
     },
     {
-        id: 'CB556677', orderNumber: 'CB556677',
+        id: 'A007', orderNumber: 'A007',
         status: 'ready_for_pickup', source: 'phone', fulfillmentType: 'pickup',
         paymentMethod: 'cash', isPaid: false, paymentStatus: 'pending',
         items: [
@@ -115,7 +115,7 @@ const SEED_ORDERS: Order[] = [
         placedAt: minsAgo(38),
     },
     {
-        id: 'CB112233', orderNumber: 'CB112233',
+        id: 'A008', orderNumber: 'A008',
         status: 'delivered', source: 'online', fulfillmentType: 'delivery',
         paymentMethod: 'momo', isPaid: true, paymentStatus: 'completed',
         items: [
@@ -130,7 +130,7 @@ const SEED_ORDERS: Order[] = [
 
     // ── POS / Dine-in orders ─────────────────────────────────────────────
     {
-        id: 'CB660011', orderNumber: 'CB660011',
+        id: 'A009', orderNumber: 'A009',
         status: 'preparing', source: 'pos', fulfillmentType: 'dine_in',
         paymentMethod: 'cash', isPaid: true, paymentStatus: 'completed',
         items: [
@@ -144,7 +144,7 @@ const SEED_ORDERS: Order[] = [
         placedAt: minsAgo(12),
     },
     {
-        id: 'CB660022', orderNumber: 'CB660022',
+        id: 'A010', orderNumber: 'A010',
         status: 'ready', source: 'pos', fulfillmentType: 'takeaway',
         paymentMethod: 'momo', isPaid: true, paymentStatus: 'completed',
         items: [
@@ -157,7 +157,7 @@ const SEED_ORDERS: Order[] = [
         placedAt: minsAgo(25),
     },
     {
-        id: 'CB660033', orderNumber: 'CB660033',
+        id: 'A011', orderNumber: 'A011',
         status: 'completed', source: 'pos', fulfillmentType: 'dine_in',
         paymentMethod: 'card', isPaid: true, paymentStatus: 'completed',
         items: [
@@ -173,7 +173,7 @@ const SEED_ORDERS: Order[] = [
 
     // ── Customer online orders ───────────────────────────────────────────
     {
-        id: 'CB770011', orderNumber: 'CB770011',
+        id: 'A012', orderNumber: 'A012',
         status: 'out_for_delivery', source: 'online', fulfillmentType: 'delivery',
         paymentMethod: 'momo', isPaid: true, paymentStatus: 'completed',
         items: [
@@ -189,7 +189,7 @@ const SEED_ORDERS: Order[] = [
 
     // ── Staff-created order (phone/whatsapp) ─────────────────────────────
     {
-        id: 'CB880011', orderNumber: 'CB880011',
+        id: 'A013', orderNumber: 'A013',
         status: 'received', source: 'whatsapp', fulfillmentType: 'delivery',
         paymentMethod: 'momo', isPaid: false, paymentStatus: 'pending',
         items: [
@@ -217,9 +217,14 @@ export class MockOrderService implements OrderService {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_ORDERS));
             }
 
-            // Cross-tab sync
+            // Cross-tab sync — BroadcastChannel (primary, fast)
             this.channel = new BroadcastChannel(CHANNEL_NAME);
             this.channel.onmessage = () => this.notifyListeners();
+
+            // Cross-tab sync — storage event (fallback, fires in OTHER tabs on any localStorage write)
+            window.addEventListener('storage', (e) => {
+                if (e.key === STORAGE_KEY) this.notifyListeners();
+            });
         }
     }
 
@@ -301,8 +306,8 @@ export class MockOrderService implements OrderService {
             source: input.source,
             fulfillmentType: input.fulfillmentType,
             paymentMethod: input.paymentMethod,
-            isPaid: input.paymentMethod === 'momo',
-            paymentStatus: input.paymentMethod === 'momo' ? 'completed' : 'pending',
+            isPaid: input.paymentMethod === 'momo' || input.paymentMethod === 'no_charge',
+            paymentStatus: (input.paymentMethod === 'momo' || input.paymentMethod === 'no_charge') ? 'completed' : 'pending',
             items: itemsWithIds,
             subtotal,
             deliveryFee,

@@ -10,7 +10,7 @@ import {
   useRef,
   ReactNode,
 } from 'react';
-import type { Order, FulfillmentType, OrderSource, CreateOrderInput } from '@/types/order';
+import type { Order, FulfillmentType, OrderSource, CreateOrderInput, OrderStatus } from '@/types/order';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 import { useKitchenOrders } from './hooks/useKitchenOrders';
 import { useKitchenSounds } from './hooks/useSounds';
@@ -32,6 +32,7 @@ interface KitchenContextValue {
     accepted: Order[];
     preparing: Order[];
     ready: Order[];
+    cancel_requested: Order[];
   };
   stats: KitchenStats;
   acceptOrder: (orderId: string) => void;
@@ -39,6 +40,8 @@ interface KitchenContextValue {
   markReady: (orderId: string) => void;
   completeOrder: (orderId: string) => void;
   completeAllReady: () => void;
+  approveCancel: (orderId: string) => void;
+  rejectCancel: (order: Order) => void;
   soundEnabled: boolean;
   setSoundEnabled: (enabled: boolean) => void;
   isFullscreen: boolean;
@@ -56,7 +59,7 @@ export function useKitchen() {
 
 export function KitchenProvider({ children }: { children: ReactNode }) {
   const kitchenOrders = useKitchenOrders();
-  const { updateOrderStatus, createOrder, refresh } = useOrderStore();
+  const { updateOrderStatus, updateOrder, createOrder, refresh } = useOrderStore();
 
   // Refresh from storage on mount to pick up orders placed in another tab
   useEffect(() => {
@@ -89,6 +92,7 @@ export function KitchenProvider({ children }: { children: ReactNode }) {
       accepted: [] as Order[],
       preparing: [] as Order[],
       ready: [] as Order[],
+      cancel_requested: [] as Order[],
     };
 
     const sorted = [...kitchenOrders].sort((a, b) => a.placedAt - b.placedAt);
@@ -145,6 +149,23 @@ export function KitchenProvider({ children }: { children: ReactNode }) {
     });
   }, [sounds, ordersByStatus.ready, updateOrderStatus]);
 
+  const approveCancel = useCallback((orderId: string) => {
+    sounds.playTap();
+    updateOrderStatus(orderId, 'cancelled', { completedAt: Date.now() });
+  }, [sounds, updateOrderStatus]);
+
+  const rejectCancel = useCallback((order: Order) => {
+    sounds.playTap();
+    const restoreStatus = (order.cancelPreviousStatus ?? 'received') as OrderStatus;
+    updateOrder(order.id, {
+      status: restoreStatus,
+      cancelRequestedBy: undefined,
+      cancelRequestedAt: undefined,
+      cancelRequestReason: undefined,
+      cancelPreviousStatus: undefined,
+    });
+  }, [sounds, updateOrder]);
+
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(console.error);
@@ -195,6 +216,7 @@ export function KitchenProvider({ children }: { children: ReactNode }) {
     <KitchenContext.Provider value={{
       orders: kitchenOrders, ordersByStatus, stats,
       acceptOrder, startOrder, markReady, completeOrder, completeAllReady,
+      approveCancel, rejectCancel,
       soundEnabled, setSoundEnabled,
       isFullscreen, toggleFullscreen,
       simulateNewOrder,

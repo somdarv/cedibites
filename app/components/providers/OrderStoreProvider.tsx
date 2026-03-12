@@ -50,12 +50,21 @@ export function OrderStoreProvider({ children }: { children: ReactNode }) {
 
         loadOrders();
 
-        // Subscribe for real-time updates (BroadcastChannel in mock, WebSocket in API)
+        // Subscribe for real-time updates (BroadcastChannel + storage event in mock, WebSocket in API)
         const unsubscribe = service.subscribe((updatedOrders) => {
             setOrders(updatedOrders);
         });
 
-        return unsubscribe;
+        // Refresh when this tab regains focus — catches updates made in other tabs while hidden
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') loadOrders();
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            unsubscribe();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, []);
 
     // ── Read ─────────────────────────────────────────────────────────────

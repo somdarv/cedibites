@@ -1,11 +1,14 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import type { MenuItem } from '@/lib/data/SampleMenu';
 import type { OrderSource, FulfillmentType, PaymentMethod } from '@/types/order';
 import type { StaffCartItem, CustomerDetails } from './types';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
+import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { getPromoService, type Promo } from '@/lib/services/promos/promo.service';
+import { getShiftService } from '@/lib/services/shifts/shift.service';
 
 // ─── Context shape ────────────────────────────────────────────────────────────
 
@@ -20,6 +23,10 @@ interface NewOrderContextType {
     payment: PaymentMethod | null;
     isSubmitting: boolean;
     orderCode: string | null;
+
+    // Promo
+    promo: Promo | null;
+    discount: number;
 
     // Actions
     setStep: (n: 1 | 2 | 3 | 4) => void;
@@ -49,6 +56,7 @@ const NewOrderContext = createContext<NewOrderContextType | undefined>(undefined
 
 export function NewOrderProvider({ children }: { children: ReactNode }) {
     const { createOrder } = useOrderStore();
+    const { staffUser } = useStaffAuth();
 
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
     const [source, setSource] = useState<OrderSource | null>(null);
@@ -59,6 +67,20 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
     const [payment, setPayment] = useState<PaymentMethod | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderCode, setOrderCode] = useState<string | null>(null);
+    const [promo, setPromo] = useState<Promo | null>(null);
+    const [discount, setDiscount] = useState(0);
+
+    // Resolve best promo whenever cart or branch changes
+    useEffect(() => {
+        if (!branchId || cart.length === 0) { setPromo(null); setDiscount(0); return; }
+        const itemIds = cart.map(c => c.id);
+        getPromoService().resolvePromo(itemIds, branchId).then(p => {
+            if (!p) { setPromo(null); setDiscount(0); return; }
+            const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+            setPromo(p);
+            setDiscount(getPromoService().calculateDiscount(p, subtotal));
+        }).catch(() => { setPromo(null); setDiscount(0); });
+    }, [branchId, cart]);
 
     const addItem = useCallback((item: MenuItem, variantKey: string, price: number, variantLabel?: string) => {
         const cartKey = `${item.id}|${variantKey}`;
@@ -127,14 +149,21 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
                 branchPhone: branch?.phone,
                 branchCoordinates: branch?.coordinates,
                 deliveryFee: orderType === 'delivery' ? (branch?.deliveryFee ?? 0) : 0,
+                discount: discount > 0 ? discount : undefined,
             });
             setOrderCode(order.orderNumber);
+            // Track order in active shift
+            if (staffUser && staffUser.role !== 'kitchen' && staffUser.role !== 'rider') {
+                getShiftService().getActive(staffUser.id).then(shift => {
+                    if (shift) getShiftService().addOrder(shift.id, order.orderNumber, order.total).catch(() => {});
+                }).catch(() => {});
+            }
         } catch {
             // Handle error — show toast or inline error
         } finally {
             setIsSubmitting(false);
         }
-    }, [source, branchId, payment, orderType, cart, customer, createOrder]);
+    }, [source, branchId, payment, orderType, cart, customer, discount, staffUser, createOrder]);
 
     const resetOrder = useCallback(() => {
         setStep(1);
@@ -151,6 +180,7 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
         <NewOrderContext.Provider value={{
             step, source, branchId, cart, orderType, customer,
             payment, isSubmitting, orderCode,
+            promo, discount,
             setStep, setSource, setBranchId,
             addItem, removeItem, clearItem,
             setOrderType, patchCustomer, setPayment,

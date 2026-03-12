@@ -16,6 +16,7 @@ import {
     SignOutIcon,
     CaretRightIcon,
     ShieldCheckIcon,
+    TagIcon,
 } from '@phosphor-icons/react';
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
@@ -27,6 +28,7 @@ const ADMIN_NAV = [
     { href: '/admin/menu',       label: 'Menu',       icon: ForkKnifeIcon             },
     { href: '/admin/staff',      label: 'Staff',      icon: UsersThreeIcon            },
     { href: '/admin/customers',  label: 'Customers',  icon: UserCircleIcon            },
+    { href: '/admin/promos',     label: 'Promos',     icon: TagIcon                   },
     { href: '/admin/analytics',  label: 'Analytics',  icon: ChartBarIcon              },
     { href: '/admin/settings',   label: 'Settings',   icon: GearSixIcon               },
     { href: '/admin/audit',      label: 'Audit Log',  icon: ClockCounterClockwiseIcon },

@@ -86,7 +86,7 @@ const DEMO_CUSTOMER_COORDS = [
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
-export function OrdersProvider({ children, role = 'sales' }: { children: React.ReactNode; role?: UserRole }) {
+export function OrdersProvider({ children, role = 'call_center' }: { children: React.ReactNode; role?: UserRole }) {
     const { orders: storeOrders, updateOrderStatus, updateOrder, createOrder } = useOrderStore();
 
     const [search, setSearch] = useState('');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { STATUS_CONFIG } from '@/app/staff/orders/constants';
 import Link from 'next/link';
 import {
@@ -19,6 +19,7 @@ import {
     ClockIcon,
     CheckCircleIcon,
 } from '@phosphor-icons/react';
+import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -115,12 +116,16 @@ function KpiCard({
     label,
     value,
     trend,
+    sub,
+    subAlert,
     accent = false,
 }: {
     icon: React.ElementType;
     label: string;
     value: string;
     trend: number;
+    sub?: string;
+    subAlert?: string;
     accent?: boolean;
 }) {
     const up = trend >= 0;
@@ -131,6 +136,8 @@ function KpiCard({
                 <span className={`text-[10px] font-bold font-body uppercase tracking-widest ${accent ? 'text-white/80' : 'text-neutral-gray'}`}>{label}</span>
             </div>
             <p className={`text-2xl font-bold font-body leading-none ${accent ? 'text-white' : 'text-text-dark'}`}>{value}</p>
+            {sub && <p className={`text-xs font-body ${accent ? 'text-white/70' : 'text-neutral-gray'}`}>{sub}</p>}
+            {subAlert && <p className="text-xs font-semibold font-body text-orange-500">{subAlert}</p>}
             <div className="flex items-center gap-1">
                 {up
                     ? <ArrowUpIcon size={11} weight="bold" className={accent ? 'text-white/70' : 'text-secondary'} />
@@ -203,8 +210,29 @@ function StatusDot({ status }: { status: string }) {
 
 export default function AdminDashboardPage() {
     const [_refresh] = useState(0);
+    const { orders } = useOrderStore();
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const startOfDay = useMemo(() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+    }, []);
+
+    const liveKpis = useMemo(() => {
+        const todayOrders = orders.filter(o => o.placedAt >= startOfDay);
+        const cancelledToday = todayOrders.filter(o => o.status === 'cancelled' || o.status === 'cancel_requested');
+        const activeStatuses = new Set(['received', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'ready_for_pickup', 'cancel_requested']);
+        return {
+            revenueToday: todayOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0),
+            ordersToday: todayOrders.length,
+            activeOrders: todayOrders.filter(o => activeStatuses.has(o.status)).length,
+            cancelledToday: cancelledToday.length,
+            cancelledValue: cancelledToday.reduce((s, o) => s + o.total, 0),
+            cancelReqCount: orders.filter(o => o.status === 'cancel_requested').length,
+        };
+    }, [orders, startOfDay]);
 
     return (
         <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
@@ -234,10 +262,17 @@ export default function AdminDashboardPage() {
 
             {/* ── Cross-branch KPI row ─────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
-                <KpiCard icon={CurrencyCircleDollarIcon} label="Revenue Today" value={formatGHS(CROSS_BRANCH_KPIS.revenueToday)} trend={CROSS_BRANCH_KPIS.revenueTrend} accent />
-                <KpiCard icon={ReceiptIcon} label="Orders Today" value={String(CROSS_BRANCH_KPIS.ordersToday)} trend={CROSS_BRANCH_KPIS.ordersTrend} />
-                <KpiCard icon={CircleNotchIcon} label="Active Now" value={String(CROSS_BRANCH_KPIS.activeOrders)} trend={CROSS_BRANCH_KPIS.activeTrend} />
-                <KpiCard icon={XCircleIcon} label="Cancelled Today" value={String(CROSS_BRANCH_KPIS.cancelledToday)} trend={CROSS_BRANCH_KPIS.cancelledTrend} />
+                <KpiCard icon={CurrencyCircleDollarIcon} label="Revenue Today" value={liveKpis.revenueToday > 0 ? formatGHS(liveKpis.revenueToday) : formatGHS(CROSS_BRANCH_KPIS.revenueToday)} trend={CROSS_BRANCH_KPIS.revenueTrend} accent />
+                <KpiCard icon={ReceiptIcon} label="Orders Today" value={String(liveKpis.ordersToday > 0 ? liveKpis.ordersToday : CROSS_BRANCH_KPIS.ordersToday)} trend={CROSS_BRANCH_KPIS.ordersTrend} />
+                <KpiCard icon={CircleNotchIcon} label="Active Now" value={String(liveKpis.activeOrders > 0 ? liveKpis.activeOrders : CROSS_BRANCH_KPIS.activeOrders)} trend={CROSS_BRANCH_KPIS.activeTrend} />
+                <KpiCard
+                    icon={XCircleIcon}
+                    label="Cancelled Today"
+                    value={String(liveKpis.cancelledToday > 0 ? liveKpis.cancelledToday : CROSS_BRANCH_KPIS.cancelledToday)}
+                    sub={liveKpis.cancelledToday > 0 ? formatGHS(liveKpis.cancelledValue) + ' lost' : undefined}
+                    subAlert={liveKpis.cancelReqCount > 0 ? `${liveKpis.cancelReqCount} pending approval` : undefined}
+                    trend={CROSS_BRANCH_KPIS.cancelledTrend}
+                />
             </div>
 
             {/* ── Branch performance strip ─────────────────────────────────────── */}

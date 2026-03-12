@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
     PhoneIcon,
     WhatsappLogoIcon,
-    InstagramLogoIcon,
-    FacebookLogoIcon,
+    ShareNetworkIcon,
     MagnifyingGlassIcon,
     PlusIcon,
     MinusIcon,
@@ -31,7 +30,7 @@ import { BRANCHES } from '@/app/components/providers/BranchProvider';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type OrderSource = 'phone' | 'whatsapp' | 'instagram' | 'facebook';
+type OrderSource = 'phone' | 'whatsapp' | 'social_media';
 type OrderType = 'delivery' | 'pickup';
 type PaymentMethod = 'momo' | 'cash_delivery' | 'cash_pickup';
 
@@ -54,10 +53,9 @@ interface CustomerDetails {
 
 
 const ORDER_SOURCES: { id: OrderSource; label: string; icon: React.ElementType }[] = [
-    { id: 'phone', label: 'Phone', icon: PhoneIcon },
-    { id: 'whatsapp', label: 'WhatsApp', icon: WhatsappLogoIcon },
-    { id: 'instagram', label: 'Instagram', icon: InstagramLogoIcon },
-    { id: 'facebook', label: 'Facebook', icon: FacebookLogoIcon },
+    { id: 'phone',        label: 'Phone',        icon: PhoneIcon },
+    { id: 'whatsapp',     label: 'WhatsApp',     icon: WhatsappLogoIcon },
+    { id: 'social_media', label: 'Social Media', icon: ShareNetworkIcon },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

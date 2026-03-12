@@ -12,6 +12,8 @@ import {
     SpinnerIcon,
     WarningCircleIcon,
     LockSimpleIcon,
+    ProhibitIcon,
+    TagIcon,
 } from '@phosphor-icons/react';
 import { BRANCHES } from '@/app/components/providers/BranchProvider';
 import type { PaymentMethod } from '@/types/order';
@@ -27,15 +29,17 @@ const PAYMENT_OPTIONS: {
     icon: React.ElementType;
     only?: 'delivery' | 'pickup';
 }[] = [
-        { id: 'momo', label: 'Mobile Money', sub: 'MTN, Telecel, AirtelTigo', icon: DeviceMobileIcon },
-        { id: 'cash', label: 'Cash on Delivery', sub: 'Paid when delivered', icon: MoneyIcon, only: 'delivery' },
-        { id: 'cash', label: 'Cash at Pickup', sub: 'Paid at branch', icon: HandCoinsIcon, only: 'pickup' },
+        { id: 'momo',      label: 'Mobile Money',     sub: 'MTN, Telecel, AirtelTigo',   icon: DeviceMobileIcon },
+        { id: 'cash',      label: 'Cash on Delivery', sub: 'Paid when delivered',         icon: MoneyIcon,    only: 'delivery' },
+        { id: 'cash',      label: 'Cash at Pickup',   sub: 'Paid at branch',              icon: HandCoinsIcon, only: 'pickup' },
+        { id: 'no_charge', label: 'No Charge',        sub: 'Staff meal — not billed',     icon: ProhibitIcon },
     ];
 
 export default function StepReview() {
     const {
         cart, customer, orderType, source, branchId,
-        payment, isSubmitting, setPayment, submit, setStep,
+        payment, isSubmitting, promo, discount,
+        setPayment, submit, setStep,
     } = useNewOrder();
 
     const [momoNetwork, setMomoNetwork] = useState<'mtn' | 'telecel' | 'airteltigo' | null>(null);
@@ -44,7 +48,7 @@ export default function StepReview() {
     const branch = BRANCHES.find(b => b.id === branchId);
     const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const deliveryFee = orderType === 'delivery' ? (branch?.deliveryFee ?? 0) : 0;
-    const total = cartTotal + deliveryFee;
+    const total = cartTotal + deliveryFee - discount;
 
     const availablePayments = PAYMENT_OPTIONS.filter(p => !p.only || p.only === orderType);
     const sourceLabel = ORDER_SOURCES.find(s => s.id === source)?.label ?? source ?? '';
@@ -90,9 +94,18 @@ export default function StepReview() {
                             <span className="text-text-light">{formatGHS(deliveryFee)}</span>
                         </div>
                     )}
+                    {promo && discount > 0 && (
+                        <div className="flex justify-between text-sm font-body">
+                            <span className="flex items-center gap-1.5 text-secondary">
+                                <TagIcon size={12} weight="fill" />
+                                {promo.name}
+                            </span>
+                            <span className="text-secondary">-{formatGHS(discount)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between text-base font-semibold font-body pt-1 border-t border-brown-light/15 mt-1">
                         <span className="text-text-light">Total</span>
-                        <span className="text-primary">{formatGHS(total)}</span>
+                        <span className="text-primary">{formatGHS(Math.max(0, total))}</span>
                     </div>
                 </div>
             </div>
@@ -232,7 +245,7 @@ export default function StepReview() {
                     {isSubmitting ? (
                         <><SpinnerIcon size={18} weight="bold" className="animate-spin" /> Placing Order...</>
                     ) : (
-                        <>Place Order &mdash; {formatGHS(total)}</>
+                        <>Place Order &mdash; {formatGHS(Math.max(0, total))}</>
                     )}
                 </button>
             </div>

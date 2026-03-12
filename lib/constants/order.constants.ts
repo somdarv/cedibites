@@ -5,8 +5,7 @@
 import {
     PhoneIcon,
     WhatsappLogoIcon,
-    InstagramLogoIcon,
-    FacebookLogoIcon,
+    ShareNetworkIcon,
     GlobeIcon,
     DeviceMobileIcon,
 } from '@phosphor-icons/react';
@@ -32,6 +31,7 @@ export const STATUS_CONFIG: Record<OrderStatus, StatusDisplayConfig> = {
     ready_for_pickup:  { label: 'Ready for Pickup',  dot: 'bg-teal-600',      color: 'border-teal-600/40',      bg: 'bg-primary/8',    textColor: '#e49925' },
     delivered:         { label: 'Delivered',          dot: 'bg-secondary',     color: 'border-secondary/40',     bg: 'bg-secondary/8',  textColor: '#6c833f' },
     completed:         { label: 'Completed',         dot: 'bg-secondary',     color: 'border-secondary/40',     bg: 'bg-secondary/8',  textColor: '#6c833f' },
+    cancel_requested:  { label: 'Cancel Requested',  dot: 'bg-orange-500',    color: 'border-orange-500/40',    bg: 'bg-orange-500/8', textColor: '#f97316', pulse: true },
     cancelled:         { label: 'Cancelled',         dot: 'bg-error',         color: 'border-error/40',         bg: 'bg-error/8',      textColor: '#d32f2f' },
 };
 
@@ -51,12 +51,11 @@ export interface SourceDisplayConfig {
 }
 
 export const SOURCE_CONFIG: Record<OrderSource, SourceDisplayConfig> = {
-    online:    { label: 'Online',    icon: GlobeIcon },
-    phone:     { label: 'Phone',     icon: PhoneIcon },
-    whatsapp:  { label: 'WhatsApp',  icon: WhatsappLogoIcon },
-    instagram: { label: 'Instagram', icon: InstagramLogoIcon },
-    facebook:  { label: 'Facebook',  icon: FacebookLogoIcon },
-    pos:       { label: 'Walk-in',   icon: DeviceMobileIcon },
+    online:       { label: 'Online',       icon: GlobeIcon },
+    phone:        { label: 'Phone',        icon: PhoneIcon },
+    whatsapp:     { label: 'WhatsApp',     icon: WhatsappLogoIcon },
+    social_media: { label: 'Social Media', icon: ShareNetworkIcon },
+    pos:          { label: 'Walk-in',      icon: DeviceMobileIcon },
 };
 
 // Convenience re-exports for backward compat
@@ -71,9 +70,10 @@ export const SOURCE_LABEL: Record<OrderSource, string> = Object.fromEntries(
 // ─── Payment labels ─────────────────────────────────────────────────────────
 
 export const PAYMENT_LABELS: Record<PaymentMethod, { short: string; full: string }> = {
-    momo: { short: 'MoMo', full: 'Mobile Money (MoMo)' },
-    cash: { short: 'Cash', full: 'Cash Payment' },
-    card: { short: 'Card', full: 'Card Payment' },
+    momo:      { short: 'MoMo',      full: 'Mobile Money (MoMo)' },
+    cash:      { short: 'Cash',      full: 'Cash Payment' },
+    card:      { short: 'Card',      full: 'Card Payment' },
+    no_charge: { short: 'No Charge', full: 'No Charge (Staff)' },
 };
 
 // ─── Fulfillment labels ─────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ export const KANBAN_COLUMNS: KanbanColumn[] = [
     {
         id: 'received',
         label: 'Received',
-        statuses: ['received', 'accepted'],
+        statuses: ['received', 'accepted', 'cancel_requested'],
         dot: 'bg-neutral-gray',
         nextStatus: 'preparing',
         nextLabel: 'Start Preparing',

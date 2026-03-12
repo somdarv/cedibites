@@ -10,9 +10,12 @@ export default function DashboardRedirect() {
 
     useEffect(() => {
         if (isLoading) return;
-        router.replace(staffUser?.role === 'manager'
-            ? '/staff/manager/dashboard'
-            : '/staff/sales/dashboard');
+        const role = staffUser?.role;
+        router.replace(
+            role === 'manager' || role === 'super_admin' ? '/staff/manager/dashboard' :
+            role === 'branch_partner'                    ? '/staff/partner/dashboard' :
+            '/staff/sales/dashboard'
+        );
     }, [staffUser, isLoading, router]);
 
     return null;

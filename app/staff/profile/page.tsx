@@ -115,7 +115,7 @@ export default function StaffProfilePage() {
     const [pinToast, setPinToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [pinLoading, setPinLoading] = useState(false);
 
-    const isPOSUser = staffData?.posAccess === true;
+    const isPOSUser = !!(staffData?.pin);
 
     // ── Handlers ──
 

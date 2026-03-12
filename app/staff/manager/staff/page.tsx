@@ -20,27 +20,28 @@ import {
     type StaffMember,
     type StaffRole,
     MOCK_STAFF,
+    defaultPermissions,
 } from '@/lib/data/mockStaff';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const BRANCH_ROLES: StaffRole[] = ['sales', 'kitchen', 'rider'];
+const BRANCH_ROLES: StaffRole[] = ['call_center', 'kitchen', 'rider'];
 
 function inBranch(s: StaffMember, branchName: string): boolean {
     return Array.isArray(s.branch) ? s.branch.includes(branchName) : s.branch === branchName;
 }
 
 function getRoleColor(role: StaffRole): string {
-    if (role === 'sales')   return 'bg-info/10 text-info border-info/20';
-    if (role === 'kitchen') return 'bg-warning/10 text-warning border-warning/20';
+    if (role === 'call_center') return 'bg-info/10 text-info border-info/20';
+    if (role === 'kitchen')     return 'bg-warning/10 text-warning border-warning/20';
     return 'bg-secondary/10 text-secondary border-secondary/20';
 }
 
 const ROLE_LABELS: Partial<Record<StaffRole, string>> = {
-    sales:   'Sales Staff',
-    kitchen: 'Kitchen Staff',
-    rider:   'Rider',
+    call_center: 'Call Center',
+    kitchen:     'Kitchen Staff',
+    rider:       'Rider',
 };
 
 // ─── Staff form modal ─────────────────────────────────────────────────────────
@@ -66,14 +67,14 @@ function StaffModal({
 }) {
     const [form, setForm] = useState<StaffFormState>({
         name:  member?.name  ?? '',
-        role:  member?.role  ?? 'sales',
+        role:  member?.role  ?? 'call_center',
         phone: member?.phone ?? '',
         email: member?.email ?? '',
         pin:   member?.pin   ?? '',
     });
     const [errors, setErrors] = useState<Partial<Record<keyof StaffFormState, string>>>({});
 
-    const isPOS = form.role === 'sales';
+    const isPOS = form.role === 'call_center';
 
     function validate() {
         const e: typeof errors = {};
@@ -92,14 +93,13 @@ function StaffModal({
         const e = validate();
         if (Object.keys(e).length > 0) { setErrors(e); return; }
         onSave({
-            id:        member?.id,
-            name:      form.name.trim(),
-            role:      form.role,
-            phone:     form.phone.trim(),
-            email:     form.email.trim(),
-            pin:       form.pin,
-            posAccess: isPOS && !!form.pin,
-            branch:    currentBranch,
+            id:     member?.id,
+            name:   form.name.trim(),
+            role:   form.role,
+            phone:  form.phone.trim(),
+            email:  form.email.trim(),
+            pin:    form.pin,
+            branch: currentBranch,
         });
     }
 
@@ -344,21 +344,24 @@ export default function ManagerStaffPage() {
         if (data.id) {
             setStaff(prev => prev.map(s => s.id === data.id ? { ...s, ...data } : s));
         } else {
+            const newRole = data.role ?? 'call_center';
             const newMember: StaffMember = {
-                id:          `u${Date.now()}`,
-                name:        data.name ?? '',
-                role:        data.role ?? 'sales',
-                phone:       data.phone ?? '',
-                email:       data.email ?? '',
-                branch:      currentBranch,
-                branchIds:   [],
-                status:      'active',
-                pin:         data.pin ?? '',
-                password:    'temp123',
-                posAccess:   data.posAccess ?? false,
-                joinedAt:    new Date().toLocaleDateString('en-GH', { month: 'short', year: 'numeric' }),
-                lastLogin:   'Never',
-                ordersToday: 0,
+                id:               `u${Date.now()}`,
+                name:             data.name ?? '',
+                role:             newRole,
+                phone:            data.phone ?? '',
+                email:            data.email ?? '',
+                branch:           currentBranch,
+                branchIds:        [],
+                status:           'active',
+                employmentStatus: 'active',
+                systemAccess:     'enabled',
+                permissions:      defaultPermissions(newRole),
+                pin:              data.pin ?? '',
+                password:         'temp123',
+                joinedAt:         new Date().toLocaleDateString('en-GH', { month: 'short', year: 'numeric' }),
+                lastLogin:        'Never',
+                ordersToday:      0,
             };
             setStaff(prev => [...prev, newMember]);
         }
@@ -462,7 +465,7 @@ export default function ManagerStaffPage() {
                                         <span className={`text-[10px] font-bold font-body border rounded-full px-2 py-0.5 ${getRoleColor(member.role)}`}>
                                             {ROLE_LABELS[member.role] ?? member.role}
                                         </span>
-                                        {member.posAccess && member.pin && (
+                                        {!!member.pin && (
                                             <span className="text-[10px] font-bold font-body bg-primary/8 text-primary/70 rounded-full px-2 py-0.5">
                                                 POS · ****
                                             </span>

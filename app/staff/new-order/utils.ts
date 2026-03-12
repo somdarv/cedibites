@@ -1,8 +1,7 @@
 import {
     PhoneIcon,
     WhatsappLogoIcon,
-    InstagramLogoIcon,
-    FacebookLogoIcon,
+    ShareNetworkIcon,
 } from '@phosphor-icons/react';
 import type { MenuItem } from '@/lib/data/SampleMenu';
 import type { OrderSource } from '@/types/order';
@@ -11,10 +10,9 @@ export { formatGHS } from '@/lib/utils/currency';
 // ─── Order sources ────────────────────────────────────────────────────────────
 
 export const ORDER_SOURCES: { id: OrderSource; label: string; icon: React.ElementType }[] = [
-    { id: 'phone', label: 'Phone', icon: PhoneIcon },
-    { id: 'whatsapp', label: 'WhatsApp', icon: WhatsappLogoIcon },
-    { id: 'instagram', label: 'Instagram', icon: InstagramLogoIcon },
-    { id: 'facebook', label: 'Facebook', icon: FacebookLogoIcon },
+    { id: 'phone',        label: 'Phone',        icon: PhoneIcon },
+    { id: 'whatsapp',     label: 'WhatsApp',     icon: WhatsappLogoIcon },
+    { id: 'social_media', label: 'Social Media', icon: ShareNetworkIcon },
 ];
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -31,9 +29,8 @@ export function formatPhone(raw: string): string {
     return raw;
 }
 
-export function generateOrderCode(): string {
-    return `CB${Date.now().toString().slice(-6)}`;
-}
+// Re-export the canonical generator so wizard uses the same format
+export { generateOrderId as generateOrderCode } from '@/types/order';
 
 // Returns the lowest applicable price for any menu item (flat, sized, or variant)
 export function getBasePrice(item: MenuItem): number {

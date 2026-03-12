@@ -46,7 +46,7 @@ interface POSContextValue {
   isPaymentOpen: boolean;
   openPayment: () => void;
   closePayment: () => void;
-  processPayment: (method: PaymentMethod, amountPaid?: number, momoNumber?: string) => Promise<Order>;
+  processPayment: (method: PaymentMethod, amountPaid?: number, momoNumber?: string, discount?: number) => Promise<Order>;
 
   // Order history (today)
   todayOrders: Order[];
@@ -199,7 +199,8 @@ export function POSProvider({ children }: POSProviderProps) {
   const processPayment = useCallback(async (
     method: PaymentMethod,
     amountPaid?: number,
-    momoNumber?: string
+    momoNumber?: string,
+    discount?: number
   ): Promise<Order> => {
     // Simulate payment processing delay
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -230,6 +231,7 @@ export function POSProvider({ children }: POSProviderProps) {
       branchCoordinates: branch?.coordinates,
       staffId: session?.staffId,
       staffName: session?.staffName,
+      discount: discount && discount > 0 ? discount : undefined,
     };
 
     const order = await createOrder(input);

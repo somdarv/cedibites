@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 import type { Order, OrderStatus } from '@/types/order';
 
-const KITCHEN_STATUSES: OrderStatus[] = ['received', 'accepted', 'preparing', 'ready'];
+const KITCHEN_STATUSES: OrderStatus[] = ['received', 'accepted', 'preparing', 'ready', 'cancel_requested'];
 
 /**
  * Returns orders relevant to the kitchen display for a specific branch.

@@ -7,7 +7,7 @@ import OrdersView from '@/app/staff/orders/OrdersView';
 export default function SalesOrdersPage() {
     return (
         <Suspense>
-            <OrdersProvider role="sales">
+            <OrdersProvider role="call_center">
                 <OrdersView />
             </OrdersProvider>
         </Suspense>

@@ -13,13 +13,14 @@ export type OrderStatus =
     | 'ready_for_pickup'
     | 'delivered'
     | 'completed'
+    | 'cancel_requested'    // call_center requested; awaiting manager approval
     | 'cancelled';
 
-export type OrderSource = 'online' | 'phone' | 'whatsapp' | 'instagram' | 'facebook' | 'pos';
+export type OrderSource = 'online' | 'phone' | 'whatsapp' | 'social_media' | 'pos';
 
 export type FulfillmentType = 'delivery' | 'pickup' | 'dine_in' | 'takeaway';
 
-export type PaymentMethod = 'momo' | 'cash' | 'card';
+export type PaymentMethod = 'momo' | 'cash' | 'card' | 'no_charge';
 
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
 
@@ -119,6 +120,12 @@ export interface Order {
     allergyFlags?: string[];
     staffNotes?: string;
 
+    // Cancel request workflow
+    cancelRequestedBy?: string;      // staffId of who requested cancellation
+    cancelRequestedAt?: number;      // timestamp of the request
+    cancelRequestReason?: string;    // reason given by call_center
+    cancelPreviousStatus?: OrderStatus; // for rejection — restore to this status
+
     // Customer-facing timeline (computed on read, not stored)
     timeline?: OrderTimelineEvent[];
 }
@@ -148,8 +155,8 @@ export interface KanbanColumn {
 
 // ─── User roles for permissions ──────────────────────────────────────────────
 
-export type StaffRole = 'admin' | 'manager' | 'sales' | 'kitchen' | 'rider' | 'call_center';
-export type UserRole = 'sales' | 'manager';
+export type StaffRole = 'super_admin' | 'branch_partner' | 'manager' | 'call_center' | 'kitchen' | 'rider';
+export type UserRole = 'call_center' | 'manager' | 'super_admin' | 'branch_partner';
 
 // ─── Filter type (for service layer) ─────────────────────────────────────────
 
@@ -311,9 +318,26 @@ export function buildOrderTimeline(order: Pick<Order, 'fulfillmentType' | 'statu
 }
 
 // ─── Order ID generation ─────────────────────────────────────────────────────
+// Format: letter + 3 digits (A001–Z999), resets daily.
+// Cycles A→Z then wraps; each branch can handle 25,974 orders/day.
+
+const DAILY_COUNTER_KEY = 'cedibites-order-counter';
 
 export function generateOrderId(): string {
-    return `CB${Date.now().toString().slice(-6)}`;
+    if (typeof window === 'undefined') {
+        // SSR fallback — should never be called server-side
+        return `A${Date.now().toString().slice(-3).padStart(3, '0')}`;
+    }
+    const today = new Date().toDateString();
+    let stored: { date: string; count: number } = { date: '', count: 0 };
+    try {
+        stored = JSON.parse(localStorage.getItem(DAILY_COUNTER_KEY) ?? '{"date":"","count":0}');
+    } catch { /* ignore */ }
+    const count = stored.date === today ? stored.count + 1 : 1;
+    localStorage.setItem(DAILY_COUNTER_KEY, JSON.stringify({ date: today, count }));
+    const letter = String.fromCharCode(65 + Math.floor((count - 1) / 999) % 26);
+    const num = ((count - 1) % 999 + 1).toString().padStart(3, '0');
+    return `${letter}${num}`;
 }
 
 // ─── Haversine distance (km) ─────────────────────────────────────────────────
@@ -375,11 +399,14 @@ export function getNextStatuses(order: Pick<Order, 'status' | 'fulfillmentType'>
         case 'delivered':
             next.push('completed');
             break;
+        case 'cancel_requested':
+            next.push('cancelled'); // manager approval
+            break;
         default:
             break;
     }
 
-    // Any non-terminal status can be cancelled
+    // Any non-terminal status can be cancelled (managers can direct-cancel)
     if (!isDoneStatus(status)) {
         next.push('cancelled');
     }
@@ -397,16 +424,18 @@ export function canAdvanceOrder(
     const allowed = getNextStatuses(order);
     if (!allowed.includes(targetStatus)) return false;
 
-    if (role === 'manager') return true;
+    // Full control: managers and super admins
+    if (role === 'manager' || role === 'super_admin') return true;
 
-    // Sales can only handle: ready → dispatch → complete
-    if (role === 'sales') {
-        const salesAllowed: OrderStatus[] = [
+    // Call center: can only handle the final dispatch/completion steps
+    if (role === 'call_center') {
+        const callCenterAllowed: OrderStatus[] = [
             'out_for_delivery', 'ready_for_pickup',
             'delivered', 'completed', 'cancelled',
         ];
-        return salesAllowed.includes(targetStatus);
+        return callCenterAllowed.includes(targetStatus);
     }
 
+    // Branch partners: read-only, no order advancement
     return false;
 }

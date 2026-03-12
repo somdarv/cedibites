@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { type StaffRole, resolveByCredentials } from '@/lib/data/mockStaff';
+import { getShiftService } from '@/lib/services/shifts/shift.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,9 +52,23 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
     const login = useCallback((user: StaffUser) => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
         setStaffUser(user);
+        // Start shift tracking (kitchen/rider have no shifts)
+        if (user.role !== 'kitchen' && user.role !== 'rider') {
+            getShiftService().startShift(user.id, user.name, user.branch, user.branch).catch(() => {});
+        }
     }, []);
 
     const logout = useCallback(() => {
+        // End active shift before clearing session
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            try {
+                const u = JSON.parse(stored) as StaffUser;
+                getShiftService().getActive(u.id).then(shift => {
+                    if (shift) getShiftService().endShift(shift.id).catch(() => {});
+                }).catch(() => {});
+            } catch { /* ignore */ }
+        }
         localStorage.removeItem(STORAGE_KEY);
         setStaffUser(null);
     }, []);
@@ -75,9 +90,12 @@ export function useStaffAuth() {
 
 /** Where to redirect after login, by role. */
 export function roleHomeRoute(role: StaffRole): string {
-    if (role === 'admin')   return '/admin/dashboard';
-    if (role === 'manager') return '/staff/manager/dashboard';
-    return '/staff/sales/dashboard';
+    if (role === 'super_admin')    return '/admin/dashboard';
+    if (role === 'manager')        return '/staff/manager/dashboard';
+    if (role === 'branch_partner') return '/staff/partner/dashboard';
+    if (role === 'call_center')    return '/staff/sales/dashboard';
+    // kitchen and rider have no portal — redirect to login
+    return '/staff/login';
 }
 
 // ─── Route helper hook ────────────────────────────────────────────────────────
@@ -85,7 +103,7 @@ export function roleHomeRoute(role: StaffRole): string {
 /** Returns role-correct internal navigation URLs for the logged-in staff member. */
 export function useStaffRoutes() {
     const { staffUser } = useStaffAuth();
-    const isManager = staffUser?.role === 'manager' || staffUser?.role === 'admin';
+    const isManager = staffUser?.role === 'manager' || staffUser?.role === 'super_admin';
     return {
         dashboard: isManager ? '/staff/manager/dashboard' : '/staff/sales/dashboard',
         orders:    isManager ? '/staff/manager/orders'    : '/staff/sales/orders',
