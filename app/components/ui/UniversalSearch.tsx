@@ -22,10 +22,7 @@ interface UniversalSearchProps {
     showPrices?: boolean;
 }
 
-const formatPrice = (price: number | undefined) => {
-    if (price === undefined || price === null || typeof price !== 'number') return '₵0.00';
-    return `₵${price.toFixed(2)}`;
-};
+const formatPrice = (price: number) => `₵${price.toFixed(2)}`;
 
 // ─── Result row ───────────────────────────────────────────────────────────────
 function ResultRow({ item, onSelect }: { item: SearchableItem; onSelect: (item: SearchableItem) => void }) {
@@ -177,7 +174,7 @@ export default function UniversalSearch({
     };
 
     return (
-        <div ref={containerRef} className="py border- my-4 md:my-0 border-neutral-gray/20 w-full relative">
+        <div ref={containerRef} className="py-4 my-4 md:my-0 border-y border-neutral-gray/20 w-full relative">
 
             {/* Search input — unchanged styling */}
             <div className="relative w-full">

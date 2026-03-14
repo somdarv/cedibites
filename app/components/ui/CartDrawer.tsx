@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
     XIcon, TrashIcon, PlusIcon, MinusIcon, ShoppingBagIcon,
     ArrowRightIcon, TagIcon, MapPinIcon, CaretRightIcon,
-    WarningCircleIcon, CheckCircleIcon, StorefrontIcon, SpinnerGapIcon
+    WarningCircleIcon, CheckCircleIcon, StorefrontIcon
 } from '@phosphor-icons/react';
 import { useCart, CartItem } from '@/app/components/providers/CartProvider';
 import { useModal } from '@/app/components/providers/ModalProvider';
@@ -14,16 +14,7 @@ import { useBranch, Branch, BranchWithDistance } from '@/app/components/provider
 import { useLocation } from '@/app/components/providers/LocationProvider';
 import { useAuth } from '../providers/AuthProvider';
 
-const formatPrice = (p: number | undefined) => {
-    if (p === undefined || p === null || typeof p !== 'number') return '₵0.00';
-    return `₵${p.toFixed(2)}`;
-};
-
-function CartItemImage({ src, alt, sizes, className }: { src?: string; alt: string; sizes: string; className?: string }) {
-    const [error, setError] = useState(false);
-    const imageSrc = !src || error ? '/menu_placeholder.png' : src;
-    return <Image src={imageSrc} alt={alt} fill sizes={sizes} className={className ?? 'object-cover'} onError={() => setError(true)} />;
-}
+const formatPrice = (p: number) => `₵${p.toFixed(2)}`;
 const DELIVERY_FEE = 15;
 const TAX_RATE = 0.025;
 
@@ -32,14 +23,13 @@ type DrawerView = 'cart' | 'branch-select' | 'branch-conflict';
 export default function CartDrawer() {
     const { isCartOpen, closeCart } = useModal();
     const { items, removeFromCart, updateQuantity, totalItems, subtotal,
-        validateCartForBranch, removeUnavailableItems, isLoading, isSyncing } = useCart();
+        validateCartForBranch, removeUnavailableItems } = useCart();
     const { selectedBranch, setSelectedBranch, branches, getBranchesWithDistance } = useBranch();
     const { coordinates } = useLocation();
 
     const [view, setView] = useState<DrawerView>('cart');
     const [pendingBranch, setPendingBranch] = useState<Branch | null>(null);
     const [conflictResult, setConflictResult] = useState<{ available: CartItem[]; unavailable: CartItem[] } | null>(null);
-    const [operatingItemId, setOperatingItemId] = useState<string | null>(null);
 
     const tax = subtotal * TAX_RATE;
     const total = subtotal + DELIVERY_FEE + tax;
@@ -155,33 +145,16 @@ export default function CartDrawer() {
                         )}
 
                         <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 flex flex-col gap-3">
-                            {isSyncing && (
-                                <div className="flex items-center justify-center gap-2 bg-primary/10 border border-primary/20 rounded-2xl p-3 text-sm text-primary font-medium">
-                                    <SpinnerGapIcon size={16} className="animate-spin" />
-                                    Syncing your cart...
-                                </div>
-                            )}
                             {items.length === 0 ? <EmptyCart /> : (
                                 <>
                                     {items.map(ci => (
                                         <CartItemRow key={ci.cartItemId} cartItem={ci}
-                                            onRemove={async () => {
-                                                setOperatingItemId(ci.cartItemId);
-                                                await removeFromCart(ci.cartItemId);
-                                                setOperatingItemId(null);
+                                            onRemove={() => removeFromCart(ci.cartItemId)}
+                                            onIncrease={() => updateQuantity(ci.cartItemId, ci.quantity + 1)}
+                                            onDecrease={() => {
+                                                if (ci.quantity <= 1) removeFromCart(ci.cartItemId);
+                                                else updateQuantity(ci.cartItemId, ci.quantity - 1);
                                             }}
-                                            onIncrease={async () => {
-                                                setOperatingItemId(ci.cartItemId);
-                                                await updateQuantity(ci.cartItemId, ci.quantity + 1);
-                                                setOperatingItemId(null);
-                                            }}
-                                            onDecrease={async () => {
-                                                setOperatingItemId(ci.cartItemId);
-                                                if (ci.quantity <= 1) await removeFromCart(ci.cartItemId);
-                                                else await updateQuantity(ci.cartItemId, ci.quantity - 1);
-                                                setOperatingItemId(null);
-                                            }}
-                                            isOperating={operatingItemId === ci.cartItemId}
                                         />
                                     ))}
                                     <button onClick={closeCart} className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border-2 border-dashed border-neutral-gray/25 text-neutral-gray hover:border-primary/40 hover:text-primary transition-colors text-sm font-medium">
@@ -286,7 +259,7 @@ export default function CartDrawer() {
                             {conflictResult.unavailable.map(ci => (
                                 <div key={ci.cartItemId} className="flex items-center gap-3 bg-error/5 border border-error/15 rounded-xl p-3">
                                     <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-error/10 shrink-0">
-                                        <CartItemImage src={ci.item.image} alt={ci.item.name} sizes="40px" />
+                                        {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -304,7 +277,7 @@ export default function CartDrawer() {
                                 {conflictResult.available.map(ci => (
                                     <div key={ci.cartItemId} className="flex items-center gap-3 bg-secondary/5 border border-secondary/15 rounded-xl p-3">
                                         <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-secondary/10 shrink-0">
-                                            <CartItemImage src={ci.item.image} alt={ci.item.name} sizes="40px" />
+                                            {ci.item.image ? <Image src={ci.item.image} alt={ci.item.name} fill sizes="40px" className="object-cover" /> : <div className="w-full h-full" />}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold text-text-dark dark:text-text-light truncate">{ci.item.name}</p>
@@ -336,32 +309,33 @@ export default function CartDrawer() {
     );
 }
 
-function CartItemRow({ cartItem, onRemove, onIncrease, onDecrease, isOperating }: {
-    cartItem: CartItem; onRemove: () => Promise<void>; onIncrease: () => Promise<void>; onDecrease: () => Promise<void>; isOperating?: boolean;
+function CartItemRow({ cartItem, onRemove, onIncrease, onDecrease }: {
+    cartItem: CartItem; onRemove: () => void; onIncrease: () => void; onDecrease: () => void;
 }) {
+    const [imgError, setImgError] = React.useState(false);
     return (
-        <div className={`flex items-center gap-3 bg-white/60 dark:bg-white/5 rounded-2xl p-3 transition-opacity ${isOperating ? 'opacity-50' : ''}`}>
+        <div className="flex items-center gap-3 bg-white/60 dark:bg-white/5 rounded-2xl p-3">
             <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-primary/10 shrink-0">
-                <CartItemImage src={cartItem.item.image} alt={cartItem.item.name} sizes="64px" />
+                {cartItem.item.image && !imgError ? <Image src={cartItem.item.image} alt={cartItem.item.name} fill sizes="64px" className="object-cover" onError={() => setImgError(true)} /> : <div className="w-full h-full" />}
             </div>
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-text-dark dark:text-text-light leading-tight truncate">{cartItem.item.name}</p>
                 <p className="text-xs text-neutral-gray mt-0.5">{cartItem.sizeLabel}</p>
                 <div className="flex items-center justify-between mt-2">
                     <div className="flex items-center gap-2 bg-neutral-gray/10 rounded-full px-1 py-0.5">
-                        <button onClick={onDecrease} disabled={isOperating} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-primary/20 active:scale-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                            {isOperating ? <SpinnerGapIcon weight="bold" size={10} className="text-text-dark dark:text-text-light animate-spin" /> : <MinusIcon weight="bold" size={10} className="text-text-dark dark:text-text-light" />}
+                        <button onClick={onDecrease} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-primary/20 active:scale-90 transition-all">
+                            <MinusIcon weight="bold" size={10} className="text-text-dark dark:text-text-light" />
                         </button>
                         <span className="text-xs font-bold text-text-dark dark:text-text-light w-4 text-center tabular-nums">{cartItem.quantity}</span>
-                        <button onClick={onIncrease} disabled={isOperating} className="w-6 h-6 flex items-center justify-center rounded-full bg-primary text-white active:scale-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                            {isOperating ? <SpinnerGapIcon weight="bold" size={10} className="animate-spin" /> : <PlusIcon weight="bold" size={10} />}
+                        <button onClick={onIncrease} className="w-6 h-6 flex items-center justify-center rounded-full bg-primary text-white active:scale-90 transition-all">
+                            <PlusIcon weight="bold" size={10} />
                         </button>
                     </div>
                     <span className="text-sm font-bold text-primary">{formatPrice(cartItem.price * cartItem.quantity)}</span>
                 </div>
             </div>
-            <button onClick={onRemove} disabled={isOperating} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-error/15 text-neutral-gray hover:text-error transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
-                {isOperating ? <SpinnerGapIcon weight="bold" size={15} className="animate-spin" /> : <TrashIcon weight="bold" size={15} />}
+            <button onClick={onRemove} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-error/15 text-neutral-gray hover:text-error transition-colors shrink-0">
+                <TrashIcon weight="bold" size={15} />
             </button>
         </div>
     );

@@ -189,21 +189,16 @@ function EmptyState({ query, category }: { query: string; category: string | nul
 // ─── List view item row ───────────────────────────────────────────────────────
 function ListItemRow({ item, onOpen }: { item: SearchableItem; onOpen: (item: SearchableItem) => void }) {
     const price = item.sizes?.[0]?.price ?? item.price ?? 0;
-    const priceDisplay = typeof price === 'number' ? price.toFixed(2) : '0.00';
-    
     return (
         <button
             onClick={() => onOpen(item)}
             className="flex items-center gap-4 w-full p-3.5 rounded-2xl bg-white dark:bg-brand-dark hover:bg-primary/4 border border-neutral-gray/10 hover:border-primary/20 transition-all text-left group"
         >
             <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-primary/10 shrink-0">
-                <Image 
-                    src={item.image || '/menu_placeholder.png'} 
-                    alt={item.name} 
-                    fill 
-                    sizes="64px" 
-                    className="object-cover group-hover:scale-105 transition-transform duration-300" 
-                />
+                {item.image
+                    ? <Image src={item.image} alt={item.name} fill sizes="64px" className="object-cover group-hover:scale-105 transition-transform duration-300" />
+                    : <div className="w-full h-full" />
+                }
                 {item.popular && (
                     <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
                         <FireIcon weight="fill" size={10} className="text-white" />
