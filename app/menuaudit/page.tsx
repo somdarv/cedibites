@@ -195,7 +195,7 @@ export default function MenuAuditPage() {
 
                                             {/* Price range */}
                                             <div className="mt-2 text-xs text-neutral-gray">
-                                                GHS {item.sizes?.[0].price} – {item.sizes?.[item.sizes.length - 1].price}
+                                                ₵{item.sizes?.[0].price} – {item.sizes?.[item.sizes.length - 1].price}
                                             </div>
                                         </div>
                                     );

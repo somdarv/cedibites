@@ -22,7 +22,7 @@ interface UniversalSearchProps {
     showPrices?: boolean;
 }
 
-const formatPrice = (price: number) => `GHS ${price.toFixed(2)}`;
+const formatPrice = (price: number) => `₵${price.toFixed(2)}`;
 
 // ─── Result row ───────────────────────────────────────────────────────────────
 function ResultRow({ item, onSelect }: { item: SearchableItem; onSelect: (item: SearchableItem) => void }) {

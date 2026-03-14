@@ -11,7 +11,7 @@ interface MenuItemCardProps {
     onOpenDetail?: (item: SearchableItem) => void;
 }
 
-const formatPrice = (price: number) => `GHS ${price.toFixed(0)}`;
+const formatPrice = (price: number) => `₵${price.toFixed(0)}`;
 
 export default function MenuItemCard({ item, onOpenDetail }: MenuItemCardProps) {
     const { addToCart, removeFromCart, getCartItem } = useCart();

@@ -14,7 +14,7 @@ import { useBranch, Branch, BranchWithDistance } from '@/app/components/provider
 import { useLocation } from '@/app/components/providers/LocationProvider';
 import { useAuth } from '../providers/AuthProvider';
 
-const formatPrice = (p: number) => `GHS ${p.toFixed(2)}`;
+const formatPrice = (p: number) => `₵${p.toFixed(2)}`;
 const DELIVERY_FEE = 15;
 const TAX_RATE = 0.025;
 
@@ -227,7 +227,7 @@ export default function CartDrawer() {
                                             <span>·</span>
                                             <span>{branch.deliveryTime}</span>
                                             <span>·</span>
-                                            <span>GHS {branch.deliveryFee} delivery</span>
+                                            <span>₵{branch.deliveryFee} delivery</span>
                                         </div>
                                     </div>
                                     {!isCurrent && branch.isOpen && <CaretRightIcon size={16} className="text-neutral-gray shrink-0 mt-1" />}

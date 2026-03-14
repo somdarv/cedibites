@@ -11,7 +11,7 @@ interface ItemDetailModalProps {
     onClose: () => void;
 }
 
-const formatPrice = (price: number) => `GHS ${price.toFixed(2)}`;
+const formatPrice = (price: number) => `₵${price.toFixed(2)}`;
 
 export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
     const { addToCart, removeFromCart, getCartItem, updateQuantity } = useCart();
@@ -139,7 +139,7 @@ export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps)
                                                 ${isSelected ? 'border-primary bg-primary/10' : 'border-neutral-gray/20 hover:border-primary/40'}`}
                                         >
                                             <span className={`text-sm font-semibold capitalize ${isSelected ? 'text-primary' : 'text-text-dark dark:text-text-light'}`}>{variant}</span>
-                                            <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-neutral-gray'}`}>GHS {vPrice}</span>
+                                            <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-neutral-gray'}`}>₵{vPrice}</span>
                                             {vQty > 0 && (
                                                 <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-bold">
                                                     {vQty}
@@ -168,7 +168,7 @@ export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps)
                                                 ${isSelected ? 'border-primary bg-primary/10' : 'border-neutral-gray/20 hover:border-primary/40'}`}
                                         >
                                             <span className={`text-sm font-semibold ${isSelected ? 'text-primary' : 'text-text-dark dark:text-text-light'}`}>{s.label}</span>
-                                            <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-neutral-gray'}`}>GHS {s.price}</span>
+                                            <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-neutral-gray'}`}>₵{s.price}</span>
                                             {sQty > 0 && (
                                                 <span className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-bold">
                                                     {sQty}
