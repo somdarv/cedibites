@@ -9,7 +9,7 @@ import {
     PhoneIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
-import { MOCK_STAFF } from '@/lib/data/mockStaff';
+import { useEmployees } from '@/lib/api/hooks/useEmployees';
 import type { StaffRole } from '@/types/order';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -49,20 +49,19 @@ function initials(name: string) {
 
 export default function PartnerStaffPage() {
     const { staffUser } = useStaffAuth();
-    const branchName = staffUser?.branch ?? '';
+    const branchIdNum = staffUser?.branchId ? parseInt(staffUser.branchId, 10) : undefined;
+    const { employees: branchStaff, isLoading } = useEmployees({ branch_id: branchIdNum });
 
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
 
-    const branchStaff = useMemo(() =>
-        MOCK_STAFF.filter(s => {
-            const branches = Array.isArray(s.branch) ? s.branch : [s.branch];
-            return branches.includes(branchName) && s.status !== 'archived';
-        }),
-    [branchName]);
+    const nonArchived = useMemo(
+        () => branchStaff.filter(s => s.status !== 'archived'),
+        [branchStaff]
+    );
 
     const filtered = useMemo(() => {
-        let list = branchStaff;
+        let list = nonArchived;
         if (roleFilter !== 'all') list = list.filter(s => s.role === roleFilter);
         if (search.trim()) {
             const q = search.toLowerCase();
@@ -73,15 +72,15 @@ export default function PartnerStaffPage() {
             );
         }
         return list;
-    }, [branchStaff, roleFilter, search]);
+    }, [nonArchived, roleFilter, search]);
 
-    const activeCount = branchStaff.filter(s => s.systemAccess === 'enabled').length;
+    const activeCount = nonArchived.filter(s => s.systemAccess === 'enabled').length;
 
     // Roles actually present in this branch
     const presentRoles = useMemo(() => {
-        const roles = new Set(branchStaff.map(s => s.role));
-        return ALL_ROLES.filter(r => r === 'all' || roles.has(r));
-    }, [branchStaff]);
+        const roles = new Set(nonArchived.map(s => s.role));
+        return ALL_ROLES.filter(r => r === 'all' || (roles as Set<string>).has(r));
+    }, [nonArchived]);
 
     return (
         <div className="px-4 md:px-8 py-6 max-w-4xl mx-auto">
@@ -94,7 +93,7 @@ export default function PartnerStaffPage() {
                         <h1 className="text-text-dark text-2xl font-bold font-body">Staff</h1>
                     </div>
                     <p className="text-neutral-gray text-sm font-body">
-                        {branchStaff.length} member{branchStaff.length !== 1 ? 's' : ''} · {activeCount} with system access
+                        {isLoading ? 'Loading…' : `${nonArchived.length} member${nonArchived.length !== 1 ? 's' : ''} · ${activeCount} with system access`}
                     </p>
                 </div>
             </div>

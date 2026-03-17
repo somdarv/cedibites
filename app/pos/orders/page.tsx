@@ -19,7 +19,7 @@ import {
 import { usePOS } from '../context';
 import type { Order } from '@/types/order';
 import { formatGHS} from '@/lib/utils/currency';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { useBranch } from '@/app/components/providers/BranchProvider';
 import { printReceipt } from '@/lib/utils/printReceipt';
 import { STATUS_CONFIG, FULFILLMENT_LABELS } from '@/lib/constants/order.constants';
 
@@ -41,6 +41,7 @@ export default function POSOrdersPage() {
     seedTestOrders,
     logout,
   } = usePOS();
+  const { branches } = useBranch();
 
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
 
@@ -51,8 +52,8 @@ export default function POSOrdersPage() {
   }, [isSessionLoaded, isSessionValid, router]);
 
   const branchInfo = useMemo(
-    () => session ? BRANCHES.find(b => b.id === session.branchId) ?? null : null,
-    [session]
+    () => session ? branches.find(b => b.id === session.branchId) ?? null : null,
+    [session, branches]
   );
 
   const filteredOrders = useMemo(() => {
@@ -125,13 +126,7 @@ export default function POSOrdersPage() {
             </div>
           </div>
 
-          <button
-            onClick={seedTestOrders}
-            className="w-10 h-10 rounded-xl bg-neutral-gray/10 flex items-center justify-center text-neutral-gray hover:text-primary hover:bg-primary/10 transition-colors"
-            title="Seed test orders"
-          >
-            <FlaskIcon className="w-5 h-5" />
-          </button>
+          {/* Removed seed test orders button - use real orders from POS terminal */}
 
           <button
             onClick={() => { if (confirm('Sign out of POS?')) { logout(); router.replace('/pos'); } }}

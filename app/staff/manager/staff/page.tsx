@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
     UsersThreeIcon,
     PlusIcon,
@@ -19,10 +19,11 @@ import {
 import {
     type StaffMember,
     type StaffRole,
-    MOCK_STAFF,
     defaultPermissions,
 } from '@/lib/data/mockStaff';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
+import { employeeService } from '@/lib/api/services/employee.service';
+import { useQuery } from '@tanstack/react-query';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -319,10 +320,29 @@ function ArchiveConfirm({
 export default function ManagerStaffPage() {
     const { staffUser } = useStaffAuth();
     const currentBranch = staffUser?.branch ?? 'East Legon';
+    const branchId = staffUser?.branchId;
+    
+    const { data: apiStaff = [], isLoading } = useQuery({
+        queryKey: ['branch-employees', branchId],
+        queryFn: () => branchId ? employeeService.getBranchEmployees(branchId) : Promise.resolve([]),
+        enabled: !!branchId,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
 
-    const [staff, setStaff] = useState<StaffMember[]>(() =>
-        MOCK_STAFF.filter(s => BRANCH_ROLES.includes(s.role) && inBranch(s, currentBranch))
+    const branchStaff = useMemo(
+        () => apiStaff.filter(s => BRANCH_ROLES.includes(s.role) && inBranch(s, currentBranch)),
+        [apiStaff, currentBranch]
     );
+
+    const [staff, setStaff] = useState<StaffMember[]>([]);
+    const hasInitialized = useRef(false);
+
+    useEffect(() => {
+        if (!hasInitialized.current && branchStaff.length > 0) {
+            hasInitialized.current = true;
+            setStaff(branchStaff);
+        }
+    }, [branchStaff]);
 
     const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
     const [editingMember, setEditingMember] = useState<StaffMember | null | 'new'>(null);

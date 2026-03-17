@@ -1,7 +1,6 @@
 // ─── Staff Service Interface ─────────────────────────────────────────────────
-// Swap MockStaffService → ApiStaffService when backend is ready.
 
-import { MockStaffService } from './staff.service.mock';
+import { ApiStaffService } from './staff.service.api';
 
 // Re-export types from the authoritative source so callers get the full type
 export type { StaffMember, StaffStatus } from '@/lib/data/mockStaff';
@@ -34,7 +33,7 @@ let _instance: StaffService | null = null;
 
 export function getStaffService(): StaffService {
     if (!_instance) {
-        _instance = new MockStaffService();
+        _instance = new ApiStaffService();
     }
     return _instance;
 }

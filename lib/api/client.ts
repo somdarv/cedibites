@@ -72,17 +72,26 @@ export function ensureGuestSessionId(): string {
   return id;
 }
 
-// Request interceptor - add auth token or X-Guest-Session
+function isStaffRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  const p = window.location.pathname;
+  return p.startsWith('/staff') || p.startsWith('/admin') || p.startsWith('/partner') || p.startsWith('/pos') || p.startsWith('/kitchen');
+}
+
+// Request interceptor - use the token that matches the current route, no fallbacks
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined' && config.headers) {
-      const token = localStorage.getItem('cedibites_auth_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      if (isStaffRoute()) {
+        const token = localStorage.getItem('cedibites_staff_token');
+        if (token) config.headers.Authorization = `Bearer ${token}`;
       } else {
-        const guestSession = localStorage.getItem(GUEST_SESSION_KEY);
-        if (guestSession) {
-          config.headers['X-Guest-Session'] = guestSession;
+        const token = localStorage.getItem('cedibites_auth_token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        } else {
+          const guestSession = localStorage.getItem(GUEST_SESSION_KEY);
+          if (guestSession) config.headers['X-Guest-Session'] = guestSession;
         }
       }
     }
@@ -111,12 +120,28 @@ apiClient.interceptors.response.use(
     // Handle 401 - Unauthorized (token expired or invalid)
     if (status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('cedibites_auth_token');
-        localStorage.removeItem('cedibites-auth-user');
+        const pathname = window.location.pathname;
+        const isStaffRoute = pathname.startsWith('/staff') ||
+          pathname.startsWith('/admin') ||
+          pathname.startsWith('/partner') ||
+          pathname.startsWith('/pos') ||
+          pathname.startsWith('/kitchen');
         
-        // Redirect to home page if not already there
-        if (window.location.pathname !== '/') {
-          window.location.href = '/';
+        if (isStaffRoute) {
+          // Don't redirect if already on a login page or POS root (login page)
+          const isOnLoginPage = pathname.includes('/login') || pathname === '/pos';
+          
+          if (!isOnLoginPage) {
+            localStorage.removeItem('cedibites_staff_token');
+            localStorage.removeItem('cedibites-staff-session');
+            window.location.href = '/staff/login';
+          }
+        } else {
+          localStorage.removeItem('cedibites_auth_token');
+          localStorage.removeItem('cedibites-auth-user');
+          if (pathname !== '/') {
+            window.location.href = '/';
+          }
         }
       }
       throw new ApiError(status, 'Unauthorized. Please login again.');

@@ -17,8 +17,7 @@ import {
     DeviceMobileIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
-
-// ─── Mock branch data ──────────────────────────────────────────────────────────
+import { useBranch } from '@/lib/api/hooks/useBranches';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -133,8 +132,26 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 export default function PartnerBranchPage() {
     const { staffUser } = useStaffAuth();
-    const branchName = staffUser?.branch ?? 'East Legon';
-    const branch = BRANCH_DATA[branchName] ?? FALLBACK;
+    const branchId = staffUser?.branchId ? parseInt(staffUser.branchId, 10) : null;
+    const { branch: apiBranch } = useBranch(branchId ?? 0);
+    const branchName = staffUser?.branch ?? apiBranch?.name ?? '—';
+
+    const branch = apiBranch
+        ? {
+            address: apiBranch.address ?? '—',
+            phone: apiBranch.phone ?? '—',
+            email: apiBranch.email ?? '—',
+            manager: apiBranch.manager?.name ?? '—',
+            openStatus: (apiBranch.is_active ? 'open' : 'closed') as 'open' | 'closed' | 'busy',
+            deliveryRadius: apiBranch.delivery_settings?.delivery_radius_km ?? 0,
+            baseDeliveryFee: apiBranch.delivery_settings?.base_delivery_fee ?? 0,
+            perKmFee: apiBranch.delivery_settings?.per_km_fee ?? 0,
+            minOrderValue: apiBranch.delivery_settings?.min_order_value ?? 0,
+            orderTypes: { delivery: true, pickup: true, dineIn: false },
+            payments: { momo: true, cashOnDelivery: true, cashAtPickup: true },
+            hours: Object.fromEntries(DAYS.map(d => [d, { open: true, from: '08:00', to: '20:00' }])),
+        }
+        : (BRANCH_DATA[branchName] ?? FALLBACK);
 
     return (
         <div className="px-4 md:px-8 py-6 max-w-4xl mx-auto">

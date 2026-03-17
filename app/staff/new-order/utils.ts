@@ -3,7 +3,7 @@ import {
     WhatsappLogoIcon,
     ShareNetworkIcon,
 } from '@phosphor-icons/react';
-import type { MenuItem } from '@/lib/data/SampleMenu';
+import type { DisplayMenuItem } from '@/lib/api/adapters/menu.adapter';
 import type { OrderSource } from '@/types/order';
 export { formatGHS} from '@/lib/utils/currency';
 
@@ -33,7 +33,7 @@ export function formatPhone(raw: string): string {
 export { generateOrderId as generateOrderCode } from '@/types/order';
 
 // Returns the lowest applicable price for any menu item (flat, sized, or variant)
-export function getBasePrice(item: MenuItem): number {
+export function getBasePrice(item: DisplayMenuItem): number {
     if (item.price !== undefined) return item.price;
     if (item.variants) return Math.min(item.variants.plain ?? Infinity, item.variants.assorted ?? Infinity);
     if (item.sizes) return Math.min(...item.sizes.map(s => s.price));

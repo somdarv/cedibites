@@ -15,7 +15,7 @@ import {
     EyeSlashIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
-import { MOCK_STAFF, roleDisplayName } from '@/lib/data/mockStaff';
+import { roleDisplayName } from '@/lib/data/mockStaff';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -98,11 +98,6 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
 export default function StaffProfilePage() {
     const { staffUser } = useStaffAuth();
 
-    const staffData = useMemo(
-        () => staffUser ? MOCK_STAFF.find(s => s.id === staffUser.id) ?? null : null,
-        [staffUser]
-    );
-
     // ── Password change state ──
     const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
     const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
@@ -115,7 +110,7 @@ export default function StaffProfilePage() {
     const [pinToast, setPinToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [pinLoading, setPinLoading] = useState(false);
 
-    const isPOSUser = !!(staffData?.pin);
+    const isPOSUser = !!(staffUser?.pin);
 
     // ── Handlers ──
 
@@ -123,7 +118,7 @@ export default function StaffProfilePage() {
         e.preventDefault();
         const errs: Record<string, string> = {};
         if (!pwForm.current)               errs.current  = 'Required';
-        if (staffData && pwForm.current !== staffData.password) errs.current = 'Current password is incorrect';
+        // Current password validation would require API call
         if (!pwForm.next)                  errs.next     = 'Required';
         else if (pwForm.next.length < 6)   errs.next     = 'At least 6 characters';
         if (pwForm.next !== pwForm.confirm) errs.confirm  = 'Passwords do not match';
@@ -143,7 +138,7 @@ export default function StaffProfilePage() {
         e.preventDefault();
         const errs: Record<string, string> = {};
         if (!pinForm.current)                       errs.current = 'Required';
-        if (staffData && pinForm.current !== staffData.pin) errs.current = 'Current PIN is incorrect';
+        if (staffUser && pinForm.current !== staffUser.pin) errs.current = 'Current PIN is incorrect';
         if (!pinForm.next)                          errs.next    = 'Required';
         else if (!/^\d{4}$/.test(pinForm.next))     errs.next    = 'PIN must be exactly 4 digits';
         if (pinForm.next !== pinForm.confirm)        errs.confirm = 'PINs do not match';
@@ -186,9 +181,9 @@ export default function StaffProfilePage() {
                     <FieldRow label="Full Name"  value={staffUser.name} />
                     <FieldRow label="Role"       value={roleDisplayName(staffUser.role)} readonly />
                     <FieldRow label="Branch"     value={branchDisplay} readonly />
-                    {staffData?.email && <FieldRow label="Email"  value={staffData.email} />}
-                    {staffData?.phone && <FieldRow label="Phone"  value={staffData.phone} />}
-                    {staffData?.joinedAt && <FieldRow label="Joined" value={staffData.joinedAt} readonly />}
+                    {staffUser?.email && <FieldRow label="Email"  value={staffUser.email} />}
+                    {staffUser?.phone && <FieldRow label="Phone"  value={staffUser.phone} />}
+                    {staffUser?.joinedAt && <FieldRow label="Joined" value={staffUser.joinedAt} readonly />}
                 </SectionCard>
 
                 {/* ── Change password ───────────────────────────────────────────── */}

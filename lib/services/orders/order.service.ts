@@ -3,7 +3,7 @@
 // Swap MockOrderService → ApiOrderService when backend is ready.
 
 import type { Order, OrderFilter, OrderStatus, CreateOrderInput } from '@/types/order';
-import { MockOrderService } from './order.service.mock';
+import { ApiOrderService } from './order.service.api';
 
 export interface OrderService {
     /** Get all orders, optionally filtered */
@@ -34,9 +34,7 @@ let _instance: OrderService | null = null;
 
 export function getOrderService(): OrderService {
     if (!_instance) {
-        // When backend is ready, swap this line:
-        // _instance = new ApiOrderService();
-        _instance = new MockOrderService();
+        _instance = new ApiOrderService();
     }
     return _instance;
 }

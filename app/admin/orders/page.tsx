@@ -1,6 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import type { EmployeeOrdersParams } from '@/lib/api/services/order.service';
+import { useBranches } from '@/lib/api/hooks/useBranches';
+import type { AdminOrder } from '@/lib/api/adapters/order.adapter';
 import {
     MagnifyingGlassIcon,
     XIcon,
@@ -27,156 +31,6 @@ type OrderStatus = 'received' | 'preparing' | 'ready' | 'ready_for_pickup' | 'ou
 type OrderSource = 'Online' | 'POS' | 'WhatsApp' | 'Instagram' | 'Facebook' | 'Phone';
 type PaymentMethod = 'Mobile Money' | 'Cash on Delivery' | 'Cash at Pickup';
 
-interface OrderItem {
-    name: string;
-    qty: number;
-    price: number;
-}
-
-interface TimelineEvent {
-    status: string;
-    at: string;
-    by: string;
-}
-
-interface AdminOrder {
-    id: string;
-    customer: string;
-    phone: string;
-    email?: string;
-    address: string;
-    branch: string;
-    source: OrderSource;
-    items: OrderItem[];
-    amount: number;
-    payment: PaymentMethod;
-    paymentStatus: 'paid' | 'pending' | 'failed';
-    hubtelRef?: string;
-    status: OrderStatus;
-    placedAt: string;
-    placedAtFull: string;
-    timeline: TimelineEvent[];
-}
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const ORDERS: AdminOrder[] = [
-    {
-        id: 'CB847291', customer: 'Ama Serwaa', phone: '0244123456', email: 'ama@gmail.com',
-        address: '14 Ring Road, Osu, Accra', branch: 'Osu', source: 'WhatsApp',
-        items: [{ name: 'Jollof Rice (Assorted)', qty: 2, price: 85 }, { name: 'Sobolo (Large)', qty: 2, price: 20 }],
-        amount: 190, payment: 'Mobile Money', paymentStatus: 'paid', hubtelRef: 'HBT-2024-001',
-        status: 'delivered', placedAt: '8:15 AM', placedAtFull: 'Today 8:15 AM',
-        timeline: [
-            { status: 'Received', at: '8:15 AM', by: 'System' },
-            { status: 'Preparing', at: '8:18 AM', by: 'Kofi (Staff)' },
-            { status: 'Out for Delivery', at: '8:45 AM', by: 'Kofi (Staff)' },
-            { status: 'Delivered', at: '9:10 AM', by: 'Rider - Kweku' },
-        ],
-    },
-    {
-        id: 'CB204837', customer: 'Abena Boateng', phone: '0201987654',
-        address: 'East Legon Hills, Accra', branch: 'East Legon', source: 'Instagram',
-        items: [{ name: 'Waakye (Special)', qty: 1, price: 73 }],
-        amount: 73, payment: 'Mobile Money', paymentStatus: 'paid',
-        status: 'preparing', placedAt: '9:30 AM', placedAtFull: 'Today 9:30 AM',
-        timeline: [
-            { status: 'Received', at: '9:30 AM', by: 'System' },
-            { status: 'Preparing', at: '9:33 AM', by: 'Esi (Staff)' },
-        ],
-    },
-    {
-        id: 'CB173920', customer: 'Yaw Darko', phone: '0277456789',
-        address: 'Spintex Road, Accra', branch: 'Spintex', source: 'Facebook',
-        items: [{ name: 'Banku & Tilapia', qty: 2, price: 55 }, { name: 'Pineapple Juice', qty: 2, price: 18 }],
-        amount: 146, payment: 'Cash on Delivery', paymentStatus: 'pending',
-        status: 'out_for_delivery', placedAt: '10:05 AM', placedAtFull: 'Today 10:05 AM',
-        timeline: [
-            { status: 'Received', at: '10:05 AM', by: 'System' },
-            { status: 'Preparing', at: '10:08 AM', by: 'Akosua (Staff)' },
-            { status: 'Out for Delivery', at: '10:40 AM', by: 'Rider - Ato' },
-        ],
-    },
-    {
-        id: 'CB998812', customer: 'Efua Mensah', phone: '0265321789',
-        address: 'Labone, Accra', branch: 'Osu', source: 'Phone',
-        items: [{ name: 'Fufu & Light Soup', qty: 1, price: 59 }],
-        amount: 59, payment: 'Mobile Money', paymentStatus: 'paid',
-        status: 'ready', placedAt: '10:45 AM', placedAtFull: 'Today 10:45 AM',
-        timeline: [
-            { status: 'Received', at: '10:45 AM', by: 'Kofi (Staff)' },
-            { status: 'Preparing', at: '10:47 AM', by: 'Kofi (Staff)' },
-            { status: 'Ready', at: '11:10 AM', by: 'Kitchen' },
-        ],
-    },
-    {
-        id: 'CB774433', customer: 'Kojo Appiah', phone: '0556123456',
-        address: 'East Legon, Accra', branch: 'East Legon', source: 'WhatsApp',
-        items: [{ name: 'Fried Rice (Plain)', qty: 2, price: 65 }, { name: 'Milo Ice Cream', qty: 3, price: 10 }],
-        amount: 160, payment: 'Mobile Money', paymentStatus: 'paid',
-        status: 'ready_for_pickup', placedAt: '11:10 AM', placedAtFull: 'Today 11:10 AM',
-        timeline: [
-            { status: 'Received', at: '11:10 AM', by: 'System' },
-            { status: 'Preparing', at: '11:12 AM', by: 'Esi (Staff)' },
-            { status: 'Ready for Pickup', at: '11:40 AM', by: 'Kitchen' },
-        ],
-    },
-    {
-        id: 'CB556677', customer: 'Adwoa Ofori', phone: '0249654321',
-        address: 'Spintex, Accra', branch: 'Spintex', source: 'Online',
-        items: [{ name: 'Jollof Rice (Plain)', qty: 2, price: 48 }],
-        amount: 96, payment: 'Mobile Money', paymentStatus: 'paid',
-        status: 'completed', placedAt: '11:50 AM', placedAtFull: 'Today 11:50 AM',
-        timeline: [
-            { status: 'Received', at: '11:50 AM', by: 'System' },
-            { status: 'Preparing', at: '11:52 AM', by: 'Akosua (Staff)' },
-            { status: 'Delivered', at: '12:25 PM', by: 'Rider' },
-            { status: 'Completed', at: '12:26 PM', by: 'System' },
-        ],
-    },
-    {
-        id: 'CB112233', customer: 'Fiifi Annan', phone: '0270789456',
-        address: 'Osu, Accra', branch: 'Osu', source: 'POS',
-        items: [{ name: 'Kelewele', qty: 2, price: 20 }, { name: 'Sobolo', qty: 2, price: 18 }],
-        amount: 76, payment: 'Cash at Pickup', paymentStatus: 'paid',
-        status: 'completed', placedAt: '12:00 PM', placedAtFull: 'Today 12:00 PM',
-        timeline: [
-            { status: 'Received', at: '12:00 PM', by: 'POS - Kofi' },
-            { status: 'Completed', at: '12:15 PM', by: 'POS - Kofi' },
-        ],
-    },
-    {
-        id: 'CB332211', customer: 'Nana Asare', phone: '0244789123',
-        address: 'Spintex, Accra', branch: 'Spintex', source: 'Phone',
-        items: [{ name: 'Banku & Okro Stew', qty: 1, price: 35 }],
-        amount: 35, payment: 'Cash on Delivery', paymentStatus: 'failed',
-        status: 'cancelled', placedAt: '12:20 PM', placedAtFull: 'Today 12:20 PM',
-        timeline: [
-            { status: 'Received', at: '12:20 PM', by: 'Akosua (Staff)' },
-            { status: 'Cancelled', at: '12:25 PM', by: 'Admin - Nana Kwame', },
-        ],
-    },
-    {
-        id: 'CB445566', customer: 'Akua Owusu', phone: '0201456789',
-        address: 'Airport Residential, Accra', branch: 'East Legon', source: 'WhatsApp',
-        items: [{ name: 'Jollof Rice (Assorted)', qty: 2, price: 85 }, { name: 'Fried Plantain', qty: 1, price: 15 }],
-        amount: 185, payment: 'Mobile Money', paymentStatus: 'paid',
-        status: 'received', placedAt: '1:00 PM', placedAtFull: 'Today 1:00 PM',
-        timeline: [{ status: 'Received', at: '1:00 PM', by: 'System' }],
-    },
-    {
-        id: 'CB667788', customer: 'Kwame Frimpong', phone: '0277654123',
-        address: 'East Legon, Accra', branch: 'East Legon', source: 'Instagram',
-        items: [{ name: 'Waakye (Small)', qty: 2, price: 41 }],
-        amount: 82, payment: 'Mobile Money', paymentStatus: 'paid',
-        status: 'preparing', placedAt: '1:15 PM', placedAtFull: 'Today 1:15 PM',
-        timeline: [
-            { status: 'Received', at: '1:15 PM', by: 'System' },
-            { status: 'Preparing', at: '1:17 PM', by: 'Esi (Staff)' },
-        ],
-    },
-];
-
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, { dot: string; label: string; pulse?: boolean }> = {
@@ -202,7 +56,15 @@ const SOURCE_STYLES: Record<OrderSource, string> = {
 const ALL_STATUSES: OrderStatus[] = ['received', 'preparing', 'ready', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'completed', 'cancelled'];
 const ALL_SOURCES: OrderSource[] = ['Online', 'POS', 'WhatsApp', 'Instagram', 'Facebook', 'Phone'];
 const ALL_PAYMENTS: PaymentMethod[] = ['Mobile Money', 'Cash on Delivery', 'Cash at Pickup'];
-const ALL_BRANCHES = ['Osu', 'East Legon', 'Spintex'];
+
+const SOURCE_TO_API: Record<OrderSource, string> = {
+    Online: 'online',
+    POS: 'pos',
+    WhatsApp: 'whatsapp',
+    Instagram: 'instagram',
+    Facebook: 'facebook',
+    Phone: 'phone',
+};
 
 const PAGE_SIZE = 25;
 
@@ -475,7 +337,34 @@ function OrderDetailPanel({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+function getDateRange(preset: string): { date_from?: string; date_to?: string } {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    if (preset === 'Today') {
+        return { date_from: today, date_to: today };
+    }
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+    if (preset === 'Yesterday') {
+        return { date_from: yesterdayStr, date_to: yesterdayStr };
+    }
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const weekStartStr = weekStart.toISOString().slice(0, 10);
+    if (preset === 'This Week') {
+        return { date_from: weekStartStr, date_to: today };
+    }
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthStartStr = monthStart.toISOString().slice(0, 10);
+    if (preset === 'This Month') {
+        return { date_from: monthStartStr, date_to: today };
+    }
+    return {};
+}
+
 export default function AdminOrdersPage() {
+    const [mounted, setMounted] = useState(false);
     const [search, setSearch] = useState('');
     const [selectedBranches, setSelectedBranches] = useState<string[]>([]);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -486,25 +375,51 @@ export default function AdminOrdersPage() {
     const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
     const [showFilters, setShowFilters] = useState(false);
 
-    const filtered = useMemo(() => {
-        let list = ORDERS;
-        if (search.trim()) {
-            const q = search.toLowerCase();
-            list = list.filter(o =>
-                o.id.toLowerCase().includes(q) ||
-                o.customer.toLowerCase().includes(q) ||
-                o.phone.includes(q)
-            );
-        }
-        if (selectedBranches.length) list = list.filter(o => selectedBranches.includes(o.branch));
-        if (selectedStatuses.length) list = list.filter(o => selectedStatuses.includes(o.status));
-        if (selectedSources.length) list = list.filter(o => selectedSources.includes(o.source));
-        if (selectedPayments.length) list = list.filter(o => selectedPayments.includes(o.payment));
-        return list;
-    }, [search, selectedBranches, selectedStatuses, selectedSources, selectedPayments]);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
-    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-    const pageOrders = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const { branches } = useBranches();
+    const branchIdByName = useMemo(() => {
+        const m: Record<string, number> = {};
+        for (const b of branches) m[b.name] = b.id;
+        return m;
+    }, [branches]);
+
+    const orderParams = useMemo(() => {
+        const params: EmployeeOrdersParams = {
+            page: page + 1,
+            per_page: PAGE_SIZE,
+        };
+        if (search.trim()) params.search = search.trim();
+        if (selectedStatuses.length) params.status = selectedStatuses;
+        if (selectedSources.length) {
+            const mappedSources = selectedSources.map((s) => SOURCE_TO_API[s as OrderSource]);
+            params.order_source = mappedSources.join(',');
+        }
+        if (selectedBranches.length === 1 && branchIdByName[selectedBranches[0]]) {
+            params.branch_id = branchIdByName[selectedBranches[0]];
+        }
+        const range = getDateRange(datePreset);
+        if (range.date_from) params.date_from = range.date_from;
+        if (range.date_to) params.date_to = range.date_to;
+        return params;
+    }, [search, selectedStatuses, selectedSources, selectedBranches, datePreset, page, branchIdByName]);
+
+    const { orders, meta, isLoading } = useEmployeeOrders(orderParams);
+
+    const pageOrders = useMemo(() => {
+        let list = orders;
+        if (selectedPayments.length) {
+            list = list.filter((o) => selectedPayments.includes(o.payment));
+        }
+        if (selectedBranches.length > 1) {
+            list = list.filter((o) => selectedBranches.includes(o.branch));
+        }
+        return list;
+    }, [orders, selectedPayments, selectedBranches]);
+
+    const totalPages = (meta as any)?.last_page ?? 1;
 
     function toggleFilter<T extends string>(arr: T[], set: (v: T[]) => void, val: T) {
         set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
@@ -519,7 +434,9 @@ export default function AdminOrdersPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-text-dark text-2xl font-bold font-body">Orders</h1>
-                    <p className="text-neutral-gray text-sm font-body mt-0.5">All branches · {filtered.length} orders</p>
+                    <p className="text-neutral-gray text-sm font-body mt-0.5">
+                        {`All branches · ${(meta as any)?.total ?? 0} orders`}
+                    </p>
                 </div>
                 <button type="button" className="flex items-center gap-2 px-4 py-2 bg-neutral-card border border-[#f0e8d8] rounded-xl text-text-dark text-sm font-medium font-body hover:border-primary/40 transition-colors cursor-pointer shrink-0">
                     <DownloadSimpleIcon size={15} weight="bold" className="text-primary" />
@@ -570,7 +487,7 @@ export default function AdminOrdersPage() {
                 {/* Expanded filters */}
                 {showFilters && (
                     <div className="border-t border-[#f0e8d8] pt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                        <FilterGroup label="Branch" options={ALL_BRANCHES} selected={selectedBranches} onToggle={v => toggleFilter(selectedBranches, setSelectedBranches, v)} />
+                        <FilterGroup label="Branch" options={branches} selected={selectedBranches} onToggle={(b: any) => toggleFilter(selectedBranches, setSelectedBranches, b.name)} keyFn={(b: any) => b.id} valueFn={(b: any) => b.name} labelFn={(b: any) => b.name} />
                         <FilterGroup label="Status" options={ALL_STATUSES} selected={selectedStatuses} onToggle={v => toggleFilter(selectedStatuses, setSelectedStatuses, v)} labelFn={v => STATUS_STYLES[v]?.label ?? v} />
                         <FilterGroup label="Source" options={ALL_SOURCES} selected={selectedSources} onToggle={v => toggleFilter(selectedSources, setSelectedSources, v)} />
                         <FilterGroup label="Payment" options={ALL_PAYMENTS} selected={selectedPayments} onToggle={v => toggleFilter(selectedPayments, setSelectedPayments, v)} />
@@ -586,7 +503,11 @@ export default function AdminOrdersPage() {
                     ))}
                 </div>
 
-                {pageOrders.length === 0 ? (
+                {!mounted || isLoading ? (
+                    <div className="px-4 py-16 text-center">
+                        <p className="text-neutral-gray text-sm font-body">Loading orders…</p>
+                    </div>
+                ) : pageOrders.length === 0 ? (
                     <div className="px-4 py-16 text-center">
                         <p className="text-neutral-gray text-sm font-body">No orders match your filters.</p>
                     </div>
@@ -641,31 +562,36 @@ export default function AdminOrdersPage() {
 
 // ─── Filter group ─────────────────────────────────────────────────────────────
 
-function FilterGroup<T extends string>({
+function FilterGroup<T>({
     label,
     options,
     selected,
     onToggle,
     labelFn,
+    keyFn,
+    valueFn,
 }: {
     label: string;
     options: T[];
-    selected: T[];
+    selected: string[];
     onToggle: (v: T) => void;
     labelFn?: (v: T) => string;
+    keyFn?: (v: T) => string | number;
+    valueFn?: (v: T) => string;
 }) {
+    const isSelected = (opt: T) => (valueFn ? selected.includes(valueFn(opt)) : selected.includes(opt as unknown as string));
     return (
         <div>
             <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-2">{label}</p>
             <div className="flex flex-wrap gap-1.5">
                 {options.map(opt => (
                     <button
-                        key={opt}
+                        key={keyFn ? keyFn(opt) : String(opt)}
                         type="button"
                         onClick={() => onToggle(opt)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium font-body transition-all cursor-pointer ${selected.includes(opt) ? 'bg-primary/15 text-primary border border-primary/30' : 'bg-neutral-light text-neutral-gray hover:text-text-dark border border-transparent'}`}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium font-body transition-all cursor-pointer ${isSelected(opt) ? 'bg-primary/15 text-primary border border-primary/30' : 'bg-neutral-light text-neutral-gray hover:text-text-dark border border-transparent'}`}
                     >
-                        {labelFn ? labelFn(opt) : opt}
+                        {labelFn ? labelFn(opt) : String(opt)}
                     </button>
                 ))}
             </div>

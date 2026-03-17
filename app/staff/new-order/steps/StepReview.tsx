@@ -15,7 +15,7 @@ import {
     ProhibitIcon,
     TagIcon,
 } from '@phosphor-icons/react';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { useBranch } from '@/app/components/providers/BranchProvider';
 import type { PaymentMethod } from '@/types/order';
 import { useNewOrder } from '../context';
 import { formatGHS, ORDER_SOURCES } from '../utils';
@@ -41,11 +41,12 @@ export default function StepReview() {
         payment, isSubmitting, promo, discount,
         setPayment, submit, setStep,
     } = useNewOrder();
+    const { branches } = useBranch();
 
     const [momoNetwork, setMomoNetwork] = useState<'mtn' | 'telecel' | 'airteltigo' | null>(null);
     const [momoPhone, setMomoPhone] = useState('');
 
-    const branch = BRANCHES.find(b => b.id === branchId);
+    const branch = branches.find(b => b.id === branchId);
     const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const deliveryFee = orderType === 'delivery' ? (branch?.deliveryFee ?? 0) : 0;
     const total = cartTotal + deliveryFee - discount;

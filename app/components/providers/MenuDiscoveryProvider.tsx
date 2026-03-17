@@ -70,10 +70,10 @@ const MenuDiscoveryContext = createContext<MenuDiscoveryContextType | null>(null
 
 interface MenuDiscoveryProviderProps {
     children: React.ReactNode;
-    items: SearchableItem[];
+    items?: SearchableItem[];
 }
 
-export function MenuDiscoveryProvider({ children, items }: MenuDiscoveryProviderProps) {
+export function MenuDiscoveryProvider({ children }: MenuDiscoveryProviderProps) {
     // Fetch menu data from API
     const { items: apiItems, isLoading: isLoadingMenu, error, refetch } = useMenu();
     

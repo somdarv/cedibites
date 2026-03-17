@@ -5,7 +5,7 @@ import type { Order, OrderStatus, UserRole, OrderNotification } from '@/types/or
 import { canAdvanceOrder } from '@/types/order';
 import type { DateRange } from './components/DateFilter';
 import { KANBAN_COLUMNS, BRANCH_COORDS } from '@/lib/constants/order.constants';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { useBranch } from '@/app/components/providers/BranchProvider';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 import { useSounds, type SoundName } from './hooks/useSounds';
 
@@ -88,6 +88,7 @@ const DEMO_CUSTOMER_COORDS = [
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function OrdersProvider({ children, role = 'call_center' }: { children: React.ReactNode; role?: UserRole }) {
+    const { branches: apiBranches } = useBranch();
     const { orders: storeOrders, updateOrderStatus, updateOrder, createOrder } = useOrderStore();
 
     const [search, setSearch] = useState('');
@@ -268,7 +269,7 @@ export function OrdersProvider({ children, role = 'call_center' }: { children: R
                 phone: DEMO_CUSTOMERS[idx].phone,
                 address: fulfillmentType === 'delivery' ? 'Test Address, Accra' : undefined,
             },
-            branchId: BRANCHES.find(b => b.name === branchName)?.id ?? branchName,
+            branchId: apiBranches.find(b => b.name === branchName)?.id ?? branchName,
             branchName,
             branchCoordinates: branchCoords,
         }).then(order => {
@@ -280,7 +281,7 @@ export function OrdersProvider({ children, role = 'call_center' }: { children: R
             }, 'newOrder');
             scheduleKitchenSim(order.id, order.contact.name);
         });
-    }, [createOrder, notify, scheduleKitchenSim]);
+    }, [createOrder, notify, scheduleKitchenSim, apiBranches]);
 
     // ── handleAdvance ─────────────────────────────────────────────────────────
     const handleAdvance = useCallback((id: string, status: OrderStatus) => {

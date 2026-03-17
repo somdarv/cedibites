@@ -1,7 +1,7 @@
 'use client';
 
 import { CaretRightIcon } from '@phosphor-icons/react';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { useBranch } from '@/app/components/providers/BranchProvider';
 import { useNewOrder } from '../context';
 import { ORDER_SOURCES, formatGHS} from '../utils';
 
@@ -9,6 +9,7 @@ import { ORDER_SOURCES, formatGHS} from '../utils';
 
 export default function StepSetup() {
     const { source, branchId, setSource, setBranchId, setStep } = useNewOrder();
+    const { branches } = useBranch();
     const canProceed = !!source && !!branchId;
 
     return (
@@ -49,7 +50,7 @@ export default function StepSetup() {
             {/* Branch list — fills remaining space, scrolls when needed */}
             <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
                 <div className="flex flex-col gap-2 pb-2">
-                    {BRANCHES.map(branch => (
+                    {branches.map(branch => (
                         <button
                             key={branch.id}
                             type="button"

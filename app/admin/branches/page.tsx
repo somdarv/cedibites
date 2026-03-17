@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
     PlusIcon,
@@ -17,68 +17,21 @@ import {
     BuildingsIcon,
     CheckCircleIcon,
 } from '@phosphor-icons/react';
+import { useBranches } from '@/lib/api/hooks/useBranches';
+import { useEmployees } from '@/lib/api/hooks/useEmployees';
+import { branchService } from '@/lib/api/services/branch.service';
+import { mapApiBranchToDisplay } from '@/lib/api/adapters/branch.adapter';
+import type { DisplayBranch } from '@/lib/api/adapters/branch.adapter';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/lib/utils/toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type BranchStatus = 'active' | 'inactive';
-type BranchOpenStatus = 'open' | 'closed' | 'busy';
-
-interface Branch {
-    id: string;
-    name: string;
-    address: string;
-    phone: string;
-    email: string;
-    status: BranchStatus;
-    openStatus: BranchOpenStatus;
-    manager: string;
-    ordersToday: number;
-    revenueToday: number;
-    deliveryRadius: number;
-    baseDeliveryFee: number;
-    perKmFee: number;
-    minOrderValue: number;
-    orderTypes: { delivery: boolean; pickup: boolean; dineIn: boolean };
-    payments: { momo: boolean; cashOnDelivery: boolean; cashAtPickup: boolean };
-    hours: Record<string, { open: boolean; from: string; to: string }>;
-}
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function defaultHours(): Branch['hours'] {
-    return Object.fromEntries(DAYS.map(d => [d, { open: true, from: '08:00', to: '20:00' }]));
+function defaultHours(): DisplayBranch['hours'] {
+    return Object.fromEntries(DAYS.map((d) => [d, { open: true, from: '08:00', to: '20:00' }]));
 }
-
-const INITIAL_BRANCHES: Branch[] = [
-    {
-        id: 'osu', name: 'Osu', address: '14 Ring Road, Osu, Accra', phone: '0302123456', email: 'osu@cedibites.com',
-        status: 'active', openStatus: 'open', manager: 'Ama Boateng', ordersToday: 38, revenueToday: 3210,
-        deliveryRadius: 5, baseDeliveryFee: 15, perKmFee: 3, minOrderValue: 50,
-        orderTypes: { delivery: true, pickup: true, dineIn: false },
-        payments: { momo: true, cashOnDelivery: true, cashAtPickup: true },
-        hours: defaultHours(),
-    },
-    {
-        id: 'east-legon', name: 'East Legon', address: 'East Legon Hills, Accra', phone: '0302789456', email: 'eastlegon@cedibites.com',
-        status: 'active', openStatus: 'open', manager: 'Kwame Asante', ordersToday: 42, revenueToday: 3680,
-        deliveryRadius: 6, baseDeliveryFee: 20, perKmFee: 4, minOrderValue: 60,
-        orderTypes: { delivery: true, pickup: true, dineIn: true },
-        payments: { momo: true, cashOnDelivery: true, cashAtPickup: false },
-        hours: defaultHours(),
-    },
-    {
-        id: 'spintex', name: 'Spintex', address: 'Spintex Road, Accra', phone: '0302654321', email: 'spintex@cedibites.com',
-        status: 'active', openStatus: 'busy', manager: 'Abena Mensah', ordersToday: 17, revenueToday: 1522,
-        deliveryRadius: 4, baseDeliveryFee: 12, perKmFee: 2.5, minOrderValue: 45,
-        orderTypes: { delivery: true, pickup: false, dineIn: false },
-        payments: { momo: true, cashOnDelivery: false, cashAtPickup: false },
-        hours: defaultHours(),
-    },
-];
-
-const ALL_MANAGERS = ['Ama Boateng', 'Kwame Asante', 'Abena Mensah', 'Kofi Acheampong', 'Efua Osei'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -86,7 +39,7 @@ function formatGHS(v: number) { return `₵${v.toLocaleString('en-GH', { minimum
 
 // ─── Branch status dot ────────────────────────────────────────────────────────
 
-function StatusPill({ status }: { status: BranchOpenStatus }) {
+function StatusPill({ status }: { status: DisplayBranch['openStatus'] }) {
     const cfg = {
         open:   { color: 'bg-secondary/10 text-secondary border-secondary/20', dot: 'bg-secondary', label: 'Open'   },
         closed: { color: 'bg-error/10 text-error border-error/20',             dot: 'bg-error',     label: 'Closed' },
@@ -107,7 +60,7 @@ function ConfirmDeleteModal({
     onConfirm,
     onCancel,
 }: {
-    branch: Branch;
+    branch: DisplayBranch;
     onConfirm: () => void;
     onCancel: () => void;
 }) {
@@ -152,25 +105,102 @@ function BranchModal({
     branch,
     onClose,
     onSave,
+    employees,
 }: {
-    branch: Branch | null;
+    branch: DisplayBranch | null;
     onClose: () => void;
-    onSave: (b: Branch) => void;
+    onSave: (b: DisplayBranch) => void;
+    employees: Array<{ id: string; name: string }>;
 }) {
     const isNew = !branch;
-    const [form, setForm] = useState<Branch>(branch ?? {
-        id: `branch-${Date.now()}`,
-        name: '', address: '', phone: '', email: '',
-        status: 'active', openStatus: 'open', manager: ALL_MANAGERS[0],
-        ordersToday: 0, revenueToday: 0,
-        deliveryRadius: 5, baseDeliveryFee: 15, perKmFee: 3, minOrderValue: 50,
-        orderTypes: { delivery: true, pickup: true, dineIn: false },
-        payments: { momo: true, cashOnDelivery: true, cashAtPickup: true },
-        hours: defaultHours(),
-    });
+    const [form, setForm] = useState<DisplayBranch>(
+        branch ?? {
+            id: `branch-${Date.now()}`,
+            name: '',
+            address: '',
+            phone: '',
+            email: '',
+            status: 'active',
+            openStatus: 'open',
+            manager: employees[0]?.name ?? '',
+            ordersToday: 0,
+            revenueToday: 0,
+            deliveryRadius: 5,
+            baseDeliveryFee: 15,
+            perKmFee: 3,
+            minOrderValue: 50,
+            orderTypes: { delivery: true, pickup: true, dineIn: false },
+            payments: { momo: true, cashOnDelivery: true, cashAtPickup: true },
+            hours: defaultHours(),
+        }
+    );
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
-    function field(key: keyof Branch, value: Branch[typeof key]) {
+    function field(key: keyof DisplayBranch, value: DisplayBranch[typeof key]) {
         setForm(f => ({ ...f, [key]: value }));
+        // Clear error when field is updated
+        if (errors[key]) {
+            setErrors(e => ({ ...e, [key]: '' }));
+        }
+    }
+
+    function validateForm(): boolean {
+        const newErrors: Record<string, string> = {};
+
+        // Required fields
+        if (!form.name.trim()) newErrors.name = 'Branch name is required';
+        if (!form.address.trim()) newErrors.address = 'Address is required';
+        if (!form.phone.trim()) newErrors.phone = 'Phone number is required';
+        
+        // Email validation (if provided)
+        if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+            newErrors.email = 'Invalid email format';
+        }
+
+        // Phone validation (basic Ghana format)
+        if (form.phone && !/^(\+233|0)[0-9]{9}$/.test(form.phone.replace(/\s/g, ''))) {
+            newErrors.phone = 'Invalid phone format (e.g., 0241234567 or +233241234567)';
+        }
+
+        // Numeric validations
+        if (form.deliveryRadius <= 0) newErrors.deliveryRadius = 'Must be greater than 0';
+        if (form.baseDeliveryFee < 0) newErrors.baseDeliveryFee = 'Cannot be negative';
+        if (form.perKmFee < 0) newErrors.perKmFee = 'Cannot be negative';
+        if (form.minOrderValue < 0) newErrors.minOrderValue = 'Cannot be negative';
+
+        // At least one order type must be enabled
+        if (!form.orderTypes.delivery && !form.orderTypes.pickup && !form.orderTypes.dineIn) {
+            newErrors.orderTypes = 'At least one order type must be enabled';
+        }
+
+        // At least one payment method must be enabled
+        if (!form.payments.momo && !form.payments.cashOnDelivery && !form.payments.cashAtPickup) {
+            newErrors.payments = 'At least one payment method must be enabled';
+        }
+
+        // At least one day must be open
+        const hasOpenDay = Object.values(form.hours).some(h => h.open);
+        if (!hasOpenDay) {
+            newErrors.hours = 'Branch must be open at least one day';
+        }
+
+        // Validate operating hours
+        Object.entries(form.hours).forEach(([day, hours]) => {
+            if (hours.open && hours.from && hours.to) {
+                if (hours.from >= hours.to) {
+                    newErrors[`hours_${day}`] = `${day}: Opening time must be before closing time`;
+                }
+            }
+        });
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    }
+
+    function handleSave() {
+        if (validateForm()) {
+            onSave(form);
+        }
     }
 
     return (
@@ -190,10 +220,10 @@ function BranchModal({
                     {/* Branch details */}
                     <Section title="Branch Details">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <Field label="Branch Name" value={form.name} onChange={v => field('name', v)} placeholder="e.g. Accra Mall" />
-                            <Field label="Phone Number" value={form.phone} onChange={v => field('phone', v)} placeholder="0302..." />
-                            <Field label="Address" value={form.address} onChange={v => field('address', v)} placeholder="Street, Area, Accra" span={2} />
-                            <Field label="Email" value={form.email} onChange={v => field('email', v)} placeholder="branch@cedibites.com" />
+                            <Field label="Branch Name" value={form.name} onChange={v => field('name', v)} placeholder="e.g. Accra Mall" error={errors.name} />
+                            <Field label="Phone Number" value={form.phone} onChange={v => field('phone', v)} placeholder="0302..." error={errors.phone} />
+                            <Field label="Address" value={form.address} onChange={v => field('address', v)} placeholder="Street, Area, Accra" span={2} error={errors.address} />
+                            <Field label="Email" value={form.email} onChange={v => field('email', v)} placeholder="branch@cedibites.com" error={errors.email} />
                             <div>
                                 <label className="block text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-1.5">Assigned Manager</label>
                                 <select
@@ -201,7 +231,11 @@ function BranchModal({
                                     onChange={e => field('manager', e.target.value)}
                                     className="w-full px-3 py-2.5 bg-neutral-light border border-[#f0e8d8] rounded-xl text-text-dark text-sm font-body focus:outline-none focus:border-primary/40"
                                 >
-                                    {ALL_MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
+                                    {employees.length === 0 ? (
+                                        <option value="">No employees available</option>
+                                    ) : (
+                                        employees.map(emp => <option key={emp.id} value={emp.name}>{emp.name}</option>)
+                                    )}
                                 </select>
                             </div>
                         </div>
@@ -209,27 +243,31 @@ function BranchModal({
 
                     {/* Operating hours */}
                     <Section title="Operating Hours">
+                        {errors.hours && <p className="text-error text-xs font-body mb-2">{errors.hours}</p>}
                         <div className="flex flex-col gap-2">
                             {DAYS.map(day => (
-                                <div key={day} className="flex items-center gap-3">
-                                    <span className="text-text-dark text-xs font-semibold font-body w-8">{day}</span>
-                                    <Toggle
-                                        checked={form.hours[day].open}
-                                        onChange={v => setForm(f => ({ ...f, hours: { ...f.hours, [day]: { ...f.hours[day], open: v } } }))}
-                                    />
-                                    {form.hours[day].open ? (
-                                        <>
-                                            <input type="time" value={form.hours[day].from}
-                                                onChange={e => setForm(f => ({ ...f, hours: { ...f.hours, [day]: { ...f.hours[day], from: e.target.value } } }))}
-                                                className="px-2.5 py-1.5 bg-neutral-light border border-[#f0e8d8] rounded-lg text-text-dark text-xs font-body focus:outline-none focus:border-primary/40" />
-                                            <span className="text-neutral-gray text-xs font-body">to</span>
-                                            <input type="time" value={form.hours[day].to}
-                                                onChange={e => setForm(f => ({ ...f, hours: { ...f.hours, [day]: { ...f.hours[day], to: e.target.value } } }))}
-                                                className="px-2.5 py-1.5 bg-neutral-light border border-[#f0e8d8] rounded-lg text-text-dark text-xs font-body focus:outline-none focus:border-primary/40" />
-                                        </>
-                                    ) : (
-                                        <span className="text-neutral-gray text-xs font-body">Closed</span>
-                                    )}
+                                <div key={day}>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-text-dark text-xs font-semibold font-body w-8">{day}</span>
+                                        <Toggle
+                                            checked={form.hours[day].open}
+                                            onChange={v => setForm(f => ({ ...f, hours: { ...f.hours, [day]: { ...f.hours[day], open: v } } }))}
+                                        />
+                                        {form.hours[day].open ? (
+                                            <>
+                                                <input type="time" value={form.hours[day].from}
+                                                    onChange={e => setForm(f => ({ ...f, hours: { ...f.hours, [day]: { ...f.hours[day], from: e.target.value } } }))}
+                                                    className="px-2.5 py-1.5 bg-neutral-light border border-[#f0e8d8] rounded-lg text-text-dark text-xs font-body focus:outline-none focus:border-primary/40" />
+                                                <span className="text-neutral-gray text-xs font-body">to</span>
+                                                <input type="time" value={form.hours[day].to}
+                                                    onChange={e => setForm(f => ({ ...f, hours: { ...f.hours, [day]: { ...f.hours[day], to: e.target.value } } }))}
+                                                    className="px-2.5 py-1.5 bg-neutral-light border border-[#f0e8d8] rounded-lg text-text-dark text-xs font-body focus:outline-none focus:border-primary/40" />
+                                            </>
+                                        ) : (
+                                            <span className="text-neutral-gray text-xs font-body">Closed</span>
+                                        )}
+                                    </div>
+                                    {errors[`hours_${day}`] && <p className="text-error text-xs font-body mt-1 ml-12">{errors[`hours_${day}`]}</p>}
                                 </div>
                             ))}
                         </div>
@@ -238,15 +276,16 @@ function BranchModal({
                     {/* Delivery settings */}
                     <Section title="Delivery Settings">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            <NumberField label="Delivery Radius (km)" value={form.deliveryRadius} onChange={v => field('deliveryRadius', v)} />
-                            <NumberField label="Base Fee (GHS)" value={form.baseDeliveryFee} onChange={v => field('baseDeliveryFee', v)} />
-                            <NumberField label="Per-km Fee (GHS)" value={form.perKmFee} onChange={v => field('perKmFee', v)} />
-                            <NumberField label="Min. Order (GHS)" value={form.minOrderValue} onChange={v => field('minOrderValue', v)} />
+                            <NumberField label="Delivery Radius (km)" value={form.deliveryRadius} onChange={v => field('deliveryRadius', v)} error={errors.deliveryRadius} />
+                            <NumberField label="Base Fee (GHS)" value={form.baseDeliveryFee} onChange={v => field('baseDeliveryFee', v)} error={errors.baseDeliveryFee} />
+                            <NumberField label="Per-km Fee (GHS)" value={form.perKmFee} onChange={v => field('perKmFee', v)} error={errors.perKmFee} />
+                            <NumberField label="Min. Order (GHS)" value={form.minOrderValue} onChange={v => field('minOrderValue', v)} error={errors.minOrderValue} />
                         </div>
                     </Section>
 
                     {/* Order types */}
                     <Section title="Order Types">
+                        {errors.orderTypes && <p className="text-error text-xs font-body mb-2">{errors.orderTypes}</p>}
                         <div className="flex gap-4">
                             {(['delivery', 'pickup', 'dineIn'] as const).map(t => (
                                 <label key={t} className="flex items-center gap-2 cursor-pointer">
@@ -259,6 +298,7 @@ function BranchModal({
 
                     {/* Payment methods */}
                     <Section title="Payment Methods">
+                        {errors.payments && <p className="text-error text-xs font-body mb-2">{errors.payments}</p>}
                         <div className="flex gap-4 flex-wrap">
                             {([['momo', 'Mobile Money'], ['cashOnDelivery', 'Cash on Delivery'], ['cashAtPickup', 'Cash at Pickup']] as const).map(([key, label]) => (
                                 <label key={key} className="flex items-center gap-2 cursor-pointer">
@@ -286,7 +326,7 @@ function BranchModal({
                     <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-neutral-light text-text-dark rounded-xl text-sm font-medium font-body hover:bg-[#f0e8d8] transition-colors cursor-pointer">
                         Cancel
                     </button>
-                    <button type="button" onClick={() => onSave(form)} className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium font-body hover:bg-primary-hover transition-colors cursor-pointer">
+                    <button type="button" onClick={handleSave} className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium font-body hover:bg-primary-hover transition-colors cursor-pointer">
                         {isNew ? 'Create Branch' : 'Save Changes'}
                     </button>
                 </div>
@@ -306,22 +346,24 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     );
 }
 
-function Field({ label, value, onChange, placeholder, span }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; span?: number }) {
+function Field({ label, value, onChange, placeholder, span, error }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; span?: number; error?: string }) {
     return (
         <div className={span === 2 ? 'col-span-2' : ''}>
             <label className="block text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-1.5">{label}</label>
             <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-                className="w-full px-3 py-2.5 bg-neutral-light border border-[#f0e8d8] rounded-xl text-text-dark text-sm font-body focus:outline-none focus:border-primary/40" />
+                className={`w-full px-3 py-2.5 bg-neutral-light border rounded-xl text-text-dark text-sm font-body focus:outline-none ${error ? 'border-error focus:border-error' : 'border-[#f0e8d8] focus:border-primary/40'}`} />
+            {error && <p className="text-error text-xs font-body mt-1">{error}</p>}
         </div>
     );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function NumberField({ label, value, onChange, error }: { label: string; value: number; onChange: (v: number) => void; error?: string }) {
     return (
         <div>
             <label className="block text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-1.5">{label}</label>
             <input type="number" value={value} onChange={e => onChange(Number(e.target.value))}
-                className="w-full px-3 py-2.5 bg-neutral-light border border-[#f0e8d8] rounded-xl text-text-dark text-sm font-body focus:outline-none focus:border-primary/40" />
+                className={`w-full px-3 py-2.5 bg-neutral-light border rounded-xl text-text-dark text-sm font-body focus:outline-none ${error ? 'border-error focus:border-error' : 'border-[#f0e8d8] focus:border-primary/40'}`} />
+            {error && <p className="text-error text-xs font-body mt-1">{error}</p>}
         </div>
     );
 }
@@ -340,27 +382,150 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminBranchesPage() {
-    const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
-    const [editBranch, setEditBranch] = useState<Branch | null | 'new'>(null);
-    const [deleteBranch, setDeleteBranch] = useState<Branch | null>(null);
-    const [deactivateConfirm, setDeactivateConfirm] = useState<Branch | null>(null);
+    const queryClient = useQueryClient();
+    const { branches: apiBranches, isLoading, refetch } = useBranches();
+    const { employees, isLoading: isLoadingEmployees } = useEmployees({ status: 'active' });
+    const [editBranch, setEditBranch] = useState<DisplayBranch | null | 'new'>(null);
+    const [deleteBranch, setDeleteBranch] = useState<DisplayBranch | null>(null);
+    const [deactivateConfirm, setDeactivateConfirm] = useState<DisplayBranch | null>(null);
+    const [localOpenStatus, setLocalOpenStatus] = useState<Record<string, DisplayBranch['openStatus']>>({});
+    const [localStatus, setLocalStatus] = useState<Record<string, DisplayBranch['status']>>({});
 
-    function saveBranch(b: Branch) {
-        setBranches(prev => {
-            const idx = prev.findIndex(x => x.id === b.id);
-            if (idx >= 0) { const n = [...prev]; n[idx] = b; return n; }
-            return [...prev, b];
+    const branches = useMemo(() => {
+        return apiBranches.map((api: any) => {
+            const display = mapApiBranchToDisplay(api);
+            return {
+                ...display,
+                openStatus: localOpenStatus[display.id] ?? display.openStatus,
+                status: localStatus[display.id] ?? display.status,
+            };
         });
-        setEditBranch(null);
+    }, [apiBranches, localOpenStatus, localStatus]);
+
+    // Map employees to simple format for dropdown
+    const employeeOptions = useMemo(() => {
+        return employees.map(emp => ({ id: emp.id, name: emp.name }));
+    }, [employees]);
+
+    async function saveBranch(b: DisplayBranch) {
+        try {
+            // Find the selected manager's employee ID
+            const selectedManager = employeeOptions.find(emp => emp.name === b.manager);
+            const managerId = selectedManager?.id;
+
+            // Map DisplayBranch to normalized backend structure
+            const payload: any = {
+                name: b.name,
+                area: b.name, // Using name as area for now
+                address: b.address,
+                phone: b.phone,
+                email: b.email,
+                is_active: b.status === 'active',
+                // Default coordinates (Accra, Ghana) - should be updated with actual geocoding
+                latitude: 5.6037,
+                longitude: -0.1870,
+                
+                // Include manager_id if a manager is selected
+                ...(managerId && { manager_id: Number(managerId) }),
+                
+                // Map operating hours: { Mon: {...}, Tue: {...} } → { monday: {...}, tuesday: {...} }
+                operating_hours: mapOperatingHours(b.hours),
+                
+                // Map delivery settings
+                delivery_settings: {
+                    base_delivery_fee: b.baseDeliveryFee,
+                    per_km_fee: b.perKmFee,
+                    delivery_radius_km: b.deliveryRadius,
+                    min_order_value: b.minOrderValue,
+                    estimated_delivery_time: `${Math.round(b.deliveryRadius * 5)}-${Math.round(b.deliveryRadius * 7)} mins`,
+                },
+                
+                // Map order types: { delivery: true, pickup: false } → { delivery: { is_enabled: true }, pickup: { is_enabled: false } }
+                order_types: {
+                    delivery: { is_enabled: b.orderTypes.delivery },
+                    pickup: { is_enabled: b.orderTypes.pickup },
+                    dine_in: { is_enabled: b.orderTypes.dineIn },
+                },
+                
+                // Map payment methods: { momo: true, cashOnDelivery: false } → { momo: { is_enabled: true }, cash_on_delivery: { is_enabled: false } }
+                payment_methods: {
+                    momo: { is_enabled: b.payments.momo },
+                    cash_on_delivery: { is_enabled: b.payments.cashOnDelivery },
+                    cash_at_pickup: { is_enabled: b.payments.cashAtPickup },
+                },
+            };
+
+            if (b.id.startsWith('branch-')) {
+                await branchService.createBranch(payload);
+                toast.success(`${b.name} has been created successfully`);
+            } else {
+                await branchService.updateBranch(Number(b.id), payload);
+                toast.success(`${b.name} has been updated successfully`);
+            }
+            
+            queryClient.invalidateQueries({ queryKey: ['branches'] });
+            setEditBranch(null);
+        } catch (error) {
+            console.error('Failed to save branch:', error);
+            toast.error('Failed to save branch. Please try again.');
+        }
     }
 
-    function deleteBranchFn(b: Branch) {
-        setBranches(prev => prev.filter(x => x.id !== b.id));
-        setDeleteBranch(null);
+    function mapOperatingHours(hours: DisplayBranch['hours']) {
+        const dayMap: Record<string, string> = {
+            Mon: 'monday',
+            Tue: 'tuesday',
+            Wed: 'wednesday',
+            Thu: 'thursday',
+            Fri: 'friday',
+            Sat: 'saturday',
+            Sun: 'sunday',
+        };
+
+        const result: Record<string, { is_open: boolean; open_time: string | null; close_time: string | null }> = {};
+        
+        for (const [shortDay, config] of Object.entries(hours)) {
+            const fullDay = dayMap[shortDay];
+            result[fullDay] = {
+                is_open: config.open,
+                open_time: config.open ? config.from : null,
+                close_time: config.open ? config.to : null,
+            };
+        }
+        
+        return result;
     }
 
-    function toggleOpen(b: Branch) {
-        setBranches(prev => prev.map(x => x.id === b.id ? { ...x, openStatus: x.openStatus === 'open' ? 'closed' : 'open' } : x));
+    async function deleteBranchFn(b: DisplayBranch) {
+        try {
+            await branchService.deleteBranch(Number(b.id));
+            toast.success(`${b.name} has been deleted successfully`);
+            queryClient.invalidateQueries({ queryKey: ['branches'] });
+            setDeleteBranch(null);
+        } catch (error) {
+            console.error('Failed to delete branch:', error);
+            toast.error('Failed to delete branch. Please try again.');
+            setDeleteBranch(null);
+        }
+    }
+
+    async function toggleOpen(b: DisplayBranch) {
+        try {
+            const result = await branchService.toggleDailyStatus(Number(b.id));
+            toast.success(result.message);
+            
+            // Update local state to reflect the change immediately
+            setLocalOpenStatus((prev) => ({
+                ...prev,
+                [b.id]: result.is_open ? 'open' : 'closed',
+            }));
+            
+            // Refresh the data from the server
+            queryClient.invalidateQueries({ queryKey: ['branches'] });
+        } catch (error) {
+            console.error('Failed to toggle branch status:', error);
+            toast.error('Failed to update branch status. Please try again.');
+        }
     }
 
     return (
@@ -384,7 +549,10 @@ export default function AdminBranchesPage() {
 
             {/* Branch cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {branches.map(branch => (
+                {isLoading ? (
+                    <div className="col-span-2 py-16 text-center text-neutral-gray text-sm font-body">Loading branches…</div>
+                ) : (
+                branches.map((branch: any) => (
                     <div key={branch.id} className={`bg-neutral-card border rounded-2xl overflow-hidden transition-all ${branch.status === 'inactive' ? 'border-[#f0e8d8] opacity-70' : 'border-[#f0e8d8]'}`}>
 
                         {/* Card header */}
@@ -459,8 +627,21 @@ export default function AdminBranchesPage() {
                                 </button>
                             ) : (
                                 <>
-                                    <button type="button" onClick={() => setBranches(prev => prev.map(b => b.id === branch.id ? { ...b, status: 'active' } : b))}
-                                        className="flex items-center gap-1.5 px-3 py-2 bg-secondary/10 rounded-xl text-secondary text-xs font-medium font-body hover:bg-secondary/20 transition-colors cursor-pointer">
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            try {
+                                                await branchService.updateBranch(Number(branch.id), { is_active: true });
+                                                toast.success(`${branch.name} has been reactivated`);
+                                                queryClient.invalidateQueries({ queryKey: ['branches'] });
+                                                setLocalStatus((prev) => ({ ...prev, [branch.id]: 'active' }));
+                                            } catch (error) {
+                                                console.error('Failed to reactivate branch:', error);
+                                                toast.error('Failed to reactivate branch. Please try again.');
+                                            }
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-2 bg-secondary/10 rounded-xl text-secondary text-xs font-medium font-body hover:bg-secondary/20 transition-colors cursor-pointer"
+                                    >
                                         <CheckCircleIcon size={13} weight="bold" />
                                         Reactivate
                                     </button>
@@ -473,15 +654,17 @@ export default function AdminBranchesPage() {
                             )}
                         </div>
                     </div>
-                ))}
+                ))
+                )}
             </div>
 
             {/* Modals */}
             {editBranch !== null && (
                 <BranchModal
-                    branch={editBranch === 'new' ? null : editBranch as Branch}
+                    branch={editBranch === 'new' ? null : editBranch}
                     onClose={() => setEditBranch(null)}
                     onSave={saveBranch}
+                    employees={employeeOptions}
                 />
             )}
 
@@ -502,10 +685,23 @@ export default function AdminBranchesPage() {
                         </p>
                         <div className="flex gap-3">
                             <button type="button" onClick={() => setDeactivateConfirm(null)} className="flex-1 px-4 py-2.5 bg-neutral-light text-text-dark rounded-xl text-sm font-medium font-body cursor-pointer">Cancel</button>
-                            <button type="button" onClick={() => {
-                                setBranches(prev => prev.map(b => b.id === deactivateConfirm.id ? { ...b, status: 'inactive' } : b));
-                                setDeactivateConfirm(null);
-                            }} className="flex-1 px-4 py-2.5 bg-warning text-white rounded-xl text-sm font-medium font-body cursor-pointer">
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    try {
+                                        await branchService.updateBranch(Number(deactivateConfirm.id), { is_active: false });
+                                        toast.success(`${deactivateConfirm.name} has been deactivated`);
+                                        queryClient.invalidateQueries({ queryKey: ['branches'] });
+                                        setLocalStatus((prev) => ({ ...prev, [deactivateConfirm.id]: 'inactive' }));
+                                        setDeactivateConfirm(null);
+                                    } catch (error) {
+                                        console.error('Failed to deactivate branch:', error);
+                                        toast.error('Failed to deactivate branch. Please try again.');
+                                        setDeactivateConfirm(null);
+                                    }
+                                }}
+                                className="flex-1 px-4 py-2.5 bg-warning text-white rounded-xl text-sm font-medium font-body cursor-pointer"
+                            >
                                 Deactivate
                             </button>
                         </div>

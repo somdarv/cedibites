@@ -1,33 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  PlusCircleIcon,
-  ListIcon,
-} from '@phosphor-icons/react';
+import { PlusCircleIcon, ListIcon } from '@phosphor-icons/react';
+import { useEmployeeOrderStats, useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { STATUS_CONFIG } from '@/app/staff/orders/constants';
-
-// ─── Mock stats — replace with real API data ──────────────────────────────────
-
-const STATS = [
-  { label: 'Received', value: '3', sub: 'awaiting preparation' },
-  { label: 'Delivering', value: '2', sub: 'out for delivery now' },
-  { label: 'Orders Today', value: '12', sub: 'across all branches' },
-];
-
-// ─── Mock recent orders — replace with real API data ──────────────────────────
-
-const RECENT_ORDERS = [
-  {
-    id: 'CB100001', name: 'Ama Serwaa', branch: 'East Legon',
-    source: 'WhatsApp', status: 'received', time: '2 mins ago'
-  },
-  { id: 'CB100002', name: 'Kweku Asante', branch: 'Osu', source: 'Phone', status: 'preparing', time: '9 mins ago' },
-  { id: 'CB100003', name: 'Abena Boateng', branch: 'Tema', source: 'Instagram', status: 'ready', time: '15 mins ago' },
-  { id: 'CB100004', name: 'Kojo Mensah', branch: 'Madina', source: 'Facebook', status: 'out_for_delivery', time: '22 mins ago' },
-  { id: 'CB100005', name: 'Adwoa Frimpong', branch: 'La Paz', source: 'POS', status: 'ready_for_pickup', time: '30 mins ago' },
-  { id: 'CB100006', name: 'Yaw Darko', branch: 'Dzorwulu', source: 'WhatsApp', status: 'cancelled', time: '45 mins ago' },
-];
 
 // ─── Source badge ─────────────────────────────────────────────────────────────
 
@@ -54,9 +31,21 @@ function StatusBadge({ status }: { status: string }) {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function SalesDashboardView() {
+  const { staffUser } = useStaffAuth();
+  const { stats } = useEmployeeOrderStats();
+  const { orders } = useEmployeeOrders({
+    status: ['received', 'preparing', 'ready', 'ready_for_pickup', 'out_for_delivery'],
+    per_page: 10,
+  });
 
-  // Replace with real auth context
-  const staffName = 'Kofi';
+  const staffName = staffUser?.name ?? 'Staff';
+  const h = new Date().getHours();
+  const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const displayStats = [
+    { label: 'Received', value: String(stats?.pending_orders ?? 0), sub: 'awaiting preparation' },
+    { label: 'Preparing', value: String(stats?.preparing_orders ?? 0), sub: 'in progress' },
+    { label: 'Orders Today', value: String(stats?.today_orders ?? 0), sub: 'your branch' },
+  ];
 
   return (
     <div className="md:px-8 py-6 max-w-4xl mx-auto">
@@ -64,7 +53,7 @@ export default function SalesDashboardView() {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="mb-8">
         <h1 className="text-text-dark font-bold dark:text-text-light text-xl font-body">
-          Good afternoon, {staffName}.
+          {greeting}, {staffName}.
         </h1>
         <p className="text-neutral-gray text-sm font-body mt-0.5">
           Here&apos;s what&apos;s happening across the branches today.
@@ -99,7 +88,7 @@ export default function SalesDashboardView() {
 
       {/* ── Stats row ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-8">
-        {STATS.map(stat => (
+        {displayStats.map(stat => (
           <div
             key={stat.label}
             className="bg-brown dark:bg-brown border-brown-light/15 rounded-2xl px-4 py-4"
@@ -128,7 +117,7 @@ export default function SalesDashboardView() {
         </div>
 
         <div className="flex flex-col gap-4">
-          {RECENT_ORDERS.filter(o => o.status !== 'completed').map(order => (
+          {orders?.filter(o => o.status !== 'completed').map(order => (
             <Link
               key={order.id}
               href={`/staff/sales/orders?select=${order.id}`}
@@ -145,16 +134,16 @@ export default function SalesDashboardView() {
               <div className="min-w-0 flex-1">
                 <div className="flex text-text-dark dark:text-text-light items-center gap-2 mb-1">
                   <span className="text-text-dark dark:text-text-light text-base font-bold font-body">
-                    {order.name}
+                    {order.customer || 'Guest Customer'}
                   </span> ·
-                  <SourceBadge source={order.source} />
+                  <SourceBadge source={order.source || 'Unknown'} />
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="dark:text-text-light/75 text-xs font-body">#{order.id}</span>
                   <span className="text-brown-light/40 text-xs">·</span>
-                  <span className="dark:text-text-light/75 text-xs font-body">{order.branch}</span>
+                  <span className="dark:text-text-light/75 text-xs font-body">{order.branch || 'Unknown Branch'}</span>
                   <span className="text-brown-light/40 text-xs">·</span>
-                  <span className="dark:text-text-light/75 text-xs font-body">{order.time}</span>
+                  <span className="dark:text-text-light/75 text-xs font-body">{order.placedAt}</span>
                 </div>
               </div>
 
@@ -166,7 +155,11 @@ export default function SalesDashboardView() {
                 </span>
               </div>
             </Link>
-          ))}
+          )) || (
+            <div className="text-center py-8 text-neutral-gray">
+              <p className="text-sm font-body">No active orders at the moment</p>
+            </div>
+          )}
         </div>
       </div>
 

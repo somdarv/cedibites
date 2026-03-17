@@ -48,7 +48,7 @@ const MANAGER_NAV_TOOLS = [
     { href: '/staff/manager/settings',   label: 'Configure',  icon: GearSixIcon    },
 ];
 
-function navItemsForRole(role: StaffRole) {
+function navItemsForRole(role: StaffRole | string) {
     if (role === 'manager' || role === 'super_admin') return { main: MANAGER_NAV_MAIN, tools: MANAGER_NAV_TOOLS };
     if (role === 'branch_partner') return { main: PARTNER_NAV, tools: [] };
     return { main: SALES_NAV, tools: [] };
@@ -104,12 +104,13 @@ function BottomNavLink({
 
 // ─── Role label ───────────────────────────────────────────────────────────────
 
-function roleLabel(role: StaffRole): string {
-    const map: Partial<Record<StaffRole, string>> = {
+function roleLabel(role: StaffRole | string): string {
+    const map: Record<string, string> = {
         super_admin:    'Super Admin',
         branch_partner: 'Branch Partner',
         manager:        'Branch Manager',
         call_center:    'Call Center',
+        employee:       'Staff',
         kitchen:        'Kitchen',
         rider:          'Rider',
     };

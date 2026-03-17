@@ -64,9 +64,9 @@ export default function BranchFilter({ value, onChange, branches }: BranchFilter
 
                     <div className="absolute left-0 top-full mt-2 z-30 w-48 bg-brown border border-brown-light/20 rounded-2xl shadow-2xl overflow-hidden">
                         <div className="p-2 flex flex-col gap-0.5">
-                            {branches.map(branch => (
+                            {branches.map((branch, i) => (
                                 <button
-                                    key={branch}
+                                    key={`${branch}-${i}`}
                                     type="button"
                                     onClick={() => select(branch)}
                                     className={`

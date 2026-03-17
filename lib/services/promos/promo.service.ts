@@ -1,7 +1,7 @@
 // ─── Promo Service ────────────────────────────────────────────────────────────
 // Swap MockPromoService → ApiPromoService when backend is ready.
 
-import { MockPromoService } from './promo.service.mock';
+import { ApiPromoService } from './promo.service.api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ let _instance: PromoService | null = null;
 
 export function getPromoService(): PromoService {
     if (!_instance) {
-        _instance = new MockPromoService();
+        _instance = new ApiPromoService();
     }
     return _instance;
 }

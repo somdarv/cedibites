@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { type StaffRole, resolveByCredentials } from '@/lib/data/mockStaff';
+import { type StaffRole } from '@/lib/data/mockStaff';
+import { clearStaffToken, staffService } from '@/lib/api/services/staff.service';
 import { getShiftService } from '@/lib/services/shifts/shift.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -14,6 +15,10 @@ export interface StaffUser {
     role: StaffRole;
     branch: string;   // display name, e.g. "East Legon"
     branchId: string; // system ID, e.g. "2"
+    email?: string;
+    phone?: string;
+    pin?: string;
+    joinedAt?: string;
 }
 
 interface StaffAuthContextValue {
@@ -22,10 +27,6 @@ interface StaffAuthContextValue {
     login: (user: StaffUser) => void;
     logout: () => void;
 }
-
-// ─── Auth helper (re-exported for the login page) ─────────────────────────────
-
-export { resolveByCredentials as resolveMockStaff };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,8 @@ export function StaffAuthProvider({ children }: { children: ReactNode }) {
                 }).catch(() => {});
             } catch { /* ignore */ }
         }
+        staffService.logout().catch(() => {});
+        clearStaffToken();
         localStorage.removeItem(STORAGE_KEY);
         setStaffUser(null);
     }, []);
@@ -90,11 +93,11 @@ export function useStaffAuth() {
 }
 
 /** Where to redirect after login, by role. */
-export function roleHomeRoute(role: StaffRole): string {
-    if (role === 'super_admin')    return '/admin/dashboard';
-    if (role === 'manager')        return '/staff/manager/dashboard';
+export function roleHomeRoute(role: StaffRole | string): string {
+    if (role === 'super_admin' || role === 'admin') return '/admin/dashboard';
+    if (role === 'manager') return '/staff/manager/dashboard';
     if (role === 'branch_partner') return '/partner/dashboard';
-    if (role === 'call_center')    return '/staff/sales/dashboard';
+    if (role === 'call_center' || role === 'employee') return '/staff/sales/dashboard';
     // kitchen and rider have no portal — redirect to login
     return '/staff/login';
 }

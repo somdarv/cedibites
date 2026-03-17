@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import {
-    PlusCircleIcon,
     ListIcon,
     ChartBarIcon,
     ForkKnifeIcon,
@@ -14,61 +13,10 @@ import {
     CaretRightIcon,
     ArrowUpRightIcon,
 } from '@phosphor-icons/react';
+import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
+import { useBranchStats, useBranchTopItems, useBranchRevenueChart } from '@/lib/api/hooks/useBranches';
+import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
 import { STATUS_CONFIG } from '@/app/staff/orders/constants';
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MANAGER = { name: 'Ama', branch: 'East Legon' };
-
-const TODAY = {
-    revenue: 1842.50,
-    orders: 24,
-    avgOrderValue: 76.77,
-    cancelled: 2,
-};
-
-const THIS_WEEK = {
-    revenue: 11230.00,
-    orders: 148,
-    avgOrderValue: 75.88,
-    cancelled: 9,
-};
-
-const THIS_MONTH = {
-    revenue: 43760.00,
-    orders: 581,
-    avgOrderValue: 75.32,
-    cancelled: 31,
-};
-
-// Weekly revenue bars (Mon→Sun), relative values 0–100
-const WEEKLY_BARS = [
-    { day: 'M', pct: 62 },
-    { day: 'T', pct: 74 },
-    { day: 'W', pct: 55 },
-    { day: 'T', pct: 88 },
-    { day: 'F', pct: 95 },
-    { day: 'S', pct: 100 },
-    { day: 'S', pct: 45 },
-];
-
-const ACTIVE_ORDERS = [
-    { id: 'CB847291', name: 'Ama Serwaa', source: 'WhatsApp', status: 'received', time: '2 mins ago' },
-    { id: 'CB204837', name: 'Abena Boateng', source: 'Instagram', status: 'preparing', time: '9 mins ago' },
-    { id: 'CB998812', name: 'Efua Mensah', source: 'Phone', status: 'ready', time: '18 mins ago' },
-    { id: 'CB774433', name: 'Kojo Appiah', source: 'WhatsApp', status: 'out_for_delivery', time: '35 mins ago' },
-    { id: 'CB556677', name: 'Adwoa Ofori', source: 'Phone', status: 'ready_for_pickup', time: '42 mins ago' },
-];
-
-const TOP_ITEMS = [
-    { name: 'Jollof Rice', sold: 18, revenue: 630 },
-    { name: 'Waakye', sold: 12, revenue: 360 },
-    { name: 'Banku & Tilapia', sold: 9, revenue: 495 },
-    { name: 'Fufu & Light Soup', sold: 7, revenue: 315 },
-    { name: 'Kelewele', sold: 11, revenue: 220 },
-];
-
-const MAX_SOLD = Math.max(...TOP_ITEMS.map(i => i.sold));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -155,14 +103,28 @@ function QuickLinkCard({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ManagerDashboardPage() {
+    const { staffUser } = useStaffAuth();
+    const branchId = staffUser?.branchId ? parseInt(staffUser.branchId, 10) : null;
+    const { stats } = useBranchStats(branchId, true);
+    const { topItems } = useBranchTopItems(branchId, { date: 'today', limit: 5 });
+    const { chartData } = useBranchRevenueChart(branchId, { period: 'week' });
+    const { orders } = useEmployeeOrders({
+        branch_id: branchId ?? undefined,
+        status: ['received', 'preparing', 'ready', 'ready_for_pickup', 'out_for_delivery'],
+        per_page: 5,
+    });
+
+    const todayRevenue = stats?.today_revenue ?? 0;
+    const todayOrders = stats?.today_orders ?? 0;
+    const todayCancelled = stats?.today_cancelled ?? 0;
+    const avgOrderValue = todayOrders > 0 ? todayRevenue / todayOrders : 0;
+    const monthRevenue = stats?.month_revenue ?? 0;
+
+    // Calculate max sold for progress bars
+    const maxSold = topItems.length > 0 ? Math.max(...topItems.map(i => i.sold)) : 1;
+
     return (
         <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">
-
-            {/* ── Header ──────────────────────────────────────────────────────── */}
-
-
-            {/* ── Primary CTA ─────────────────────────────────────────────────── */}
-
 
             {/* ── Period stats ────────────────────────────────────────────────── */}
             <div className="mb-8">
@@ -178,10 +140,10 @@ export default function ManagerDashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <StatCard icon={CurrencyCircleDollarIcon} label="Revenue" value={formatGHS(TODAY.revenue)} sub="Today" />
-                    <StatCard icon={ReceiptIcon} label="Orders" value={String(TODAY.orders)} sub="Today" />
-                    <StatCard icon={TrendUpIcon} label="Avg. Value" value={formatGHS(TODAY.avgOrderValue)} sub="Per order" />
-                    <StatCard icon={XCircleIcon} label="Cancelled" value={String(TODAY.cancelled)} sub="Today" />
+                    <StatCard icon={CurrencyCircleDollarIcon} label="Revenue" value={formatGHS(todayRevenue)} sub="Today" />
+                    <StatCard icon={ReceiptIcon} label="Orders" value={String(todayOrders)} sub="Today" />
+                    <StatCard icon={TrendUpIcon} label="Avg. Value" value={formatGHS(avgOrderValue)} sub="Per order" />
+                    <StatCard icon={XCircleIcon} label="Cancelled" value={String(todayCancelled)} sub="Today" />
                 </div>
             </div>
 
@@ -189,18 +151,26 @@ export default function ManagerDashboardPage() {
             <div className="bg-neutral-card border border-brown-light/15 rounded-2xl px-4 pt-4 pb-5 mb-8">
                 <div className="flex items-center justify-between mb-4">
                     <p className="text-text-dark text-sm font-semibold font-body">Revenue this week</p>
-                    <p className="text-primary text-sm font-bold font-body">{formatGHS(THIS_WEEK.revenue)}</p>
+                    <p className="text-primary text-sm font-bold font-body">{formatGHS(monthRevenue)}</p>
                 </div>
                 <div className="flex items-end gap-2 h-16">
-                    {WEEKLY_BARS.map((bar, i) => (
+                    {chartData.length > 0 ? chartData.map((bar, i) => (
                         <div key={i} className="flex-1 flex flex-col items-center gap-1">
                             <div
-                                className={`w-full rounded-md transition-all ${i === 5 ? 'bg-primary' : 'bg-neutral-gray/50'}`}
-                                style={{ height: `${(bar.pct / 100) * 56}px` }}
+                                className={`w-full rounded-md transition-all ${bar.percentage === Math.max(...chartData.map(d => d.percentage)) ? 'bg-primary' : 'bg-neutral-gray/50'}`}
+                                style={{ height: `${Math.max((bar.percentage / 100) * 56, 2)}px` }}
                             />
                             <span className="text-[10px] text-neutral-gray font-body">{bar.day}</span>
                         </div>
-                    ))}
+                    )) : (
+                        // Fallback when no data
+                        Array.from({ length: 7 }, (_, i) => (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                                <div className="w-full rounded-md bg-neutral-gray/20 h-2" />
+                                <span className="text-[10px] text-neutral-gray font-body">—</span>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -220,7 +190,7 @@ export default function ManagerDashboardPage() {
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        {ACTIVE_ORDERS.map(order => (
+                        {orders.slice(0, 5).map(order => (
                             <Link
                                 key={order.id}
                                 href={`/staff/manager/orders?select=${order.id}`}
@@ -232,10 +202,10 @@ export default function ManagerDashboardPage() {
                             >
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2 mb-0.5">
-                                        <span className="text-text-dark text-sm font-bold font-body">{order.name}</span>
+                                        <span className="text-text-dark text-sm font-bold font-body">{order.customer}</span>
                                         <span className="text-neutral-gray text-xs font-body">{order.source}</span>
                                     </div>
-                                    <span className="text-neutral-gray text-xs font-body">#{order.id} &middot; {order.time}</span>
+                                    <span className="text-neutral-gray text-xs font-body">#{order.id} &middot; {order.timeAgo ?? order.placedAt}</span>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                     <StatusBadge status={order.status} />
@@ -254,10 +224,10 @@ export default function ManagerDashboardPage() {
                     </div>
 
                     <div className="bg-neutral-card border border-brown-light/15 rounded-2xl overflow-hidden">
-                        {TOP_ITEMS.map((item, i) => (
+                        {topItems.length > 0 ? topItems.map((item, i) => (
                             <div
                                 key={item.name}
-                                className={`px-4 py-3 flex items-center gap-3 ${i < TOP_ITEMS.length - 1 ? 'border-b border-brown-light/10' : ''}`}
+                                className={`px-4 py-3 flex items-center gap-3 ${i < topItems.length - 1 ? 'border-b border-brown-light/10' : ''}`}
                             >
                                 <span className="text-neutral-gray/50 text-xs font-bold font-body w-4 shrink-0">{i + 1}</span>
                                 <div className="flex-1 min-w-0">
@@ -265,7 +235,7 @@ export default function ManagerDashboardPage() {
                                     <div className="mt-1 h-1.5 bg-brown-light/15 rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-primary/60 rounded-full"
-                                            style={{ width: `${(item.sold / MAX_SOLD) * 100}%` }}
+                                            style={{ width: `${(item.sold / maxSold) * 100}%` }}
                                         />
                                     </div>
                                 </div>
@@ -274,7 +244,11 @@ export default function ManagerDashboardPage() {
                                     <p className="text-neutral-gray text-[10px] font-body">₵{item.revenue}</p>
                                 </div>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="px-4 py-8 text-center">
+                                <p className="text-neutral-gray text-sm font-body">No sales data for today</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

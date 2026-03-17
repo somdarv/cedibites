@@ -2,7 +2,7 @@
 // Swap MockBranchService → ApiBranchService when backend is ready.
 
 import type { Branch } from '@/types/branch';
-import { MockBranchService } from './branch.service.mock';
+import { ApiBranchService } from './branch.service.api';
 
 export interface BranchService {
     getAll(): Promise<Branch[]>;
@@ -18,7 +18,7 @@ let _instance: BranchService | null = null;
 
 export function getBranchService(): BranchService {
     if (!_instance) {
-        _instance = new MockBranchService();
+        _instance = new ApiBranchService();
     }
     return _instance;
 }

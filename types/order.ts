@@ -34,6 +34,7 @@ export interface OrderItem {
     unitPrice: number;
     image?: string;
     icon?: string;
+    sizeId?: number;            // menu_item_size_id for backend
     sizeLabel?: string;         // display label: "Large", "350ml"
     variantKey?: string;        // lookup key: "plain", "large", "fried-rice"
     notes?: string;             // per-item kitchen notes
@@ -194,6 +195,9 @@ export interface CreateOrderInput {
     promoCode?: string;
     deliveryFee?: number;
     tax?: number;
+    // POS-specific fields
+    amountPaid?: number;
+    momoNumber?: string;
 }
 
 // ─── Terminal statuses ───────────────────────────────────────────────────────

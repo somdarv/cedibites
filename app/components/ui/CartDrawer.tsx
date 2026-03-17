@@ -14,7 +14,10 @@ import { useBranch, Branch, BranchWithDistance } from '@/app/components/provider
 import { useLocation } from '@/app/components/providers/LocationProvider';
 import { useAuth } from '../providers/AuthProvider';
 
-const formatPrice = (p: number) => `₵${p.toFixed(2)}`;
+const formatPrice = (p: number | string | null | undefined) => {
+    const n = typeof p === 'number' ? p : Number(p);
+    return `₵${Number.isNaN(n) ? '0.00' : n.toFixed(2)}`;
+};
 const DELIVERY_FEE = 15;
 const TAX_RATE = 0.025;
 

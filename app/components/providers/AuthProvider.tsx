@@ -73,7 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const loadUser = async () => {
             try {
-                // Check if we have a token
+                // When staff is logged in, skip customer session validation to avoid
+                // triggering requests that could 401 and clear staff tokens on reload
+                const staffToken = localStorage.getItem('cedibites_staff_token');
+                if (staffToken) {
+                    setHydrated(true);
+                    return;
+                }
+
+                // Check if we have a customer token
                 const token = localStorage.getItem('cedibites_auth_token');
                 if (!token) {
                     // Fallback to old localStorage user (for backward compatibility)

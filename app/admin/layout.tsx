@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import {
     SquaresFourIcon,
     ListIcon,
@@ -18,6 +19,7 @@ import {
     ShieldCheckIcon,
     TagIcon,
 } from '@phosphor-icons/react';
+import { StaffAuthProvider, useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
@@ -37,8 +39,6 @@ const ADMIN_NAV = [
 const BOTTOM_NAV = ADMIN_NAV.filter(n =>
     ['/admin/dashboard', '/admin/orders', '/admin/branches', '/admin/menu', '/admin/settings'].includes(n.href)
 );
-
-const ADMIN = { name: 'Nana Kwame Adjei', email: 'admin@cedibites.com' };
 
 // ─── Sidebar link ─────────────────────────────────────────────────────────────
 
@@ -86,8 +86,43 @@ function BottomNavLink({
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
+    const router = useRouter();
+    const { staffUser, isLoading, logout } = useStaffAuth();
+
+    // Redirect to login if not authenticated or not admin/super_admin
+    useEffect(() => {
+        if (!isLoading) {
+            if (!staffUser) {
+                router.push('/staff/login');
+                return;
+            }
+            
+            // Only allow super_admin to access admin panel
+            if (staffUser.role !== 'super_admin') {
+                router.push('/staff/login');
+                return;
+            }
+        }
+    }, [staffUser, isLoading, router]);
+
+    // Show loading while checking authentication
+    if (isLoading) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-neutral-light">
+                <div className="text-center">
+                    <Image src="/cblogo.webp" alt="CediBites" width={48} height={48} className="mx-auto mb-4" />
+                    <p className="text-neutral-gray text-sm font-body">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Don't render anything if not authenticated (will redirect)
+    if (!staffUser || staffUser.role !== 'super_admin') {
+        return null;
+    }
 
     return (
         <div className="h-screen overflow-hidden bg-neutral-light w-full flex">
@@ -125,17 +160,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div className="flex items-center gap-2.5 px-3 py-2.5 mb-1.5 bg-neutral-light rounded-xl">
                         <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
                             <span className="text-primary text-xs font-bold font-body">
-                                {ADMIN.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                                {staffUser.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
                             </span>
                         </div>
                         <div className="min-w-0">
-                            <p className="text-text-dark text-xs font-semibold font-body truncate">{ADMIN.name}</p>
-                            <p className="text-neutral-gray text-[10px] font-body truncate">{ADMIN.email}</p>
+                            <p className="text-text-dark text-xs font-semibold font-body truncate">{staffUser.name}</p>
+                            <p className="text-neutral-gray text-[10px] font-body truncate">{staffUser.role}</p>
                         </div>
                     </div>
                     <button
                         type="button"
-                        onClick={() => { window.location.href = '/staff/login'; }}
+                        onClick={logout}
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-neutral-gray hover:text-error hover:bg-error/10 text-sm font-medium font-body transition-all cursor-pointer"
                     >
                         <SignOutIcon size={16} weight="regular" className="shrink-0" />
@@ -157,7 +192,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
                             <span className="text-primary text-[10px] font-bold font-body">
-                                {ADMIN.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                                {staffUser.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
                             </span>
                         </div>
                     </div>
@@ -183,5 +218,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </nav>
 
         </div>
+    );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <StaffAuthProvider>
+            <AdminLayoutInner>{children}</AdminLayoutInner>
+        </StaffAuthProvider>
     );
 }

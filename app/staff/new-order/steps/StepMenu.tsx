@@ -10,7 +10,8 @@ import {
     ShoppingCartSimpleIcon,
 } from '@phosphor-icons/react';
 import Input from '@/app/components/base/Input';
-import { sampleMenuItems, menuCategories, type MenuItem } from '@/lib/data/SampleMenu';
+import { useMenuItems } from '@/lib/api/hooks/useMenuItems';
+import type { DisplayMenuItem } from '@/lib/api/adapters/menu.adapter';
 import type { StaffCartItem } from '../types';
 import { useNewOrder } from '../context';
 import { formatGHS} from '../utils';
@@ -23,9 +24,9 @@ function MenuItemRow({
     addItem,
     removeItem,
 }: {
-    item: MenuItem;
+    item: DisplayMenuItem;
     cart: StaffCartItem[];
-    addItem: (item: MenuItem, variantKey: string, price: number, variantLabel?: string) => void;
+    addItem: (item: DisplayMenuItem, variantKey: string, price: number, variantLabel?: string) => void;
     removeItem: (cartKey: string) => void;
 }) {
     const hasVariants = !!item.hasVariants && !!item.variants;
@@ -169,18 +170,27 @@ function MenuItemRow({
 
 export default function StepMenu() {
     const { cart, addItem, removeItem, clearItem, setStep } = useNewOrder();
+    const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems();
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('all');
 
+    const allCategories = useMemo(
+        () => [{ id: 'all', name: 'All' }, ...menuCategories],
+        [menuCategories]
+    );
+
     const filtered = useMemo(() => {
-        let items = sampleMenuItems;
-        if (category !== 'all') items = items.filter(i => i.category === category);
+        let items = menuItems;
+        if (category !== 'all') {
+            const catName = menuCategories.find(c => c.id === category)?.name ?? category;
+            items = items.filter(i => i.category === catName);
+        }
         if (search.trim()) {
             const q = search.toLowerCase();
             items = items.filter(i => i.name.toLowerCase().includes(q));
         }
         return items;
-    }, [search, category]);
+    }, [menuItems, menuCategories, search, category]);
 
     const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
@@ -205,7 +215,7 @@ export default function StepMenu() {
                 {/* Category tabs */}
                 <div className='w-full'>
                     <div className="flex gap-2 h- bg-red-20 custom-scrollbar2 overflow-x-auto pb-4 nscrollbar">
-                        {menuCategories.map(cat => (
+                        {allCategories.map(cat => (
                             <button
                                 key={cat.id}
                                 type="button"
@@ -219,17 +229,20 @@ export default function StepMenu() {
                                     }
                 `}
                             >
-                                {cat.label}
+                                {cat.name}
                             </button>
                         ))}
                     </div>                </div>
 
                 {/* Menu items */}
                 <div className="flex flex-col gap-1.5 pb-2">
-                    {filtered.length === 0 && (
+                    {menuLoading && (
+                        <p className="text-neutral-gray text-sm font-body text-center py-8">Loading menu…</p>
+                    )}
+                    {!menuLoading && filtered.length === 0 && (
                         <p className="text-neutral-gray text-sm font-body text-center py-8">No items found.</p>
                     )}
-                    {filtered.map(item => (
+                    {!menuLoading && filtered.map(item => (
                         <MenuItemRow
                             key={item.id}
                             item={item}

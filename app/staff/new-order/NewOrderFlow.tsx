@@ -23,9 +23,9 @@ import {
 } from '@phosphor-icons/react';
 import { useNewOrder } from './context';
 import { useStaffRoutes } from '@/app/components/providers/StaffAuthProvider';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
-import { sampleMenuItems, menuCategories } from '@/lib/data/SampleMenu';
-import type { MenuItem, MenuItemSize } from '@/lib/data/SampleMenu';
+import { useBranch } from '@/app/components/providers/BranchProvider';
+import { useMenuItems } from '@/lib/api/hooks/useMenuItems';
+import type { DisplayMenuItem } from '@/lib/api/adapters/menu.adapter';
 import type { OrderSource, PaymentMethod } from '@/types/order';
 import { formatGHS, ORDER_SOURCES } from './utils';
 import OrderConfirmed from './steps/OrderConfirmed';
@@ -39,31 +39,54 @@ interface DisplayRow {
     menuItemId: string;
     variantKey: string;
     variantLabel?: string; // e.g. "Small", "Plain"
-    originalItem: MenuItem;
+    sizeId?: number;       // menu_item_size_id for backend
+    originalItem: DisplayMenuItem;
     isNew?: boolean;
 }
 
-function expandItem(item: MenuItem): DisplayRow[] {
+function expandItem(item: DisplayMenuItem): DisplayRow[] {
+    // If item has sizes, always use them (even if it also has variants)
     if (item.sizes && item.sizes.length > 0) {
-        return item.sizes.map((size: MenuItemSize) => ({
+        return item.sizes.map((size) => ({
             key: `${item.id}|${size.key}`,
             name: `${size.label} ${item.name}`,
             price: size.price,
             menuItemId: item.id,
             variantKey: size.key,
             variantLabel: size.label,
+            sizeId: size.id, // Include size ID
             originalItem: item,
             isNew: item.isNew,
         }));
     }
+    // Only use variants if there are no sizes (legacy support)
     if (item.hasVariants && item.variants) {
         const rows: DisplayRow[] = [];
         if (item.variants.plain !== undefined)
-            rows.push({ key: `${item.id}|plain`, name: `${item.name} (Plain)`, price: item.variants.plain, menuItemId: item.id, variantKey: 'plain', variantLabel: 'Plain', originalItem: item, isNew: item.isNew });
+            rows.push({ 
+                key: `${item.id}|plain`, 
+                name: `${item.name} (Plain)`, 
+                price: item.variants.plain, 
+                menuItemId: item.id, 
+                variantKey: 'plain', 
+                variantLabel: 'Plain', 
+                originalItem: item, 
+                isNew: item.isNew 
+            });
         if (item.variants.assorted !== undefined)
-            rows.push({ key: `${item.id}|assorted`, name: `${item.name} (Assorted)`, price: item.variants.assorted, menuItemId: item.id, variantKey: 'assorted', variantLabel: 'Assorted', originalItem: item, isNew: item.isNew });
+            rows.push({ 
+                key: `${item.id}|assorted`, 
+                name: `${item.name} (Assorted)`, 
+                price: item.variants.assorted, 
+                menuItemId: item.id, 
+                variantKey: 'assorted', 
+                variantLabel: 'Assorted', 
+                originalItem: item, 
+                isNew: item.isNew 
+            });
         return rows;
     }
+    // Simple item with just a base price
     if (item.price !== undefined)
         return [{ key: item.id, name: item.name, price: item.price, menuItemId: item.id, variantKey: item.id, originalItem: item, isNew: item.isNew }];
     return [];
@@ -83,9 +106,11 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; icon: React.ElementTy
 export default function NewOrderFlow() {
     const router = useRouter();
     const { dashboard } = useStaffRoutes();
+    const { branches } = useBranch();
+    const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems();
     const {
         source, branchId, cart, orderType, customer, payment,
-        isSubmitting, orderCode,
+        isSubmitting, orderCode, staffUser,
         setSource, setBranchId,
         addItem, removeItem, clearItem,
         setOrderType, patchCustomer, setPayment,
@@ -100,13 +125,14 @@ export default function NewOrderFlow() {
     // Pre-fill MoMo number from customer phone when MoMo is selected
     useEffect(() => {
         if (payment === 'momo' && !momoNumber && customer.phone) {
+            console.log('Auto-filling MoMo number:', customer.phone);
             setMomoNumber(customer.phone);
         }
     }, [payment, customer.phone, momoNumber]);
 
     // ── Derived menu rows ───────────────────────────────────────────────────
 
-    const allRows = useMemo(() => sampleMenuItems.flatMap(expandItem), []);
+    const allRows = useMemo(() => menuItems.flatMap(expandItem), [menuItems]);
 
     const filteredRows = useMemo(() => {
         const q = search.toLowerCase();
@@ -116,7 +142,7 @@ export default function NewOrderFlow() {
                 ? true
                 : activeCategory === 'all'
                     ? row.originalItem.popular
-                    : row.originalItem.category === activeCategory;
+                    : row.originalItem.category.toLowerCase().replace(/\s+/g, '-') === activeCategory || row.originalItem.category === activeCategory;
             return matchesSearch && matchesCategory;
         });
     }, [allRows, search, activeCategory]);
@@ -124,7 +150,7 @@ export default function NewOrderFlow() {
     // ── Cart calculations ───────────────────────────────────────────────────
 
     const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const branch = BRANCHES.find(b => b.id === branchId);
+    const branch = branches.find(b => b.id === branchId);
     const deliveryFee = orderType === 'delivery' ? (branch?.deliveryFee ?? 15) : 0;
     const total = subtotal + deliveryFee;
     const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
@@ -132,7 +158,7 @@ export default function NewOrderFlow() {
     // ── Handlers ────────────────────────────────────────────────────────────
 
     const handleRowTap = useCallback((row: DisplayRow) => {
-        addItem(row.originalItem, row.variantKey, row.price, row.variantLabel);
+        addItem(row.originalItem, row.variantKey, row.price, row.variantLabel, row.sizeId);
     }, [addItem]);
 
     const handleRowMinus = useCallback((row: DisplayRow) => {
@@ -148,9 +174,18 @@ export default function NewOrderFlow() {
     // ── Place order handler ─────────────────────────────────────────────────
 
     const handlePlaceOrder = useCallback(async () => {
+        console.log('Place Order clicked:', {
+            source,
+            branchId,
+            payment,
+            cartLength: cart.length,
+            isSubmitting,
+            momoNumber: payment === 'momo' ? momoNumber : 'N/A'
+        });
+        
         if (payment === 'momo') setMomoStep('awaiting');
         await submit();
-    }, [payment, submit]);
+    }, [payment, submit, source, branchId, cart.length, isSubmitting, momoNumber]);
 
     // ── MoMo awaiting screen ────────────────────────────────────────────────
 
@@ -269,7 +304,7 @@ export default function NewOrderFlow() {
                                     : 'bg-neutral-light text-neutral-gray hover:bg-neutral-gray/20'
                                     }`}
                             >
-                                {cat.label}
+                                {cat.name}
                             </button>
                         ))}
                     </div>
@@ -277,7 +312,12 @@ export default function NewOrderFlow() {
 
                 {/* Item list — flat rows, one per variant */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar2">
-                    {filteredRows.length === 0 ? (
+                    {menuLoading ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-neutral-gray">
+                            <SpinnerIcon className="w-10 h-10 mb-3 animate-spin opacity-60" />
+                            <p className="text-sm">Loading menu…</p>
+                        </div>
+                    ) : filteredRows.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-neutral-gray">
                             <MagnifyingGlassIcon className="w-10 h-10 mb-3 opacity-40" />
                             <p className="text-sm">No items found</p>
@@ -397,18 +437,25 @@ export default function NewOrderFlow() {
                     </div>
 
                     {/* Branch */}
-                    <div className="mb-3">
-                        <select
-                            value={branchId ?? ''}
-                            onChange={e => setBranchId(e.target.value)}
-                            className="w-full h-9 px-3 rounded-xl bg-neutral-light text-text-dark border border-neutral-gray/20 focus:border-primary/50 outline-none text-xs transition-colors"
-                        >
-                            <option value="" disabled>Select branch…</option>
-                            {BRANCHES.filter(b => b.isOpen).map(b => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                    {staffUser?.role === 'super_admin' ? (
+                        <div className="mb-3">
+                            <select
+                                value={branchId ?? ''}
+                                onChange={e => setBranchId(e.target.value)}
+                                className="w-full h-9 px-3 rounded-xl bg-neutral-light text-text-dark border border-neutral-gray/20 focus:border-primary/50 outline-none text-xs transition-colors"
+                            >
+                                <option value="" disabled>Select branch…</option>
+                                {branches.filter(b => b.isOpen).map(b => (
+                                    <option key={b.id} value={b.id}>{b.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    ) : (
+                        <div className="mb-3 px-3 py-2 rounded-xl bg-neutral-light border border-neutral-gray/20 text-xs text-text-dark">
+                            <span className="text-neutral-gray">Branch: </span>
+                            <span className="font-medium">{branches.find(b => b.id === branchId)?.name || 'Loading...'}</span>
+                        </div>
+                    )}
 
                     {/* Address — delivery only */}
                     {orderType === 'delivery' && (
@@ -492,6 +539,7 @@ export default function NewOrderFlow() {
                         onClick={handlePlaceOrder}
                         disabled={!source || !branchId || !payment || cart.length === 0 || isSubmitting || (payment === 'momo' && !momoNumber.trim())}
                         className="w-full h-11 rounded-xl bg-primary text-brown font-semibold text-sm flex items-center justify-center gap-2 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100 transition-all"
+                        title={`Debug: source=${source}, branchId=${branchId}, payment=${payment}, cart=${cart.length}, submitting=${isSubmitting}, momoNumber=${payment === 'momo' ? momoNumber : 'N/A'}`}
                     >
                         {isSubmitting ? (
                             <><SpinnerIcon className="w-4 h-4 animate-spin" /> Placing…</>
@@ -501,9 +549,12 @@ export default function NewOrderFlow() {
                     </button>
 
                     {/* Validation hint */}
-                    {(!source || !branchId) && cart.length > 0 && (
+                    {((!source || !branchId || (payment === 'momo' && !momoNumber.trim())) && cart.length > 0) && (
                         <p className="text-[10px] text-neutral-gray text-center mt-1.5">
-                            {!source ? 'Select a source' : 'Select a branch'} to continue
+                            {!source ? 'Select a source (Phone/WhatsApp/Social Media)' : 
+                             !branchId ? 'Select a branch' : 
+                             (payment === 'momo' && !momoNumber.trim()) ? 'Enter MoMo number' : 
+                             'Complete all required fields'} to continue
                         </p>
                     )}
                 </div>

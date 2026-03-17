@@ -8,7 +8,6 @@ import { LocationProvider } from "./components/providers/LocationProvider";
 import { BranchProvider } from "./components/providers/BranchProvider";
 import { MenuDiscoveryProvider } from "./components/providers/MenuDiscoveryProvider";
 import { CartProvider } from "./components/providers/CartProvider";
-import { sampleMenuItems } from "@/lib/data/SampleMenu";
 import LocationRequestModal from "./components/ui/LocationRequestModal";
 import BranchSelectorModal from "./components/ui/BranchSelectorModal";
 import { AuthProvider } from "./components/providers/AuthProvider";
@@ -47,7 +46,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${cabin.variable} ${caprasimo.variable} bg-neutral-light dark:bg-brand-darker antialiased`}>
-      <body className={abeezee.variable}>
+      <body className={abeezee.variable} suppressHydrationWarning>
         <Script
           src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
           strategy="beforeInteractive"
@@ -58,7 +57,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <LocationProvider autoRequest={false}>
               <BranchProvider>
                 <OrderStoreProvider>
-                  <MenuDiscoveryProvider items={sampleMenuItems}>
+                  <MenuDiscoveryProvider>
                     <CartProvider>
                     <LocationRequestModal />
                     <BranchSelectorModal />

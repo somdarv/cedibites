@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { CheckCircleIcon, ClockIcon } from '@phosphor-icons/react';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { useBranch } from '@/app/components/providers/BranchProvider';
 import { useNewOrder } from '../context';
 import { useStaffRoutes } from '@/app/components/providers/StaffAuthProvider';
 
@@ -11,7 +11,8 @@ import { useStaffRoutes } from '@/app/components/providers/StaffAuthProvider';
 export default function OrderConfirmed() {
     const { orderCode, branchId, resetOrder } = useNewOrder();
     const { orders } = useStaffRoutes();
-    const branch = BRANCHES.find(b => b.id === branchId);
+    const { branches } = useBranch();
+    const branch = branches.find(b => b.id === branchId);
 
     return (
         <div className="flex flex-col items-center text-center gap-6 py-8">

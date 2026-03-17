@@ -29,8 +29,9 @@ import Link from 'next/link';
 import { usePOS } from '../context';
 import { formatGHS} from '@/lib/utils/currency';
 import type { PaymentMethod, Order } from '@/types/order';
-import { sampleMenuItems, menuCategories, MenuItem } from '@/lib/data/SampleMenu';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import type { DisplayMenuItem } from '@/lib/api/adapters/menu.adapter';
+import { useBranch } from '@/app/components/providers/BranchProvider';
+import { useMenuItems } from '@/lib/api/hooks/useMenuItems';
 import { printReceipt } from '@/lib/utils/printReceipt';
 import { getPromoService, type Promo } from '@/lib/services/promos/promo.service';
 
@@ -40,18 +41,20 @@ interface DisplayRow {
   name: string;
   price: number;
   menuItemId: string;
+  sizeId?: number;
   variantKey?: string;
   isNew?: boolean;
 }
 
 // Expand items with sizes/variants into individual tappable rows
-function expandItem(item: MenuItem): DisplayRow[] {
+function expandItem(item: DisplayMenuItem): DisplayRow[] {
   if (item.sizes && item.sizes.length > 0) {
     return item.sizes.map(size => ({
       key: `${item.id}|${size.key}`,
       name: `${size.label} ${item.name}`,
       price: size.price,
       menuItemId: item.id,
+      sizeId: size.id,
       variantKey: size.key,
       isNew: item.isNew,
     }));
@@ -97,6 +100,8 @@ export default function POSTerminalPage() {
     todayOrders,
     logout
   } = usePOS();
+  const { branches } = useBranch();
+  const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems();
 
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,20 +131,25 @@ export default function POSTerminalPage() {
 
   // Get branch info and its allowed menu item IDs
   const branchInfo = useMemo(
-    () => session ? BRANCHES.find(b => b.id === session.branchId) ?? null : null,
-    [session]
+    () => session ? branches.find(b => b.id === session.branchId) ?? null : null,
+    [session, branches]
   );
 
   // Fallback to all items if branchInfo is null (e.g. stale session with old branch IDs)
   const branchMenuIds = useMemo(
-    () => branchInfo?.menuItemIds ?? sampleMenuItems.map(i => i.id),
-    [branchInfo]
+    () => branchInfo?.menuItemIds ?? menuItems.map(i => i.id),
+    [branchInfo, menuItems]
   );
 
   // All menu items available at this branch
   const branchMenuItems = useMemo(
-    () => sampleMenuItems.filter(item => branchMenuIds.includes(item.id)),
-    [branchMenuIds]
+    () => menuItems.filter(item => branchMenuIds.includes(item.id)),
+    [branchMenuIds, menuItems]
+  );
+
+  const allCategories = useMemo(
+    () => [{ id: 'all', name: 'Popular' }, ...menuCategories],
+    [menuCategories]
   );
 
   // Filter by active category and search
@@ -147,12 +157,12 @@ export default function POSTerminalPage() {
     return branchMenuItems.filter(item => {
       const matchesCategory = activeCategory === 'all'
         ? item.popular  // "All" tab shows popular items
-        : item.category === activeCategory;
+        : item.category === (menuCategories.find(c => c.id === activeCategory)?.name ?? activeCategory);
       const matchesSearch = !searchQuery ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [branchMenuItems, activeCategory, searchQuery]);
+  }, [branchMenuItems, activeCategory, searchQuery, menuCategories]);
 
   // When searching, ignore category filter
   const displayedItems = useMemo(() => {
@@ -176,6 +186,7 @@ export default function POSTerminalPage() {
       menuItemId: row.menuItemId,
       name: row.name,
       price: row.price,
+      sizeId: row.sizeId,
       variantKey: row.variantKey,
     });
   }, [addToCart]);
@@ -294,7 +305,7 @@ export default function POSTerminalPage() {
         {/* Category Tabs */}
         <div className="shrink-0 px-4 py-3 border-b border-neutral-gray/15 bg-white">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {menuCategories.map(cat => (
+            {allCategories.map((cat: { id: string; name: string }) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
@@ -307,7 +318,7 @@ export default function POSTerminalPage() {
                   }
                 `}
               >
-                {cat.id === 'all' ? 'Popular' : cat.label}
+                {cat.id === 'all' ? 'Popular' : cat.name}
               </button>
             ))}
           </div>

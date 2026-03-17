@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useAdminDashboard } from '@/lib/api/hooks/useAdminDashboard';
+import { useAnalytics } from '@/lib/api/hooks/useAnalytics';
 import { STATUS_CONFIG } from '@/app/staff/orders/constants';
 import Link from 'next/link';
 import {
@@ -21,9 +23,6 @@ import {
 } from '@phosphor-icons/react';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const ADMIN = { name: 'Nana Kwame' };
 
 function greeting() {
     const h = new Date().getHours();
@@ -36,68 +35,7 @@ function formatGHS(v: number) {
     return `₵${v.toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-const CROSS_BRANCH_KPIS = {
-    revenueToday: 8_412.50,
-    revenueTrend: +14,
-    ordersToday: 97,
-    ordersTrend: +8,
-    activeOrders: 21,
-    activeTrend: +5,
-    cancelledToday: 4,
-    cancelledTrend: -2,
-};
-
-const BRANCHES = [
-    {
-        id: 'osu',
-        name: 'Osu',
-        status: 'open' as const,
-        revenueToday: 3_210.00,
-        ordersToday: 38,
-        sparkline: [40, 55, 70, 62, 80, 95, 88],
-    },
-    {
-        id: 'east-legon',
-        name: 'East Legon',
-        status: 'open' as const,
-        revenueToday: 3_680.50,
-        ordersToday: 42,
-        sparkline: [30, 48, 60, 78, 90, 100, 85],
-    },
-    {
-        id: 'spintex',
-        name: 'Spintex',
-        status: 'busy' as const,
-        revenueToday: 1_522.00,
-        ordersToday: 17,
-        sparkline: [20, 30, 22, 38, 45, 55, 50],
-    },
-];
-
 type OrderSource = 'WhatsApp' | 'Phone' | 'Online' | 'POS' | 'Instagram' | 'Facebook';
-
-interface LiveOrder {
-    id: string;
-    customer: string;
-    branch: string;
-    source: OrderSource;
-    status: string;
-    timeAgo: string;
-    amount: number;
-}
-
-const LIVE_ORDERS: LiveOrder[] = [
-    { id: 'CB847291', customer: 'Ama Serwaa', branch: 'Osu', source: 'WhatsApp', status: 'preparing', timeAgo: '2 min', amount: 94 },
-    { id: 'CB204837', customer: 'Abena Boateng', branch: 'East Legon', source: 'Instagram', status: 'received', timeAgo: '4 min', amount: 73 },
-    { id: 'CB173920', customer: 'Yaw Darko', branch: 'East Legon', source: 'Facebook', status: 'preparing', timeAgo: '8 min', amount: 110 },
-    { id: 'CB998812', customer: 'Efua Mensah', branch: 'Osu', source: 'Phone', status: 'ready', timeAgo: '12 min', amount: 59 },
-    { id: 'CB774433', customer: 'Kojo Appiah', branch: 'Spintex', source: 'WhatsApp', status: 'out_for_delivery', timeAgo: '18 min', amount: 117 },
-    { id: 'CB556677', customer: 'Adwoa Ofori', branch: 'East Legon', source: 'Online', status: 'ready_for_pickup', timeAgo: '25 min', amount: 96 },
-    { id: 'CB112233', customer: 'Fiifi Annan', branch: 'Osu', source: 'POS', status: 'delivered', timeAgo: '31 min', amount: 76 },
-    { id: 'CB332211', customer: 'Nana Asare', branch: 'Spintex', source: 'Phone', status: 'completed', timeAgo: '38 min', amount: 35 },
-    { id: 'CB445566', customer: 'Akua Owusu', branch: 'Osu', source: 'WhatsApp', status: 'preparing', timeAgo: '44 min', amount: 145 },
-    { id: 'CB667788', customer: 'Kwame Frimpong', branch: 'East Legon', source: 'Instagram', status: 'received', timeAgo: '51 min', amount: 82 },
-];
 
 
 const SOURCE_COLORS: Record<OrderSource, string> = {
@@ -210,9 +148,16 @@ function StatusDot({ status }: { status: string }) {
 
 export default function AdminDashboardPage() {
     const [_refresh] = useState(0);
+    const [mounted, setMounted] = useState(false);
     const { orders } = useOrderStore();
+    const { userName, kpis, branches, liveOrders, isLoading } = useAdminDashboard();
+    const { sales } = useAnalytics('week');
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const startOfDay = useMemo(() => {
         const d = new Date();
@@ -234,6 +179,29 @@ export default function AdminDashboardPage() {
         };
     }, [orders, startOfDay]);
 
+    const displayKpis = {
+        revenueToday: kpis?.revenue_today ?? liveKpis.revenueToday,
+        ordersToday: kpis?.orders_today ?? liveKpis.ordersToday,
+        activeOrders: kpis?.active_orders ?? liveKpis.activeOrders,
+        cancelledToday: kpis?.cancelled_today ?? liveKpis.cancelledToday,
+    };
+
+    // Prevent hydration mismatch by only showing dynamic content after mount
+    if (!mounted) {
+        return (
+            <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
+                <div className="animate-pulse">
+                    <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="h-24 bg-gray-200 rounded-2xl"></div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
 
@@ -241,7 +209,7 @@ export default function AdminDashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-7">
                 <div>
                     <h1 className="text-text-dark text-2xl font-bold font-body">
-                        {greeting()}, {ADMIN.name}
+                        {greeting()}, {userName}
                     </h1>
                     <p className="text-neutral-gray text-sm font-body mt-1 flex items-center gap-2">
                         {dateStr}
@@ -262,16 +230,16 @@ export default function AdminDashboardPage() {
 
             {/* ── Cross-branch KPI row ─────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
-                <KpiCard icon={CurrencyCircleDollarIcon} label="Revenue Today" value={liveKpis.revenueToday > 0 ? formatGHS(liveKpis.revenueToday) : formatGHS(CROSS_BRANCH_KPIS.revenueToday)} trend={CROSS_BRANCH_KPIS.revenueTrend} accent />
-                <KpiCard icon={ReceiptIcon} label="Orders Today" value={String(liveKpis.ordersToday > 0 ? liveKpis.ordersToday : CROSS_BRANCH_KPIS.ordersToday)} trend={CROSS_BRANCH_KPIS.ordersTrend} />
-                <KpiCard icon={CircleNotchIcon} label="Active Now" value={String(liveKpis.activeOrders > 0 ? liveKpis.activeOrders : CROSS_BRANCH_KPIS.activeOrders)} trend={CROSS_BRANCH_KPIS.activeTrend} />
+                <KpiCard icon={CurrencyCircleDollarIcon} label="Revenue Today" value={isLoading ? '…' : formatGHS(displayKpis.revenueToday)} trend={0} accent />
+                <KpiCard icon={ReceiptIcon} label="Orders Today" value={isLoading ? '…' : String(displayKpis.ordersToday)} trend={0} />
+                <KpiCard icon={CircleNotchIcon} label="Active Now" value={isLoading ? '…' : String(displayKpis.activeOrders)} trend={0} />
                 <KpiCard
                     icon={XCircleIcon}
                     label="Cancelled Today"
-                    value={String(liveKpis.cancelledToday > 0 ? liveKpis.cancelledToday : CROSS_BRANCH_KPIS.cancelledToday)}
+                    value={isLoading ? '…' : String(displayKpis.cancelledToday)}
                     sub={liveKpis.cancelledToday > 0 ? formatGHS(liveKpis.cancelledValue) + ' lost' : undefined}
                     subAlert={liveKpis.cancelReqCount > 0 ? `${liveKpis.cancelReqCount} pending approval` : undefined}
-                    trend={CROSS_BRANCH_KPIS.cancelledTrend}
+                    trend={0}
                 />
             </div>
 
@@ -285,7 +253,7 @@ export default function AdminDashboardPage() {
                     </Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {BRANCHES.map(branch => (
+                    {branches.map((branch) => (
                         <Link
                             key={branch.id}
                             href={`/admin/analytics?branch=${branch.id}`}
@@ -293,14 +261,14 @@ export default function AdminDashboardPage() {
                         >
                             <div className="flex items-center justify-between">
                                 <span className="text-text-dark text-sm font-bold font-body">{branch.name}</span>
-                                <BranchStatusDot status={branch.status} />
+                                <BranchStatusDot status={(branch.status as 'open') || 'open'} />
                             </div>
                             <div className="flex items-end justify-between gap-3">
                                 <div>
-                                    <p className="text-primary text-lg font-bold font-body leading-none">{formatGHS(branch.revenueToday)}</p>
-                                    <p className="text-neutral-gray text-xs font-body mt-1">{branch.ordersToday} orders today</p>
+                                    <p className="text-primary text-lg font-bold font-body leading-none">{formatGHS(branch.revenue_today ?? 0)}</p>
+                                    <p className="text-neutral-gray text-xs font-body mt-1">{branch.orders_today ?? 0} orders today</p>
                                 </div>
-                                <Sparkline data={branch.sparkline} />
+                                <Sparkline data={[40, 55, 70, 62, 80, 95, 88]} />
                             </div>
                         </Link>
                     ))}
@@ -308,7 +276,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* ── Revenue chart (7-day) ────────────────────────────────────────── */}
-            <RevenueChart />
+            <RevenueChart salesByDay={sales?.sales_by_day} />
 
             {/* ── Live order feed ──────────────────────────────────────────────── */}
             <div className="mb-7">
@@ -325,23 +293,26 @@ export default function AdminDashboardPage() {
                             <span key={h} className="text-neutral-gray text-[10px] font-bold font-body uppercase tracking-wider">{h}</span>
                         ))}
                     </div>
-                    {LIVE_ORDERS.map((order, i) => (
-                        <div
-                            key={order.id}
-                            className={`px-4 py-3 flex flex-col md:grid md:grid-cols-[1.5fr_1fr_1fr_1.2fr_1fr_1fr] gap-2 md:gap-4 md:items-center hover:bg-neutral-light/60 transition-colors ${i < LIVE_ORDERS.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
-                        >
-                            <div className="min-w-0">
-                                <p className="text-text-dark text-sm font-semibold font-body truncate">{order.customer}</p>
-                                <p className="text-neutral-gray text-xs font-body">#{order.id}</p>
+                    {liveOrders.length === 0 && !isLoading ? (
+                        <div className="px-4 py-8 text-center text-neutral-gray text-sm font-body">No active orders</div>
+                    ) : (
+                        liveOrders.map((order, i) => (
+                            <div
+                                key={order.id}
+                                className={`px-4 py-3 flex flex-col md:grid md:grid-cols-[1.5fr_1fr_1fr_1.2fr_1fr_1fr] gap-2 md:gap-4 md:items-center hover:bg-neutral-light/60 transition-colors ${i < liveOrders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
+                            >
+                                <div className="min-w-0">
+                                    <p className="text-text-dark text-sm font-semibold font-body truncate">{order.customer}</p>
+                                    <p className="text-neutral-gray text-xs font-body">#{order.id}</p>
+                                </div>
+                                <span className="text-text-dark text-xs font-body">{order.branch}</span>
+                                <SourceBadge source={order.source as OrderSource} />
+                                <StatusDot status={order.status} />
+                                <span className="text-neutral-gray text-xs font-body">{order.time_ago} ago</span>
+                                <span className="text-text-dark text-sm font-bold font-body">₵{order.amount}</span>
                             </div>
-                            <span className="text-text-dark text-xs font-body">{order.branch}</span>
-                            <span className='text-text-dark text-xs font-body'>{order.source}
-                            </span>
-                            <StatusDot status={order.status} />
-                            <span className="text-neutral-gray text-xs font-body">{order.timeAgo} ago</span>
-                            <span className="text-text-dark text-sm font-bold font-body">₵{order.amount}</span>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -364,12 +335,22 @@ const BRANCH_REVENUE: Record<string, number[]> = {
 
 const BRANCH_COLORS = ['#e49925', '#6c833f', '#c8a87a'];
 
-function RevenueChart() {
+function RevenueChart({ salesByDay }: { salesByDay?: Array<{ date: string; total: number; orders: number }> }) {
     const [stacked, setStacked] = useState(true);
     const branches = Object.keys(BRANCH_REVENUE);
     const totals = DAYS.map((_, i) => branches.reduce((s, b) => s + BRANCH_REVENUE[b][i], 0));
-    const maxVal = stacked ? Math.max(...totals) : Math.max(...Object.values(BRANCH_REVENUE).flat());
-    const weekTotal = totals.reduce((a, b) => a + b, 0);
+    const maxVal = stacked ? Math.max(...totals, 1) : Math.max(...Object.values(BRANCH_REVENUE).flat(), 1);
+    const weekTotal = salesByDay?.length
+        ? salesByDay.reduce((s, d) => s + Number(d.total), 0)
+        : totals.reduce((a, b) => a + b, 0);
+
+    const dayLabels = salesByDay?.length
+        ? salesByDay.map((d) => DAYS[(new Date(d.date).getDay() + 6) % 7] ?? d.date)
+        : DAYS;
+    const values = salesByDay?.length
+        ? salesByDay.map((d) => Number(d.total))
+        : totals;
+    const chartMax = salesByDay?.length ? Math.max(...values, 1) : maxVal;
 
     return (
         <div className="bg-neutral-card border border-[#f0e8d8] rounded-2xl p-5 mb-7">
@@ -378,63 +359,77 @@ function RevenueChart() {
                     <p className="text-text-dark text-sm font-bold font-body">Revenue — All Branches (7 days)</p>
                     <p className="text-primary text-base font-bold font-body mt-0.5">{formatGHS(weekTotal)}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setStacked(true)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-body transition-all cursor-pointer ${stacked ? 'bg-primary text-white' : 'bg-neutral-light text-neutral-gray hover:text-text-dark'}`}
-                    >
-                        Stacked
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setStacked(false)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-body transition-all cursor-pointer ${!stacked ? 'bg-primary text-white' : 'bg-neutral-light text-neutral-gray hover:text-text-dark'}`}
-                    >
-                        Grouped
-                    </button>
-                </div>
+                {!salesByDay?.length && (
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setStacked(true)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-body transition-all cursor-pointer ${stacked ? 'bg-primary text-white' : 'bg-neutral-light text-neutral-gray hover:text-text-dark'}`}
+                        >
+                            Stacked
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStacked(false)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-body transition-all cursor-pointer ${!stacked ? 'bg-primary text-white' : 'bg-neutral-light text-neutral-gray hover:text-text-dark'}`}
+                        >
+                            Grouped
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="flex items-end gap-2 h-32">
-                {DAYS.map((day, di) => (
-                    <div key={day} className="flex-1 flex flex-col items-center gap-1">
-                        <div className={`w-full flex ${stacked ? 'flex-col-reverse' : 'flex-row'} items-end gap-0.5`} style={{ height: 112 }}>
-                            {branches.map((b, bi) => {
-                                const val = BRANCH_REVENUE[b][di];
-                                const h = stacked
-                                    ? Math.round((val / maxVal) * 112)
-                                    : Math.round((val / maxVal) * 112);
-                                return (
-                                    <div
-                                        key={b}
-                                        className="rounded-sm"
-                                        style={{
-                                            height: stacked ? h : h,
-                                            width: stacked ? '100%' : `${100 / branches.length}%`,
-                                            background: BRANCH_COLORS[bi],
-                                            opacity: 0.85,
-                                            transition: 'height 0.3s ease',
-                                            flexShrink: 0,
-                                        }}
-                                    />
-                                );
-                            })}
+                {salesByDay?.length ? (
+                    dayLabels.map((day, di) => {
+                        const val = values[di] ?? 0;
+                        const h = Math.round((val / chartMax) * 112) || 4;
+                        return (
+                            <div key={`${day}-${di}`} className="flex-1 flex flex-col items-center gap-1">
+                                <div className="w-full rounded-sm bg-primary/85" style={{ height: h, minHeight: 4, transition: 'height 0.3s ease' }} />
+                                <span className="text-[9px] text-neutral-gray font-body">{day}</span>
+                            </div>
+                        );
+                    })
+                ) : (
+                    DAYS.map((day, di) => (
+                        <div key={day} className="flex-1 flex flex-col items-center gap-1">
+                            <div className={`w-full flex ${stacked ? 'flex-col-reverse' : 'flex-row'} items-end gap-0.5`} style={{ height: 112 }}>
+                                {branches.map((b, bi) => {
+                                    const val = BRANCH_REVENUE[b][di];
+                                    const h = Math.round((val / maxVal) * 112);
+                                    return (
+                                        <div
+                                            key={`${b}-${bi}`}
+                                            className="rounded-sm"
+                                            style={{
+                                                height: h,
+                                                width: stacked ? '100%' : `${100 / branches.length}%`,
+                                                background: BRANCH_COLORS[bi],
+                                                opacity: 0.85,
+                                                transition: 'height 0.3s ease',
+                                                flexShrink: 0,
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            <span className="text-[9px] text-neutral-gray font-body">{day}</span>
                         </div>
-                        <span className="text-[9px] text-neutral-gray font-body">{day}</span>
-                    </div>
-                ))}
+                    ))
+                )}
             </div>
 
-            {/* Legend */}
-            <div className="flex gap-4 mt-4">
-                {branches.map((b, bi) => (
-                    <div key={b} className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-sm" style={{ background: BRANCH_COLORS[bi] }} />
-                        <span className="text-[11px] text-neutral-gray font-body">{b}</span>
-                    </div>
-                ))}
-            </div>
+            {!salesByDay?.length && (
+                <div className="flex gap-4 mt-4">
+                    {branches.map((b, bi) => (
+                        <div key={`${b}-${bi}`} className="flex items-center gap-1.5">
+                            <div className="w-2.5 h-2.5 rounded-sm" style={{ background: BRANCH_COLORS[bi] }} />
+                            <span className="text-[11px] text-neutral-gray font-body">{b}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

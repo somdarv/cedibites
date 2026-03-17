@@ -16,6 +16,7 @@ export interface POSCartItem {
   quantity: number;
   image?: string;
   notes?: string;
+  sizeId?: number;
   variantKey?: string;
 }
 

@@ -17,7 +17,7 @@ import {
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
-import { MOCK_STAFF } from '@/lib/data/mockStaff';
+import { useEmployees } from '@/lib/api/hooks/useEmployees';
 import { formatPrice } from '@/types/order';
 import { STATUS_CONFIG } from '@/lib/constants/order.constants';
 
@@ -126,14 +126,10 @@ export default function PartnerDashboardPage() {
     const completedToday  = todayOrders.filter(o => ['delivered', 'completed'].includes(o.status)).length;
     const cancelledToday  = todayOrders.filter(o => o.status === 'cancelled').length;
 
-    const branchStaff = useMemo(() =>
-        MOCK_STAFF.filter(s => {
-            const branches = Array.isArray(s.branch) ? s.branch : [s.branch];
-            return branches.includes(branchName) && s.status !== 'archived';
-        }),
-    [branchName]);
-
-    const activeStaff = branchStaff.filter(s => s.systemAccess === 'enabled').length;
+    const branchIdNum = staffUser?.branchId ? parseInt(staffUser.branchId, 10) : undefined;
+    const { employees: branchStaff } = useEmployees({ branch_id: branchIdNum });
+    const nonArchived = branchStaff.filter(s => s.status !== 'archived');
+    const activeStaff = nonArchived.filter(s => s.systemAccess === 'enabled').length;
 
     const dateStr = new Date().toLocaleDateString('en-GH', {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',

@@ -10,8 +10,8 @@ import {
   UserIcon,
   SpinnerIcon
 } from '@phosphor-icons/react';
-import { BRANCHES, Branch } from '@/app/components/providers/BranchProvider';
-import { resolveByPin } from '@/lib/data/mockStaff';
+import { useBranch, type Branch } from '@/app/components/providers/BranchProvider';
+import { staffService } from '@/lib/api/services/staff.service';
 import { usePOS } from './context';
 
 type LoginStep = 'pin' | 'branch';
@@ -19,6 +19,7 @@ type LoginStep = 'pin' | 'branch';
 export default function POSLoginPage() {
   const router = useRouter();
   const { login } = usePOS();
+  const { branches } = useBranch();
   const [step, setStep] = useState<LoginStep>('pin');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -50,27 +51,21 @@ export default function POSLoginPage() {
 
   const verifyPin = async (pinToVerify: string) => {
     setIsLoading(true);
+    setError('');
 
-    // Simulate API delay - replace with real auth
-    await new Promise(resolve => setTimeout(resolve, 300));
+    try {
+      const { user } = await staffService.posLogin(pinToVerify);
 
-    const staff = resolveByPin(pinToVerify);
+      setStaffInfo({ id: user.id, name: user.name, branches: [user.branchId] });
 
-    if (staff) {
-      setStaffInfo({ id: staff.id, name: staff.name, branches: staff.branchIds });
-
-      // If staff only has one branch, auto-select and proceed
-      if (staff.branchIds.length === 1) {
-        proceedToTerminal(staff.branchIds[0], staff.id, staff.name);
-      } else {
-        setStep('branch');
-      }
-    } else {
+      // API returns single branch per employee; proceed directly
+      proceedToTerminal(user.branchId, user.id, user.name);
+    } catch {
       setError('Invalid PIN');
       setPin('');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const proceedToTerminal = (branchId: string, staffId: string, staffName: string) => {
@@ -129,7 +124,7 @@ export default function POSLoginPage() {
       ) : (
         <BranchSelectView
           staffName={staffInfo?.name || ''}
-          branches={BRANCHES.filter(b => staffInfo?.branches.includes(b.id))}
+          branches={branches.filter(b => staffInfo?.branches.includes(b.id))}
           selectedBranch={selectedBranch}
           onSelect={handleBranchSelect}
           onConfirm={handleBranchConfirm}

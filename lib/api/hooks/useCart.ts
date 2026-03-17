@@ -3,9 +3,21 @@ import { cartService } from '../services/cart.service';
 import type { AddCartItemRequest, UpdateCartItemRequest } from '../services/cart.service';
 import { getGuestSessionId } from '../client';
 
-const hasCartIdentity = () =>
-  typeof window !== 'undefined' &&
-  (!!localStorage.getItem('cedibites_auth_token') || !!getGuestSessionId());
+const hasCartIdentity = () => {
+  if (typeof window === 'undefined') return false;
+  
+  // Don't fetch cart on POS or other staff routes
+  const pathname = window.location.pathname;
+  if (pathname.startsWith('/pos') || pathname.startsWith('/staff') || 
+      pathname.startsWith('/admin') || pathname.startsWith('/partner') || 
+      pathname.startsWith('/kitchen')) {
+    return false;
+  }
+  
+  // Cart is for customers; staff token causes 401 on cart API
+  return !localStorage.getItem('cedibites_staff_token') && 
+         (!!localStorage.getItem('cedibites_auth_token') || !!getGuestSessionId());
+};
 
 export const useCart = () => {
   const queryClient = useQueryClient();

@@ -9,137 +9,22 @@ import {
     EnvelopeIcon,
     MapPinIcon,
     ClockIcon,
-    LockSimpleIcon,
     ProhibitIcon,
     TrashIcon,
     ArrowCounterClockwiseIcon,
     DownloadSimpleIcon,
     CaretRightIcon,
-    WarningCircleIcon,
     ReceiptIcon,
     CurrencyCircleDollarIcon,
     TrendUpIcon,
 } from '@phosphor-icons/react';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type CustomerStatus = 'active' | 'suspended';
-type AccountType = 'Registered' | 'Guest';
-
-interface CustomerOrder {
-    id: string;
-    branch: string;
-    status: string;
-    amount: number;
-    date: string;
-}
-
-interface Customer {
-    id: string;
-    name: string;
-    phone: string;
-    email?: string;
-    accountType: AccountType;
-    status: CustomerStatus;
-    totalOrders: number;
-    totalSpend: number;
-    lastOrderDate: string;
-    joinDate: string;
-    addresses: string[];
-    orders: CustomerOrder[];
-    mostOrderedItem: string;
-    avgOrderValue: number;
-}
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const CUSTOMERS: Customer[] = [
-    {
-        id: 'c1', name: 'Ama Serwaa', phone: '0244123456', email: 'ama.serwaa@gmail.com',
-        accountType: 'Registered', status: 'active',
-        totalOrders: 24, totalSpend: 1840, lastOrderDate: 'Today 8:15 AM', joinDate: 'Jan 2024', avgOrderValue: 76.67,
-        addresses: ['14 Ring Road, Osu, Accra', 'Airport Residential, Accra'],
-        mostOrderedItem: 'Jollof Rice (Assorted)',
-        orders: [
-            { id: 'CB847291', branch: 'Osu',        status: 'delivered',  amount: 94,  date: 'Today 8:15 AM'    },
-            { id: 'CB445566', branch: 'East Legon',  status: 'completed',  amount: 145, date: 'Yesterday 2:00 PM' },
-            { id: 'CB220011', branch: 'Osu',        status: 'completed',  amount: 88,  date: 'Mar 8, 2:30 PM'   },
-        ],
-    },
-    {
-        id: 'c2', name: 'Kwame Asante', phone: '0277456789', email: 'kwame.asante@yahoo.com',
-        accountType: 'Registered', status: 'active',
-        totalOrders: 18, totalSpend: 1260, lastOrderDate: 'Yesterday', joinDate: 'Feb 2024', avgOrderValue: 70.00,
-        addresses: ['East Legon, Accra'],
-        mostOrderedItem: 'Waakye (Special)',
-        orders: [
-            { id: 'CB334466', branch: 'East Legon',  status: 'completed',  amount: 90,  date: 'Yesterday 9:30 AM' },
-            { id: 'CB119977', branch: 'East Legon',  status: 'delivered',  amount: 73,  date: 'Mar 7, 12:00 PM'  },
-        ],
-    },
-    {
-        id: 'c3', name: 'Abena Boateng', phone: '0201987654', email: 'abena.b@gmail.com',
-        accountType: 'Registered', status: 'active',
-        totalOrders: 31, totalSpend: 2480, lastOrderDate: 'Today 9:30 AM', joinDate: 'Nov 2023', avgOrderValue: 80.00,
-        addresses: ['East Legon Hills, Accra', 'Labone, Accra'],
-        mostOrderedItem: 'Banku & Tilapia',
-        orders: [
-            { id: 'CB204837', branch: 'East Legon',  status: 'preparing',  amount: 73,  date: 'Today 9:30 AM'    },
-            { id: 'CB667788', branch: 'East Legon',  status: 'completed',  amount: 82,  date: 'Yesterday 11:30 AM'},
-        ],
-    },
-    {
-        id: 'c4', name: 'Yaw Darko', phone: '0265321789',
-        accountType: 'Guest', status: 'active',
-        totalOrders: 5, totalSpend: 375, lastOrderDate: 'Today 10:05 AM', joinDate: 'Mar 2024', avgOrderValue: 75.00,
-        addresses: ['Spintex Road, Accra'],
-        mostOrderedItem: 'Banku & Tilapia',
-        orders: [
-            { id: 'CB173920', branch: 'Spintex',    status: 'out_for_delivery', amount: 110, date: 'Today 10:05 AM' },
-        ],
-    },
-    {
-        id: 'c5', name: 'Efua Mensah', phone: '0249654321', email: 'efua.m@outlook.com',
-        accountType: 'Registered', status: 'suspended',
-        totalOrders: 12, totalSpend: 840, lastOrderDate: '2 weeks ago', joinDate: 'Dec 2023', avgOrderValue: 70.00,
-        addresses: ['Labone, Accra'],
-        mostOrderedItem: 'Fufu & Light Soup',
-        orders: [
-            { id: 'CB998812', branch: 'Osu',        status: 'cancelled',  amount: 59,  date: '2 weeks ago' },
-        ],
-    },
-    {
-        id: 'c6', name: 'Kojo Appiah', phone: '0556123456',
-        accountType: 'Guest', status: 'active',
-        totalOrders: 8, totalSpend: 640, lastOrderDate: 'Today 11:10 AM', joinDate: 'Mar 2024', avgOrderValue: 80.00,
-        addresses: ['East Legon, Accra'],
-        mostOrderedItem: 'Fried Rice (Plain)',
-        orders: [
-            { id: 'CB774433', branch: 'East Legon',  status: 'ready_for_pickup', amount: 160, date: 'Today 11:10 AM' },
-        ],
-    },
-    {
-        id: 'c7', name: 'Adwoa Ofori', phone: '0270789456', email: 'adwoa.ofori@gmail.com',
-        accountType: 'Registered', status: 'active',
-        totalOrders: 42, totalSpend: 3360, lastOrderDate: 'Today 11:50 AM', joinDate: 'Oct 2023', avgOrderValue: 80.00,
-        addresses: ['Spintex, Accra', 'Accra Mall Area'],
-        mostOrderedItem: 'Jollof Rice (Plain)',
-        orders: [
-            { id: 'CB556677', branch: 'Spintex',    status: 'completed',  amount: 96,  date: 'Today 11:50 AM'   },
-            { id: 'CB334477', branch: 'Spintex',    status: 'delivered',  amount: 88,  date: 'Yesterday 1:00 PM'},
-        ],
-    },
-    {
-        id: 'c8', name: 'Fiifi Annan', phone: '0244789123',
-        accountType: 'Guest', status: 'active',
-        totalOrders: 3, totalSpend: 210, lastOrderDate: 'Today 12:00 PM', joinDate: 'Mar 2024', avgOrderValue: 70.00,
-        addresses: ['Osu, Accra'],
-        mostOrderedItem: 'Kelewele',
-        orders: [
-            { id: 'CB112233', branch: 'Osu',        status: 'completed',  amount: 76,  date: 'Today 12:00 PM'   },
-        ],
-    },
-];
+import { useCustomers, useCustomerOrders } from '@/lib/api/hooks/useCustomers';
+import { mapApiCustomerToDisplay } from '@/lib/api/adapters/customer.adapter';
+import { customerService } from '@/lib/api/services/customer.service';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/lib/utils/toast';
+import { DeleteConfirmDialog } from '@/app/components/ui/DeleteConfirmDialog';
+import type { DisplayCustomer } from '@/lib/api/adapters/customer.adapter';
 
 const STATUS_STYLES: Record<string, { dot: string; label: string }> = {
     received:         { dot: 'bg-info',           label: 'Received'        },
@@ -159,13 +44,12 @@ function formatGHS(v: number) { return `₵${v.toFixed(2)}`; }
 // ─── Customer detail panel ────────────────────────────────────────────────────
 
 function CustomerDetailPanel({ customer, onClose, onSuspend, onUnsuspend, onDelete }: {
-    customer: Customer;
+    customer: DisplayCustomer;
     onClose: () => void;
     onSuspend: () => void;
     onUnsuspend: () => void;
     onDelete: () => void;
 }) {
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     return (
         <>
@@ -252,23 +136,29 @@ function CustomerDetailPanel({ customer, onClose, onSuspend, onUnsuspend, onDele
                     <div>
                         <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-2">Order History</p>
                         <div className="bg-neutral-light rounded-xl overflow-hidden">
-                            {customer.orders.map((order, i) => {
-                                const statusCfg = STATUS_STYLES[order.status] ?? STATUS_STYLES.received;
-                                return (
-                                    <div key={order.id} className={`flex items-center justify-between px-3 py-3 ${i < customer.orders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-text-dark text-xs font-bold font-body">#{order.id}</span>
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-body text-neutral-gray">
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />{statusCfg.label}
-                                                </span>
+                            {customer.orders.length === 0 ? (
+                                <div className="px-3 py-6 text-center">
+                                    <p className="text-neutral-gray text-xs font-body">No orders found</p>
+                                </div>
+                            ) : (
+                                customer.orders.map((order, i) => {
+                                    const statusCfg = STATUS_STYLES[order.status] ?? STATUS_STYLES.received;
+                                    return (
+                                        <div key={order.id} className={`flex items-center justify-between px-3 py-3 ${i < customer.orders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-text-dark text-xs font-bold font-body">#{order.id}</span>
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-body text-neutral-gray">
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />{statusCfg.label}
+                                                    </span>
+                                                </div>
+                                                <p className="text-neutral-gray text-[10px] font-body">{order.branch} · {order.date}</p>
                                             </div>
-                                            <p className="text-neutral-gray text-[10px] font-body">{order.branch} · {order.date}</p>
+                                            <span className="text-text-dark text-xs font-bold font-body">{formatGHS(order.amount)}</span>
                                         </div>
-                                        <span className="text-text-dark text-xs font-bold font-body">{formatGHS(order.amount)}</span>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })
+                            )}
                         </div>
                     </div>
                 </div>
@@ -277,12 +167,6 @@ function CustomerDetailPanel({ customer, onClose, onSuspend, onUnsuspend, onDele
                 <div className="border-t border-[#f0e8d8] p-4 flex flex-col gap-2.5">
                     <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider">Admin Actions</p>
                     <div className="grid grid-cols-2 gap-2">
-                        {customer.accountType === 'Registered' && (
-                            <button type="button" className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-neutral-light rounded-xl text-text-dark text-xs font-medium font-body hover:bg-[#f0e8d8] transition-colors cursor-pointer">
-                                <LockSimpleIcon size={13} weight="bold" className="text-primary" />
-                                Reset Password
-                            </button>
-                        )}
                         {customer.status === 'active' ? (
                             <button type="button" onClick={onSuspend}
                                 className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-error/10 rounded-xl text-error text-xs font-medium font-body hover:bg-error/20 transition-colors cursor-pointer">
@@ -300,53 +184,15 @@ function CustomerDetailPanel({ customer, onClose, onSuspend, onUnsuspend, onDele
                             <DownloadSimpleIcon size={13} weight="bold" className="text-primary" />
                             Export Data
                         </button>
-                        <button type="button" onClick={() => setShowDeleteConfirm(true)}
-                            className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-error/10 rounded-xl text-error text-xs font-medium font-body hover:bg-error/20 transition-colors cursor-pointer">
+                        <button type="button" onClick={onDelete}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-error/10 rounded-xl text-error text-xs font-medium font-body hover:bg-error/20 transition-colors cursor-pointer col-span-2">
                             <TrashIcon size={13} weight="bold" />
                             Delete Account
                         </button>
                     </div>
                 </div>
             </aside>
-
-            {showDeleteConfirm && (
-                <DeleteCustomerModal
-                    customer={customer}
-                    onConfirm={() => { onDelete(); setShowDeleteConfirm(false); }}
-                    onCancel={() => setShowDeleteConfirm(false)}
-                />
-            )}
         </>
-    );
-}
-
-function DeleteCustomerModal({ customer, onConfirm, onCancel }: { customer: Customer; onConfirm: () => void; onCancel: () => void }) {
-    const [input, setInput] = useState('');
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="bg-neutral-card rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
-                <div className="h-1.5 bg-error" />
-                <div className="p-6">
-                    <div className="flex items-center gap-2 mb-2">
-                        <WarningCircleIcon size={18} weight="fill" className="text-error" />
-                        <h3 className="text-text-dark text-base font-bold font-body">Delete customer account?</h3>
-                    </div>
-                    <p className="text-neutral-gray text-sm font-body mb-4">
-                        This will permanently delete <strong className="text-text-dark">{customer.name}</strong>&apos;s account and anonymise their order history (replacing name/phone/email with [Deleted Customer]).
-                    </p>
-                    <p className="text-xs font-body text-neutral-gray mb-2">Type <strong>CONFIRM</strong> to proceed:</p>
-                    <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder="CONFIRM"
-                        className="w-full px-3 py-2.5 bg-neutral-light border border-[#f0e8d8] rounded-xl text-text-dark text-sm font-body focus:outline-none focus:border-error/50 mb-4" />
-                    <div className="flex gap-3">
-                        <button type="button" onClick={onCancel} className="flex-1 px-4 py-2.5 bg-neutral-light text-text-dark rounded-xl text-sm font-medium font-body cursor-pointer">Cancel</button>
-                        <button type="button" onClick={onConfirm} disabled={input !== 'CONFIRM'}
-                            className="flex-1 px-4 py-2.5 bg-error text-white rounded-xl text-sm font-medium font-body disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed">
-                            Delete permanently
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
     );
 }
 
@@ -355,45 +201,89 @@ function DeleteCustomerModal({ customer, onConfirm, onCancel }: { customer: Cust
 type FilterTab = 'All' | 'Registered' | 'Guest' | 'Suspended';
 type SortBy = 'recent' | 'orders' | 'spend';
 
+const TABS: FilterTab[] = ['All', 'Registered', 'Guest', 'Suspended'];
+
 export default function AdminCustomersPage() {
-    const [customers, setCustomers] = useState<Customer[]>(CUSTOMERS);
+    const queryClient = useQueryClient();
     const [tab, setTab] = useState<FilterTab>('All');
     const [search, setSearch] = useState('');
     const [sortBy, setSortBy] = useState<SortBy>('recent');
-    const [selected, setSelected] = useState<Customer | null>(null);
+    const [selected, setSelected] = useState<DisplayCustomer | null>(null);
+    const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; customer: DisplayCustomer | null; isLoading: boolean }>({
+        isOpen: false,
+        customer: null,
+        isLoading: false,
+    });
 
-    const TABS: FilterTab[] = ['All', 'Registered', 'Guest', 'Suspended'];
+    const { customers: apiCustomers, meta, isLoading, refetch } = useCustomers({
+        search: search.trim() || undefined,
+        is_guest: tab === 'Guest' ? true : tab === 'Registered' ? false : undefined,
+        per_page: 100,
+    });
+
+    const { orders: customerOrders } = useCustomerOrders(selected?.id ?? null);
+
+    const customers: DisplayCustomer[] = useMemo(() => {
+        return apiCustomers.map((api) => mapApiCustomerToDisplay(api, []));
+    }, [apiCustomers]);
 
     const filtered = useMemo(() => {
         let list = customers;
-        if (tab === 'Suspended') list = list.filter(c => c.status === 'suspended');
-        else if (tab !== 'All') list = list.filter(c => c.accountType === tab && c.status === 'active');
-        else list = list.filter(c => c.status !== 'suspended');
-
-        if (search.trim()) {
-            const q = search.toLowerCase();
-            list = list.filter(c => c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.email?.toLowerCase().includes(q));
+        if (tab === 'Suspended') list = list.filter((c) => c.status === 'suspended');
+        else {
+            list = list.filter((c) => c.status !== 'suspended');
+            if (tab !== 'All') list = list.filter((c) => c.accountType === tab);
         }
 
         if (sortBy === 'orders') list = [...list].sort((a, b) => b.totalOrders - a.totalOrders);
         else if (sortBy === 'spend') list = [...list].sort((a, b) => b.totalSpend - a.totalSpend);
 
         return list;
-    }, [customers, tab, search, sortBy]);
+    }, [customers, tab, sortBy]);
 
-    function suspend(c: Customer) {
-        setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, status: 'suspended' } : x));
-        setSelected(prev => prev?.id === c.id ? { ...prev, status: 'suspended' } : prev);
+    const selectedWithOrders = useMemo(() => {
+        if (!selected) return null;
+        const api = apiCustomers.find((c) => c.id === selected.id);
+        if (!api) return selected;
+        return mapApiCustomerToDisplay(api, Array.isArray(customerOrders) ? customerOrders : []);
+    }, [selected, apiCustomers, customerOrders]);
+
+    async function suspend(c: DisplayCustomer) {
+        try {
+            await customerService.suspendCustomer(Number(c.id));
+            queryClient.invalidateQueries({ queryKey: ['customers'] });
+            if (selected?.id === c.id) setSelected({ ...selected, status: 'suspended' });
+            toast.success(`${c.name} has been suspended successfully`);
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to suspend customer');
+        }
     }
 
-    function unsuspend(c: Customer) {
-        setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, status: 'active' } : x));
-        setSelected(prev => prev?.id === c.id ? { ...prev, status: 'active' } : prev);
+    async function unsuspend(c: DisplayCustomer) {
+        try {
+            await customerService.unsuspendCustomer(Number(c.id));
+            queryClient.invalidateQueries({ queryKey: ['customers'] });
+            if (selected?.id === c.id) setSelected({ ...selected, status: 'active' });
+            toast.success(`${c.name} has been unsuspended successfully`);
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to unsuspend customer');
+        }
     }
 
-    function deleteCustomer(c: Customer) {
-        setCustomers(prev => prev.filter(x => x.id !== c.id));
-        setSelected(null);
+    async function deleteCustomer() {
+        if (!deleteDialog.customer) return;
+        
+        setDeleteDialog(prev => ({ ...prev, isLoading: true }));
+        try {
+            await customerService.deleteCustomer(Number(deleteDialog.customer.id));
+            queryClient.invalidateQueries({ queryKey: ['customers'] });
+            setSelected(null);
+            toast.success(`${deleteDialog.customer.name} has been deleted successfully`);
+            setDeleteDialog({ isOpen: false, customer: null, isLoading: false });
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to delete customer');
+            setDeleteDialog(prev => ({ ...prev, isLoading: false }));
+        }
     }
 
     return (
@@ -444,7 +334,11 @@ export default function AdminCustomersPage() {
                     ))}
                 </div>
 
-                {filtered.length === 0 ? (
+                {isLoading ? (
+                    <div className="px-4 py-16 text-center">
+                        <p className="text-neutral-gray text-sm font-body">Loading customers…</p>
+                    </div>
+                ) : filtered.length === 0 ? (
                     <div className="px-4 py-16 text-center">
                         <UserCircleIcon size={32} weight="thin" className="text-neutral-gray/40 mx-auto mb-3" />
                         <p className="text-neutral-gray text-sm font-body">No customers found.</p>
@@ -481,15 +375,26 @@ export default function AdminCustomersPage() {
             </div>
 
             {/* Detail panel */}
-            {selected && (
+            {selected && selectedWithOrders && (
                 <CustomerDetailPanel
-                    customer={selected}
+                    customer={selectedWithOrders}
                     onClose={() => setSelected(null)}
                     onSuspend={() => suspend(selected)}
                     onUnsuspend={() => unsuspend(selected)}
-                    onDelete={() => deleteCustomer(selected)}
+                    onDelete={() => setDeleteDialog({ isOpen: true, customer: selectedWithOrders, isLoading: false })}
                 />
             )}
+
+            {/* Delete Confirmation Dialog */}
+            <DeleteConfirmDialog
+                isOpen={deleteDialog.isOpen}
+                title="Delete customer account?"
+                message="This will permanently delete {itemName}'s account and anonymise their order history (replacing name/phone/email with [Deleted Customer])."
+                itemName={deleteDialog.customer?.name || ''}
+                onConfirm={deleteCustomer}
+                onCancel={() => setDeleteDialog({ isOpen: false, customer: null, isLoading: false })}
+                isLoading={deleteDialog.isLoading}
+            />
         </div>
     );
 }

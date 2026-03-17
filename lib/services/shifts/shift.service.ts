@@ -1,7 +1,7 @@
 // ─── Shift Service ────────────────────────────────────────────────────────────
 // Swap MockShiftService → ApiShiftService when backend is ready.
 
-import { MockShiftService } from './shift.service.mock';
+import { ApiShiftService } from './shift.service.api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ let _instance: ShiftService | null = null;
 
 export function getShiftService(): ShiftService {
     if (!_instance) {
-        _instance = new MockShiftService();
+        _instance = new ApiShiftService();
     }
     return _instance;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { menuConfigService } from '@/lib/api/services/menuConfig.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,39 +100,34 @@ export const DEFAULT_CONFIG: MenuConfig = {
     },
 };
 
-const STORAGE_KEY = 'cedibites_menu_config';
-
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useMenuConfig() {
     const [config, setConfig] = useState<MenuConfig>(DEFAULT_CONFIG);
-    const [ready,  setReady]  = useState(false);
+    const [ready, setReady] = useState(false);
 
     useEffect(() => {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw) as Partial<MenuConfig>;
+        menuConfigService
+            .get()
+            .then((fetched) => {
                 setConfig({
-                    categories:      parsed.categories      ?? DEFAULT_CONFIG.categories,
-                    optionTemplates: parsed.optionTemplates ?? DEFAULT_CONFIG.optionTemplates,
-                    addOns:          parsed.addOns          ?? DEFAULT_CONFIG.addOns,
-                    branch:          parsed.branch          ?? DEFAULT_CONFIG.branch,
+                    categories: fetched.categories ?? DEFAULT_CONFIG.categories,
+                    optionTemplates: fetched.optionTemplates ?? DEFAULT_CONFIG.optionTemplates,
+                    addOns: fetched.addOns ?? DEFAULT_CONFIG.addOns,
+                    branch: fetched.branch ?? DEFAULT_CONFIG.branch,
                 });
-            }
-        } catch {
-            // silently fall back to defaults
-        }
-        setReady(true);
+            })
+            .catch(() => {
+                // Fall back to defaults on error (e.g. network, 401)
+            })
+            .finally(() => setReady(true));
     }, []);
 
     const save = useCallback((updated: MenuConfig) => {
         setConfig(updated);
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        } catch {
-            // storage quota — ignore
-        }
+        menuConfigService.save(updated).catch(() => {
+            // API error — config already updated locally; next load will fetch from API
+        });
     }, []);
 
     return { config, save, ready };

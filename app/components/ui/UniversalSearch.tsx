@@ -22,7 +22,10 @@ interface UniversalSearchProps {
     showPrices?: boolean;
 }
 
-const formatPrice = (price: number) => `₵${price.toFixed(2)}`;
+const formatPrice = (price: number | string | null | undefined) => {
+    const n = typeof price === 'number' ? price : Number(price);
+    return `₵${Number.isNaN(n) ? '0.00' : n.toFixed(2)}`;
+};
 
 // ─── Result row ───────────────────────────────────────────────────────────────
 function ResultRow({ item, onSelect }: { item: SearchableItem; onSelect: (item: SearchableItem) => void }) {

@@ -11,18 +11,15 @@ import {
     ArrowDownIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
-import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
+import { useAnalytics } from '@/lib/api/hooks/useAnalytics';
 import { formatPrice } from '@/types/order';
-
-// ─── Mock data (branch-scoped) ─────────────────────────────────────────────────
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// Per-branch 7-day revenue data
-const BRANCH_REVENUE: Record<string, number[]> = {
+const BRANCH_REVENUE_FALLBACK: Record<string, number[]> = {
     'East Legon': [3100, 3400, 2900, 3800, 3500, 4600, 2400],
-    'Osu':        [2800, 3100, 2600, 3400, 3200, 4100, 2100],
-    'Spintex':    [1200, 1400, 1100, 1600, 1500, 2000, 1000],
+    'Osu': [2800, 3100, 2600, 3400, 3200, 4100, 2100],
+    'Spintex': [1200, 1400, 1100, 1600, 1500, 2000, 1000],
 };
 
 const ORDER_SOURCES = [
@@ -188,31 +185,26 @@ function TopItems({ scale }: { scale: number }) {
 
 export default function PartnerAnalyticsPage() {
     const { staffUser } = useStaffAuth();
-    const { orders } = useOrderStore();
-    const branchName = staffUser?.branch ?? 'East Legon';
-
+    const branchId = staffUser?.branchId ? parseInt(staffUser.branchId, 10) : undefined;
     const [period, setPeriod] = useState<Period>('week');
+    const analyticsPeriod = period === 'today' ? 'today' : period === 'month' ? 'month' : 'week';
+    const { sales, isLoading } = useAnalytics(analyticsPeriod, branchId);
+    const branchName = staffUser?.branch ?? '—';
+
     const scale = PERIOD_SCALE[period];
 
-    const revenueData = BRANCH_REVENUE[branchName] ?? BRANCH_REVENUE['East Legon'];
+    const revenueData = useMemo(() => {
+        if (sales?.sales_by_day?.length) {
+            return sales.sales_by_day.map((d) => Number(d.total));
+        }
+        return BRANCH_REVENUE_FALLBACK[branchName] ?? BRANCH_REVENUE_FALLBACK['East Legon'];
+    }, [sales?.sales_by_day, branchName]);
 
-    const startOfDay = useMemo(() => {
-        const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime();
-    }, []);
-
-    const branchOrders = orders.filter(o => o.branch.name === branchName);
-    const todayOrders  = branchOrders.filter(o => o.placedAt >= startOfDay);
-
-    const liveRevenue  = todayOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0);
-    const liveCount    = todayOrders.length;
-    const liveCancelled = todayOrders.filter(o => o.status === 'cancelled').length;
-
-    // Scaled mock KPIs for non-today periods
     const weekRevTotal = revenueData.reduce((a, b) => a + b, 0);
-    const kpiRevenue   = period === 'today' && liveRevenue > 0 ? formatPrice(liveRevenue) : formatPrice(Math.round(weekRevTotal * scale));
-    const kpiOrders    = period === 'today' && liveCount > 0   ? String(liveCount)         : String(Math.round(42 * scale));
-    const kpiCompleted = period === 'today' ? String(todayOrders.filter(o => ['delivered','completed'].includes(o.status)).length) : String(Math.round(38 * scale));
-    const kpiCancelled = period === 'today' && liveCancelled > 0 ? String(liveCancelled) : String(Math.round(3 * scale));
+    const kpiRevenue = isLoading ? '…' : formatPrice(sales?.total_sales ?? Math.round(weekRevTotal * scale));
+    const kpiOrders = isLoading ? '…' : String(sales?.total_orders ?? Math.round(42 * scale));
+    const kpiCompleted = isLoading ? '…' : String(Math.round((sales?.total_orders ?? 38) * 0.9 * scale));
+    const kpiCancelled = isLoading ? '…' : String(Math.round(3 * scale));
 
     return (
         <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">

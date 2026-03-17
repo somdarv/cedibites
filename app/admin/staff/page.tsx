@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import * as React from 'react';
 import {
     PlusIcon,
     PencilSimpleIcon,
@@ -26,19 +27,17 @@ import {
     type EmploymentStatus,
     type SystemAccess,
     type StaffPermissions,
-    MOCK_STAFF,
     roleDisplayName,
     employmentStatusLabel,
     defaultPermissions,
 } from '@/lib/data/mockStaff';
+import { useEmployees } from '@/lib/api/hooks/useEmployees';
+import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
+import { useRoles, usePermissions } from '@/lib/api/hooks/useRoles';
+import { employeeService, staffRoleToBackendRole, mapPermissionsToBackend } from '@/lib/api/services/employee.service';
+import { toast } from '@/lib/utils/toast';
 
 // ─── Display helpers ──────────────────────────────────────────────────────────
-
-const ALL_BRANCHES = ['Osu', 'East Legon', 'Spintex', 'Tema', 'Madina', 'La Paz', 'Dzorwulu'];
-const BRANCH_ID_MAP: Record<string, string> = {
-    'Osu': '1', 'East Legon': '2', 'Spintex': '3',
-    'Tema': '4', 'Madina': '5', 'La Paz': '6', 'Dzorwulu': '7',
-};
 
 const ROLE_STYLES: Record<StaffRole, string> = {
     super_admin:    'bg-primary/10 text-primary',
@@ -79,8 +78,8 @@ function AvatarCircle({ name }: { name: string }) {
 
 function Toggle({ checked, onChange, label, sub }: { checked: boolean; onChange: (v: boolean) => void; label: string; sub?: string }) {
     return (
-        <label className="flex items-center justify-between gap-3 cursor-pointer py-1.5">
-            <div>
+        <div className="flex items-center justify-between gap-3 py-1.5">
+            <div className="flex-1 cursor-pointer" onClick={() => onChange(!checked)}>
                 <p className="text-text-dark text-sm font-medium font-body">{label}</p>
                 {sub && <p className="text-neutral-gray text-xs font-body">{sub}</p>}
             </div>
@@ -90,7 +89,7 @@ function Toggle({ checked, onChange, label, sub }: { checked: boolean; onChange:
                     : <ToggleLeftIcon  size={28} weight="fill" className="text-neutral-gray/40" />
                 }
             </button>
-        </label>
+        </div>
     );
 }
 
@@ -135,12 +134,15 @@ interface StaffFormState {
     name:             string;
     phone:            string;
     email:            string;
+    password:         string;
+    passwordConfirm:  string;
     role:             StaffRole;
     branch:           string | string[];
     employmentStatus: EmploymentStatus;
     systemAccess:     SystemAccess;
     pin:              string;
     permissions:      StaffPermissions;
+    forcePasswordReset: boolean;
     // HR
     ssnit:            string;
     ghanaCard:        string;
@@ -152,30 +154,38 @@ interface StaffFormState {
     emergencyRel:     string;
 }
 
-function blankForm(): StaffFormState {
-    return {
-        name: '', phone: '', email: '',
-        role: 'call_center',
-        branch: 'Osu',
-        employmentStatus: 'active',
-        systemAccess: 'enabled',
-        pin: '',
-        permissions: defaultPermissions('call_center'),
-        ssnit: '', ghanaCard: '', tinNumber: '',
-        dateOfBirth: '', nationality: 'Ghanaian',
-        emergencyName: '', emergencyPhone: '', emergencyRel: '',
-    };
-}
-
 function memberToForm(s: StaffMember): StaffFormState {
+    // Handle branch data properly - convert string to array if needed
+    let branchValue: string | string[];
+    if (MULTI_BRANCH_ROLES.includes(s.role)) {
+        // For multi-branch roles, ensure branch is an array
+        if (typeof s.branch === 'string') {
+            // Split comma-separated string into array
+            branchValue = s.branch.split(',').map(b => b.trim()).filter(b => b.length > 0);
+        } else {
+            branchValue = Array.isArray(s.branch) ? s.branch : [s.branch];
+        }
+    } else {
+        // For single-branch roles, ensure branch is a string
+        if (Array.isArray(s.branch)) {
+            branchValue = s.branch[0] || '';
+        } else if (typeof s.branch === 'string') {
+            // If it's a comma-separated string, take the first branch
+            branchValue = s.branch.split(',')[0]?.trim() || '';
+        } else {
+            branchValue = s.branch || '';
+        }
+    }
+
     return {
-        name: s.name, phone: s.phone, email: s.email,
+        name: s.name, phone: s.phone, email: s.email, password: '', passwordConfirm: '',
         role: s.role,
-        branch: s.branch,
+        branch: branchValue,
         employmentStatus: s.employmentStatus,
         systemAccess: s.systemAccess,
         pin: s.pin,
         permissions: { ...s.permissions },
+        forcePasswordReset: false, // Always default to false for existing staff
         ssnit: s.ssnit ?? '',
         ghanaCard: s.ghanaCard ?? '',
         tinNumber: s.tinNumber ?? '',
@@ -190,11 +200,108 @@ function memberToForm(s: StaffMember): StaffFormState {
 // Roles that can span multiple branches
 const MULTI_BRANCH_ROLES: StaffRole[] = ['call_center', 'branch_partner', 'super_admin'];
 
-function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onClose: () => void; onSave: (s: StaffMember) => void }) {
+function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onClose: () => void; onSave: (s: StaffMember) => void | Promise<void> }) {
+    const { branches, isLoading: branchesLoading } = useBranchesApi();
+    const { roles, isLoading: rolesLoading } = useRoles();
+    const { permissions, isLoading: permissionsLoading } = usePermissions();
+    const ALL_BRANCHES = branches.map((b) => b.name);
+    const BRANCH_ID_MAP: Record<string, string> = Object.fromEntries(branches.map((b) => [b.name, String(b.id)]));
     const isNew = !staff;
-    const [form, setForm] = useState<StaffFormState>(staff ? memberToForm(staff) : blankForm());
+    
+    // Create a dynamic blank form that uses the first available branch
+    const createBlankForm = (): StaffFormState => ({
+        name: '', phone: '', email: '', password: '', passwordConfirm: '',
+        role: 'call_center',
+        branch: ALL_BRANCHES[0] || '',
+        employmentStatus: 'active',
+        systemAccess: 'enabled',
+        pin: '',
+        permissions: defaultPermissions('call_center'),
+        forcePasswordReset: false,
+        ssnit: '', ghanaCard: '', tinNumber: '',
+        dateOfBirth: '', nationality: 'Ghanaian',
+        emergencyName: '', emergencyPhone: '', emergencyRel: '',
+    });
+    
+    const [form, setForm] = useState<StaffFormState>(staff ? memberToForm(staff) : createBlankForm());
     const [modalTab, setModalTab] = useState<ModalTab>('profile');
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    
+    // Update form branch when branches load (for new staff only)
+    React.useEffect(() => {
+        if (isNew && ALL_BRANCHES.length > 0 && !form.branch) {
+            setForm(f => ({ ...f, branch: ALL_BRANCHES[0] }));
+        }
+    }, [ALL_BRANCHES, isNew, form.branch]);
+
+    // Convert database role name to StaffRole
+    const dbRoleToStaffRole = (dbRoleName: string): StaffRole => {
+        const mapping: Record<string, StaffRole> = {
+            'super_admin': 'super_admin',
+            'admin': 'super_admin', // Map admin to super_admin for display
+            'branch_partner': 'branch_partner',
+            'manager': 'manager',
+            'call_center': 'call_center',
+            'kitchen': 'kitchen',
+            'rider': 'rider',
+            'employee': 'call_center', // Map legacy employee to call_center
+        };
+        return mapping[dbRoleName] ?? 'call_center';
+    };
+
+    // Convert StaffRole to database role name
+    const staffRoleToDbRole = (staffRole: StaffRole): string => {
+        const mapping: Record<StaffRole, string> = {
+            'super_admin': 'super_admin',
+            'branch_partner': 'branch_partner',
+            'manager': 'manager',
+            'call_center': 'call_center',
+            'kitchen': 'kitchen',
+            'rider': 'rider',
+        };
+        return mapping[staffRole] ?? 'call_center';
+    };
+
+    // Get available roles for the dropdown (filter to only show roles that map to valid StaffRole)
+    const availableRoles = roles.filter(role => {
+        const staffRole = dbRoleToStaffRole(role.name);
+        return ['super_admin', 'branch_partner', 'manager', 'call_center', 'kitchen', 'rider'].includes(staffRole);
+    });
+
+    // Map database permissions to frontend permission structure
+    const getPermissionMapping = () => {
+        const mapping: Record<string, { key: keyof StaffPermissions; label: string; description: string }> = {};
+        
+        permissions.forEach(perm => {
+            switch (perm.name) {
+                case 'create_orders':
+                    mapping[perm.name] = { key: 'canPlaceOrders', label: perm.display_name, description: perm.description };
+                    break;
+                case 'update_orders':
+                    mapping[perm.name] = { key: 'canAdvanceOrders', label: perm.display_name, description: perm.description };
+                    break;
+                case 'view_orders':
+                    mapping[perm.name] = { key: 'canAccessPOS', label: 'Can Access POS Terminal', description: 'Allows logging in to the POS terminal with a PIN' };
+                    break;
+                case 'view_analytics':
+                    mapping[perm.name] = { key: 'canViewReports', label: perm.display_name, description: perm.description };
+                    break;
+                case 'manage_menu':
+                    mapping[perm.name] = { key: 'canManageMenu', label: perm.display_name, description: perm.description };
+                    break;
+                case 'manage_employees':
+                    mapping[perm.name] = { key: 'canManageStaff', label: perm.display_name, description: perm.description };
+                    break;
+            }
+        });
+        
+        return mapping;
+    };
+
+    const permissionMapping = getPermissionMapping();
+    const displayPermissions = Object.entries(permissionMapping);
 
     const isMultiBranch = MULTI_BRANCH_ROLES.includes(form.role);
 
@@ -221,14 +328,54 @@ function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onC
         return Object.keys(e).length === 0;
     }
 
-    function handleSave() {
+    async function handleSave() {
+        setSubmitError(null);
         if (!validate()) return;
-        const branchArr = Array.isArray(form.branch) ? form.branch : [form.branch as string];
+        
+        // Ensure branches are loaded
+        if (branches.length === 0) {
+            setSubmitError('Branches are still loading. Please wait and try again.');
+            return;
+        }
+        
+        // Process branch data properly
+        let branchNames: string[] = [];
+        if (Array.isArray(form.branch)) {
+            // If it's already an array, flatten any comma-separated strings
+            branchNames = form.branch.flatMap(b => 
+                typeof b === 'string' ? b.split(',').map(name => name.trim()).filter(name => name.length > 0) : []
+            );
+        } else if (typeof form.branch === 'string') {
+            // If it's a string, split by comma
+            branchNames = form.branch.split(',').map(name => name.trim()).filter(name => name.length > 0);
+        }
+        
+        // Remove duplicates
+        branchNames = [...new Set(branchNames)];
+        
+        // Validate that all selected branches exist in the branch map
+        const branchIds = branchNames.map(branchName => {
+            const branchId = BRANCH_ID_MAP[branchName];
+            if (!branchId) {
+                console.error(`Branch "${branchName}" not found in BRANCH_ID_MAP:`, BRANCH_ID_MAP);
+                console.error('Available branches:', Object.keys(BRANCH_ID_MAP));
+                console.error('Processed branch names:', branchNames);
+                console.error('Original form.branch:', form.branch);
+                throw new Error(`Invalid branch selected: ${branchName}`);
+            }
+            return branchId;
+        });
+        
+        if (branchIds.length === 0) {
+            setSubmitError('Please select at least one branch.');
+            return;
+        }
+        
         const updated: StaffMember = {
             ...(staff ?? {
                 id:          `u${Date.now()}`,
                 status:      'active' as StaffStatus,
-                password:    'temp123',
+                password:    form.password,
                 joinedAt:    new Date().toLocaleDateString('en-GH', { month: 'short', year: 'numeric' }),
                 lastLogin:   'Never',
                 ordersToday: 0,
@@ -237,8 +384,8 @@ function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onC
             phone:            form.phone.trim(),
             email:            form.email.trim(),
             role:             form.role,
-            branch:           isMultiBranch ? form.branch : (Array.isArray(form.branch) ? form.branch[0] : form.branch),
-            branchIds:        branchArr.map(b => BRANCH_ID_MAP[b] ?? b),
+            branch:           isMultiBranch ? branchNames : branchNames[0],
+            branchIds:        branchIds,
             employmentStatus: form.employmentStatus,
             systemAccess:     form.systemAccess,
             permissions:      form.permissions,
@@ -254,7 +401,22 @@ function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onC
                 relationship: form.emergencyRel,
             } : undefined,
         };
-        onSave(updated);
+        setIsSaving(true);
+        try {
+            await onSave(updated);
+            
+            // Handle force password reset separately for existing staff
+            if (!isNew && form.forcePasswordReset) {
+                await employeeService.requirePasswordReset(updated.id);
+            }
+            
+            onClose();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to save. Please try again.';
+            setSubmitError(message);
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     const MODAL_TABS: { id: ModalTab; label: string }[] = [
@@ -305,22 +467,36 @@ function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onC
                                         value={form.role}
                                         onChange={e => handleRoleChange(e.target.value as StaffRole)}
                                         className="w-full px-3 py-2.5 bg-neutral-light border border-[#f0e8d8] rounded-xl text-text-dark text-sm font-body focus:outline-none focus:border-primary/40"
+                                        disabled={rolesLoading}
                                     >
-                                        {(['super_admin','branch_partner','manager','call_center','kitchen','rider'] as StaffRole[]).map(r => (
-                                            <option key={r} value={r}>{roleDisplayName(r)}</option>
-                                        ))}
+                                        {rolesLoading ? (
+                                            <option>Loading roles...</option>
+                                        ) : (
+                                            availableRoles.map(role => {
+                                                const staffRole = dbRoleToStaffRole(role.name);
+                                                return (
+                                                    <option key={role.name} value={staffRole}>
+                                                        {role.display_name}
+                                                    </option>
+                                                );
+                                            })
+                                        )}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-1.5">
                                         {isMultiBranch ? 'Branches' : 'Branch'}
                                     </label>
-                                    {isMultiBranch ? (
+                                    {branchesLoading ? (
+                                        <div className="w-full px-3 py-2.5 bg-neutral-light border border-[#f0e8d8] rounded-xl text-neutral-gray text-sm font-body">
+                                            Loading branches...
+                                        </div>
+                                    ) : isMultiBranch ? (
                                         <div className="grid grid-cols-2 gap-1.5">
-                                            {ALL_BRANCHES.map(b => {
+                                            {ALL_BRANCHES.map((b, i) => {
                                                 const arr = Array.isArray(form.branch) ? form.branch : [form.branch as string];
                                                 return (
-                                                    <label key={b} className="flex items-center gap-1.5 cursor-pointer">
+                                                    <label key={`${b}-${i}`} className="flex items-center gap-1.5 cursor-pointer">
                                                         <input type="checkbox" checked={arr.includes(b)} onChange={e => {
                                                             const branches = Array.isArray(form.branch) ? form.branch : [form.branch as string];
                                                             setForm(f => ({ ...f, branch: e.target.checked ? [...branches, b] : branches.filter(x => x !== b) }));
@@ -336,7 +512,7 @@ function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onC
                                             onChange={e => setForm(f => ({ ...f, branch: e.target.value }))}
                                             className="w-full px-3 py-2.5 bg-neutral-light border border-[#f0e8d8] rounded-xl text-text-dark text-sm font-body focus:outline-none focus:border-primary/40"
                                         >
-                                            {ALL_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                                            {ALL_BRANCHES.map((b, i) => <option key={`${b}-${i}`} value={b}>{b}</option>)}
                                         </select>
                                     )}
                                 </div>
@@ -405,7 +581,12 @@ function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onC
                             </div>
 
                             <label className="flex items-center gap-3 cursor-pointer p-3 bg-warning/5 border border-warning/20 rounded-xl">
-                                <input type="checkbox" className="accent-warning" />
+                                <input 
+                                    type="checkbox" 
+                                    className="accent-warning"
+                                    checked={form.forcePasswordReset}
+                                    onChange={e => setForm(f => ({ ...f, forcePasswordReset: e.target.checked }))}
+                                />
                                 <div>
                                     <p className="text-text-dark text-sm font-semibold font-body">Force password reset on next login</p>
                                     <p className="text-neutral-gray text-xs font-body">Staff must set a new password before accessing the portal</p>
@@ -420,44 +601,31 @@ function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onC
                             <p className="text-neutral-gray text-xs font-body mb-2">
                                 Defaults are set by role. Toggle to grant or restrict individual permissions.
                             </p>
-                            <div className="divide-y divide-[#f0e8d8]">
-                                <Toggle
-                                    checked={form.permissions.canPlaceOrders}
-                                    onChange={v => setForm(f => ({ ...f, permissions: { ...f.permissions, canPlaceOrders: v } }))}
-                                    label="Can Place Orders"
-                                    sub="Create new orders via call center or manager portal"
-                                />
-                                <Toggle
-                                    checked={form.permissions.canAdvanceOrders}
-                                    onChange={v => setForm(f => ({ ...f, permissions: { ...f.permissions, canAdvanceOrders: v } }))}
-                                    label="Can Advance Orders"
-                                    sub="Move orders through statuses (accept, start, complete)"
-                                />
-                                <Toggle
-                                    checked={form.permissions.canAccessPOS}
-                                    onChange={v => setForm(f => ({ ...f, permissions: { ...f.permissions, canAccessPOS: v }, pin: v ? f.pin : '' }))}
-                                    label="Can Access POS Terminal"
-                                    sub="Allows logging in to the POS terminal with a PIN"
-                                />
-                                <Toggle
-                                    checked={form.permissions.canViewReports}
-                                    onChange={v => setForm(f => ({ ...f, permissions: { ...f.permissions, canViewReports: v } }))}
-                                    label="Can View Reports"
-                                    sub="Access to sales analytics and branch performance"
-                                />
-                                <Toggle
-                                    checked={form.permissions.canManageMenu}
-                                    onChange={v => setForm(f => ({ ...f, permissions: { ...f.permissions, canManageMenu: v } }))}
-                                    label="Can Manage Menu"
-                                    sub="Add, edit, or remove menu items and categories"
-                                />
-                                <Toggle
-                                    checked={form.permissions.canManageStaff}
-                                    onChange={v => setForm(f => ({ ...f, permissions: { ...f.permissions, canManageStaff: v } }))}
-                                    label="Can Manage Staff"
-                                    sub="Create, edit, or suspend staff accounts"
-                                />
-                            </div>
+                            {permissionsLoading ? (
+                                <div className="text-center py-4">
+                                    <p className="text-neutral-gray text-sm font-body">Loading permissions...</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-[#f0e8d8]">
+                                    {displayPermissions.map(([permName, permConfig]) => (
+                                        <Toggle
+                                            key={permName}
+                                            checked={form.permissions[permConfig.key]}
+                                            onChange={v => setForm(f => ({ 
+                                                ...f, 
+                                                permissions: { 
+                                                    ...f.permissions, 
+                                                    [permConfig.key]: v
+                                                },
+                                                // Special handling for POS access - clear PIN if disabled
+                                                ...(permConfig.key === 'canAccessPOS' && !v && { pin: '' })
+                                            }))}
+                                            label={permConfig.label}
+                                            sub={permConfig.description}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -492,10 +660,17 @@ function StaffModal({ staff, onClose, onSave }: { staff: StaffMember | null; onC
                     )}
                 </div>
 
+                {submitError && (
+                    <div className="mx-6 px-4 py-2.5 rounded-xl bg-error/10 border border-error/20 flex items-center gap-2">
+                        <WarningCircleIcon size={18} className="text-error shrink-0" />
+                        <p className="text-error text-sm font-body">{submitError}</p>
+                    </div>
+                )}
+
                 <div className="flex gap-3 px-6 py-4 border-t border-[#f0e8d8]">
-                    <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-neutral-light text-text-dark rounded-xl text-sm font-medium font-body cursor-pointer">Cancel</button>
-                    <button type="button" onClick={handleSave} className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium font-body cursor-pointer hover:bg-primary-hover transition-colors">
-                        {isNew ? 'Create Account' : 'Save Changes'}
+                    <button type="button" onClick={onClose} disabled={isSaving} className="flex-1 px-4 py-2.5 bg-neutral-light text-text-dark rounded-xl text-sm font-medium font-body cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">Cancel</button>
+                    <button type="button" onClick={() => void handleSave()} disabled={isSaving || branchesLoading || rolesLoading} className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium font-body cursor-pointer hover:bg-primary-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                        {isSaving ? (isNew ? 'Creating…' : 'Saving…') : branchesLoading || rolesLoading ? 'Loading...' : (isNew ? 'Create Account' : 'Save Changes')}
                     </button>
                 </div>
             </div>
@@ -541,8 +716,21 @@ function tabCount(staff: StaffMember[], tab: FilterTab): number {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+function isNewStaffId(id: string): boolean {
+    return id.startsWith('u');
+}
+
 export default function AdminStaffPage() {
-    const [staff, setStaff] = useState<StaffMember[]>(MOCK_STAFF);
+    const { employees: apiStaff, isLoading, refetch } = useEmployees();
+    const [staff, setStaff] = useState<StaffMember[]>([]);
+    const hasInitialized = useRef(false);
+
+    useEffect(() => {
+        if (!hasInitialized.current && apiStaff.length > 0) {
+            hasInitialized.current = true;
+            setStaff(apiStaff);
+        }
+    }, [apiStaff]);
     const [tab, setTab] = useState<FilterTab>('All');
     const [search, setSearch] = useState('');
     const [editStaff, setEditStaff] = useState<StaffMember | null | 'new'>(null);
@@ -559,23 +747,150 @@ export default function AdminStaffPage() {
         return list;
     }, [staff, tab, search]);
 
-    function saveStaff(s: StaffMember) {
-        setStaff(prev => {
-            const idx = prev.findIndex(x => x.id === s.id);
-            if (idx >= 0) { const n = [...prev]; n[idx] = s; return n; }
-            return [...prev, s];
-        });
-        setEditStaff(null);
+    async function saveStaff(s: StaffMember) {
+        const branchIds = s.branchIds ?? [];
+        const isNew = isNewStaffId(s.id);
+        try {
+            if (isNew) {
+                if (branchIds.length === 0) throw new Error('Select at least one branch.');
+                await employeeService.createEmployee({
+                    name: s.name,
+                    email: s.email || null,
+                    phone: s.phone,
+                    branch_ids: branchIds.map((id) => Number(id)),
+                    role: staffRoleToBackendRole(s.role),
+                    hire_date: s.joinedAt || undefined,
+                    // HR fields
+                    pos_pin: s.pin || undefined,
+                    ssnit_number: s.ssnit || undefined,
+                    ghana_card_id: s.ghanaCard || undefined,
+                    tin_number: s.tinNumber || undefined,
+                    date_of_birth: s.dateOfBirth || undefined,
+                    nationality: s.nationality || undefined,
+                    emergency_contact_name: s.emergencyContact?.name || undefined,
+                    emergency_contact_phone: s.emergencyContact?.phone || undefined,
+                    emergency_contact_relationship: s.emergencyContact?.relationship || undefined,
+                    // Individual permissions
+                    permissions: mapPermissionsToBackend(s.permissions),
+                });
+            } else {
+                await employeeService.updateEmployee(s.id, {
+                    name: s.name,
+                    email: s.email || null,
+                    phone: s.phone,
+                    ...(branchIds.length > 0 && { branch_ids: branchIds.map((id) => Number(id)) }),
+                    role: staffRoleToBackendRole(s.role),
+                    hire_date: s.joinedAt || undefined,
+                    // HR fields
+                    pos_pin: s.pin || undefined,
+                    ssnit_number: s.ssnit || undefined,
+                    ghana_card_id: s.ghanaCard || undefined,
+                    tin_number: s.tinNumber || undefined,
+                    date_of_birth: s.dateOfBirth || undefined,
+                    nationality: s.nationality || undefined,
+                    emergency_contact_name: s.emergencyContact?.name || undefined,
+                    emergency_contact_phone: s.emergencyContact?.phone || undefined,
+                    emergency_contact_relationship: s.emergencyContact?.relationship || undefined,
+                    // Individual permissions
+                    permissions: mapPermissionsToBackend(s.permissions),
+                });
+            }
+            const result = await refetch();
+            setStaff(Array.isArray(result.data) ? result.data : []);
+            setEditStaff(null);
+            toast.success(isNew ? `${s.name} has been added successfully` : `${s.name} has been updated successfully`);
+        } catch (err: unknown) {
+            let msg = 'Failed to save. Please try again.';
+            if (err && typeof err === 'object' && 'response' in err) {
+                const res = (err as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } }).response?.data;
+                if (res?.message) msg = res.message;
+                else if (res?.errors && typeof res.errors === 'object') {
+                    const first = Object.values(res.errors).flat()[0];
+                    if (first) msg = first;
+                }
+            } else if (err instanceof Error) msg = err.message;
+            throw new Error(msg);
+        }
     }
 
-    function deleteStaffFn(s: StaffMember) {
-        setStaff(prev => prev.filter(x => x.id !== s.id));
-        setDeleteStaff(null);
+    async function deleteStaffFn(s: StaffMember) {
+        try {
+            await employeeService.deleteEmployee(s.id);
+            setStaff(prev => prev.filter(x => x.id !== s.id));
+            setDeleteStaff(null);
+            toast.success(`${s.name} has been deleted successfully`);
+        } catch (error) {
+            console.error('Failed to delete employee:', error);
+            toast.error('Failed to delete employee. Please try again.');
+            setDeleteStaff(null);
+        }
     }
 
-    function suspend(s: StaffMember)   { setStaff(prev => prev.map(x => x.id === s.id ? { ...x, status: 'inactive' as StaffStatus, systemAccess: 'disabled' as SystemAccess } : x)); }
-    function reinstate(s: StaffMember) { setStaff(prev => prev.map(x => x.id === s.id ? { ...x, status: 'active' as StaffStatus, systemAccess: 'enabled' as SystemAccess }  : x)); }
-    function archive(s: StaffMember)   { setStaff(prev => prev.map(x => x.id === s.id ? { ...x, status: 'archived' as StaffStatus, systemAccess: 'disabled' as SystemAccess, employmentStatus: 'resigned' as EmploymentStatus } : x)); }
+    async function suspend(s: StaffMember) {
+        try {
+            await employeeService.updateEmployee(s.id, { status: 'suspended' });
+            setStaff(prev => prev.map(x => x.id === s.id ? { 
+                ...x, 
+                status: 'inactive' as StaffStatus, 
+                systemAccess: 'disabled' as SystemAccess 
+            } : x));
+            toast.success(`${s.name} has been suspended`);
+        } catch (error) {
+            console.error('Failed to suspend employee:', error);
+            toast.error('Failed to suspend employee. Please try again.');
+        }
+    }
+
+    async function reinstate(s: StaffMember) {
+        try {
+            await employeeService.updateEmployee(s.id, { status: 'active' });
+            setStaff(prev => prev.map(x => x.id === s.id ? { 
+                ...x, 
+                status: 'active' as StaffStatus, 
+                systemAccess: 'enabled' as SystemAccess 
+            } : x));
+            toast.success(`${s.name} has been reinstated`);
+        } catch (error) {
+            console.error('Failed to reinstate employee:', error);
+            toast.error('Failed to reinstate employee. Please try again.');
+        }
+    }
+
+    async function archive(s: StaffMember) {
+        try {
+            await employeeService.updateEmployee(s.id, { status: 'archived' });
+            setStaff(prev => prev.map(x => x.id === s.id ? { 
+                ...x, 
+                status: 'archived' as StaffStatus, 
+                systemAccess: 'disabled' as SystemAccess, 
+                employmentStatus: 'resigned' as EmploymentStatus 
+            } : x));
+            toast.success(`${s.name} has been archived`);
+        } catch (error) {
+            console.error('Failed to archive employee:', error);
+            toast.error('Failed to archive employee. Please try again.');
+        }
+    }
+
+    async function forceLogout(s: StaffMember) {
+        try {
+            await employeeService.forceLogout(s.id);
+            toast.success(`${s.name} has been logged out from all devices`);
+        } catch (error) {
+            console.error('Failed to force logout employee:', error);
+            toast.error('Failed to force logout. Please try again.');
+        }
+    }
+
+    async function requirePasswordReset(s: StaffMember) {
+        try {
+            await employeeService.requirePasswordReset(s.id);
+            toast.success(`Password reset required for ${s.name}. Notification sent.`);
+        } catch (error) {
+            console.error('Failed to require password reset:', error);
+            toast.error('Failed to require password reset. Please try again.');
+        }
+    }
 
     return (
         <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">
@@ -613,7 +928,11 @@ export default function AdminStaffPage() {
 
             {/* Staff list */}
             <div className="bg-neutral-card border border-[#f0e8d8] rounded-2xl overflow-hidden">
-                {filtered.length === 0 ? (
+                {isLoading && staff.length === 0 ? (
+                    <div className="px-4 py-16 text-center">
+                        <p className="text-neutral-gray text-sm font-body">Loading staff…</p>
+                    </div>
+                ) : filtered.length === 0 ? (
                     <div className="px-4 py-16 text-center">
                         <UserCircleIcon size={32} weight="thin" className="text-neutral-gray/40 mx-auto mb-3" />
                         <p className="text-neutral-gray text-sm font-body">No staff found.</p>
@@ -663,8 +982,8 @@ export default function AdminStaffPage() {
                                 {member.status !== 'archived' && (
                                     <>
                                         <ActionBtn icon={PencilSimpleIcon} label="Edit" onClick={() => setEditStaff(member)} color="text-primary" />
-                                        <ActionBtn icon={LockSimpleIcon} label="Reset PW" onClick={() => {}} color="text-neutral-gray" />
-                                        <ActionBtn icon={SignOutIcon} label="Force Logout" onClick={() => {}} color="text-neutral-gray" />
+                                        <ActionBtn icon={LockSimpleIcon} label="Reset PW" onClick={() => requirePasswordReset(member)} color="text-neutral-gray" />
+                                        <ActionBtn icon={SignOutIcon} label="Force Logout" onClick={() => forceLogout(member)} color="text-neutral-gray" />
                                         {member.systemAccess === 'enabled'
                                             ? <ActionBtn icon={ArchiveIcon} label="Suspend" onClick={() => suspend(member)} color="text-warning" />
                                             : <ActionBtn icon={ArrowCounterClockwiseIcon} label="Reinstate" onClick={() => reinstate(member)} color="text-secondary" />

@@ -45,13 +45,39 @@ export interface Branch {
   area: string;
   address: string;
   phone: string;
+  email?: string;
   latitude: number;
   longitude: number;
   is_active: boolean;
-  operating_hours: string;
-  delivery_fee: number;
-  delivery_radius_km: number;
-  estimated_delivery_time: string;
+  operating_hours?: Record<string, {
+    is_open: boolean;
+    open_time: string | null;
+    close_time: string | null;
+  }>;
+  delivery_settings?: {
+    base_delivery_fee: number;
+    per_km_fee: number;
+    delivery_radius_km: number;
+    min_order_value: number;
+    estimated_delivery_time?: string;
+  } | null;
+  order_types?: Record<string, {
+    is_enabled: boolean;
+    metadata?: any;
+  }>;
+  payment_methods?: Record<string, {
+    is_enabled: boolean;
+    metadata?: any;
+  }>;
+  manager?: {
+    id: number;
+    name: string;
+    email?: string;
+    phone?: string;
+  } | null;
+  today_orders?: number;
+  today_revenue?: number;
+  menu_items?: MenuItem[];
   created_at: string;
   updated_at: string;
 }
@@ -158,7 +184,7 @@ export interface Payment {
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
   amount: number;
-  transaction_reference?: string;
+  transaction_id?: string;
   momo_number?: string;
   momo_network?: string;
   paid_at?: string;
@@ -171,7 +197,9 @@ export interface Order {
   customer?: User;
   branch_id: number;
   branch?: Branch;
+  assigned_employee_id?: number | null;
   order_type: OrderType;
+  order_source?: string;
   status: OrderStatus;
   items: OrderItem[];
   payment?: Payment;
@@ -195,6 +223,45 @@ export interface Order {
   estimated_delivery_time?: string;
   created_at: string;
   updated_at: string;
+}
+
+// Activity Log types (admin audit)
+export type ActivityLogSeverity = 'info' | 'warning' | 'destructive';
+export type ActivityLogEntity = 'order' | 'staff' | 'branch' | 'menu' | 'customer' | 'system';
+
+export interface ActivityLogCauser {
+  id: number;
+  name: string;
+  email: string | null;
+}
+
+export interface ActivityLog {
+  id: number;
+  log_name: string;
+  description: string;
+  event: string | null;
+  subject_type: string | null;
+  subject_id: number | null;
+  causer: ActivityLogCauser | null;
+  properties: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+  entity: ActivityLogEntity;
+  severity: ActivityLogSeverity;
+}
+
+export interface ActivityLogsParams {
+  page?: number;
+  per_page?: number;
+  entity?: ActivityLogEntity | 'auth';
+  severity?: ActivityLogSeverity;
+  log_name?: string;
+  subject_type?: string;
+  event?: string;
+  causer_id?: number;
+  date_from?: string;
+  date_to?: string;
+  search?: string;
 }
 
 // Notification types

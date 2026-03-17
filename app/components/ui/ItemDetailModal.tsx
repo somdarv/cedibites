@@ -11,7 +11,10 @@ interface ItemDetailModalProps {
     onClose: () => void;
 }
 
-const formatPrice = (price: number) => `₵${price.toFixed(2)}`;
+const formatPrice = (price: number | string | null | undefined) => {
+    const n = typeof price === 'number' ? price : Number(price);
+    return `₵${Number.isNaN(n) ? '0.00' : n.toFixed(2)}`;
+};
 
 export default function ItemDetailModal({ item, onClose }: ItemDetailModalProps) {
     const { addToCart, removeFromCart, getCartItem, updateQuantity } = useCart();

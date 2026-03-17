@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
     ForkKnifeIcon,
     PlusIcon,
@@ -23,8 +23,8 @@ import {
     EyeSlashIcon,
 } from '@phosphor-icons/react';
 import Link from 'next/link';
-import { sampleMenuItems } from '@/lib/data/SampleMenu';
-import type { MenuItem, SizeKey } from '@/lib/data/SampleMenu';
+import { useMenuItems } from '@/lib/api/hooks/useMenuItems';
+import type { DisplayMenuItem } from '@/lib/api/adapters/menu.adapter';
 import { useMenuConfig, DEFAULT_CONFIG } from '@/lib/hooks/useMenuConfig';
 import type { OptionTemplate, AddOn } from '@/lib/hooks/useMenuConfig';
 
@@ -32,7 +32,7 @@ const BASE_CATEGORIES = DEFAULT_CONFIG.categories;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ManagedMenuItem = MenuItem & { available: boolean; archived?: boolean };
+type ManagedMenuItem = DisplayMenuItem & { available: boolean; archived?: boolean };
 
 // Pricing is either a single flat price, or a flexible list of named options
 // (replaces both the old 'sizes' array and 'hasVariants/plain/assorted').
@@ -41,20 +41,13 @@ type PricingType = 'simple' | 'options';
 
 interface OptionRow { label: string; price: string; image?: string; }
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
-
-const INITIAL_ITEMS: ManagedMenuItem[] = sampleMenuItems.map(item => ({
-    ...item,
-    available: true,
-}));
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function hasPricingOptions(item: MenuItem): boolean {
+function hasPricingOptions(item: DisplayMenuItem): boolean {
     return !!(item.sizes?.length) || !!(item.hasVariants && item.variants);
 }
 
-function getOptionRows(item: MenuItem): OptionRow[] {
+function getOptionRows(item: DisplayMenuItem): OptionRow[] {
     if (item.hasVariants && item.variants) {
         const rows: OptionRow[] = [];
         if (item.variants.plain != null) rows.push({ label: 'Plain', price: String(item.variants.plain) });
@@ -67,7 +60,7 @@ function getOptionRows(item: MenuItem): OptionRow[] {
     return [{ label: '', price: '' }];
 }
 
-function PriceDisplay({ item }: { item: MenuItem }) {
+function PriceDisplay({ item }: { item: DisplayMenuItem }) {
     if (hasPricingOptions(item)) {
         const rows = getOptionRows(item);
         if (rows.length === 1) {
@@ -152,9 +145,10 @@ function formToItem(form: ItemFormState, allCategories: string[], existing?: Man
 
     const base: ManagedMenuItem = {
         id,
+        numericId: existing?.numericId ?? (parseInt(id, 10) || 0),
         name: form.name.trim(),
         description: form.description.trim(),
-        category: category as MenuItem['category'],
+        category: category as DisplayMenuItem['category'],
         url: existing?.url ?? `/menu?item=${id}`,
         image: existing?.image,
         popular: form.popular || undefined,
@@ -169,8 +163,9 @@ function formToItem(form: ItemFormState, allCategories: string[], existing?: Man
     } else {
         // Serialise options as `sizes` — flexible and forward-compatible
         const validOptions = form.options.filter(o => o.label.trim() && o.price);
-        base.sizes = validOptions.map(o => ({
-            key: o.label.trim().toLowerCase().replace(/\s+/g, '-') as SizeKey,
+        base.sizes = validOptions.map((o, idx) => ({
+            id: idx + 1,
+            key: o.label.trim().toLowerCase().replace(/\s+/g, '-'),
             label: o.label.trim(),
             price: Number(o.price),
             image: o.image,
@@ -576,7 +571,16 @@ function ArchiveConfirm({ name, onConfirm, onClose }: { name: string; onConfirm:
 
 export default function ManagerMenuPage() {
     const { config } = useMenuConfig();
-    const [items, setItems] = useState<ManagedMenuItem[]>(INITIAL_ITEMS);
+    const { items: menuItems, isLoading: menuLoading } = useMenuItems();
+    const [items, setItems] = useState<ManagedMenuItem[]>([]);
+    const hasInitialized = useRef(false);
+
+    useEffect(() => {
+        if (!hasInitialized.current && menuItems.length > 0) {
+            hasInitialized.current = true;
+            setItems(menuItems.map(item => ({ ...item, available: true } as ManagedMenuItem)));
+        }
+    }, [menuItems]);
     const [search, setSearch] = useState('');
     const [categoryFilter, setFilter] = useState<string>('All');
     const [editingItem, setEditingItem] = useState<ManagedMenuItem | null | 'new'>(null);
@@ -704,7 +708,11 @@ export default function ManagerMenuPage() {
 
 
                 {/* ── Menu groups ─────────────────────────────────────────────── */}
-                {[...grouped.values()].every(arr => arr.length === 0) ? (
+                {menuLoading && items.length === 0 ? (
+                    <div className="text-center py-16">
+                        <p className="text-neutral-gray text-sm font-body">Loading menu…</p>
+                    </div>
+                ) : [...grouped.values()].every(arr => arr.length === 0) ? (
                     <div className="text-center py-16">
                         <ForkKnifeIcon size={36} weight="duotone" className="text-neutral-gray/30 mx-auto mb-3" />
                         <p className="text-neutral-gray text-sm font-body">No items match your search.</p>

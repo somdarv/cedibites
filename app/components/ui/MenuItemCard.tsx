@@ -11,7 +11,10 @@ interface MenuItemCardProps {
     onOpenDetail?: (item: SearchableItem) => void;
 }
 
-const formatPrice = (price: number) => `₵${price.toFixed(0)}`;
+const formatPrice = (price: number | string | null | undefined) => {
+    const n = typeof price === 'number' ? price : Number(price);
+    return `₵${Number.isNaN(n) ? '0' : n.toFixed(0)}`;
+};
 
 export default function MenuItemCard({ item, onOpenDetail }: MenuItemCardProps) {
     const { addToCart, removeFromCart, getCartItem } = useCart();

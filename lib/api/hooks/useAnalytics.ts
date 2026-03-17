@@ -1,0 +1,169 @@
+import { useQuery } from '@tanstack/react-query';
+import {
+  analyticsService,
+  type AnalyticsFilters,
+  type SalesAnalytics,
+  type OrderAnalytics,
+  type CustomerAnalytics,
+  type OrderSource,
+  type TopItem,
+  type BottomItem,
+  type CategoryRevenue,
+  type BranchPerformance,
+  type DeliveryPickupAnalytics,
+  type PaymentMethod,
+} from '../services/analytics.service';
+
+export type AnalyticsPeriod = 'today' | 'week' | 'month' | '30d' | '90d' | 'custom';
+
+function getDateRange(period: AnalyticsPeriod): { date_from: string; date_to: string } {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  switch (period) {
+    case 'today':
+      return { date_from: today, date_to: today };
+    case 'week': {
+      const weekStart = new Date(now);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      return { date_from: weekStart.toISOString().slice(0, 10), date_to: today };
+    }
+    case 'month': {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { date_from: monthStart.toISOString().slice(0, 10), date_to: today };
+    }
+    case '30d': {
+      const d30 = new Date(now);
+      d30.setDate(d30.getDate() - 30);
+      return { date_from: d30.toISOString().slice(0, 10), date_to: today };
+    }
+    case '90d': {
+      const d90 = new Date(now);
+      d90.setDate(d90.getDate() - 90);
+      return { date_from: d90.toISOString().slice(0, 10), date_to: today };
+    }
+    default:
+      return { date_from: today, date_to: today };
+  }
+}
+
+export const useAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number) => {
+  const range = getDateRange(period);
+  const filters: AnalyticsFilters = { ...range };
+  if (branchId) filters.branch_id = branchId;
+
+  const salesQuery = useQuery({
+    queryKey: ['analytics', 'sales', period, branchId],
+    queryFn: () => analyticsService.getSalesAnalytics(filters),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const ordersQuery = useQuery({
+    queryKey: ['analytics', 'orders', period, branchId],
+    queryFn: () => analyticsService.getOrderAnalytics(filters),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const customersQuery = useQuery({
+    queryKey: ['analytics', 'customers', period, branchId],
+    queryFn: () => analyticsService.getCustomerAnalytics({ date_from: range.date_from, date_to: range.date_to }),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  return {
+    sales: salesQuery.data,
+    orders: ordersQuery.data,
+    customers: customersQuery.data,
+    isLoading: salesQuery.isLoading || ordersQuery.isLoading || customersQuery.isLoading,
+    error: salesQuery.error ?? ordersQuery.error ?? customersQuery.error,
+    refetch: () => {
+      salesQuery.refetch();
+      ordersQuery.refetch();
+      customersQuery.refetch();
+    },
+  };
+};
+
+export const useOrderSourceAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number) => {
+  const range = getDateRange(period);
+  const filters: AnalyticsFilters = { ...range };
+  if (branchId) filters.branch_id = branchId;
+
+  return useQuery({
+    queryKey: ['analytics', 'order-sources', period, branchId],
+    queryFn: () => analyticsService.getOrderSourceAnalytics(filters),
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const useTopItemsAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number, limit = 10) => {
+  const range = getDateRange(period);
+  const filters: AnalyticsFilters & { limit?: number } = { ...range, limit };
+  if (branchId) filters.branch_id = branchId;
+
+  return useQuery({
+    queryKey: ['analytics', 'top-items', period, branchId, limit],
+    queryFn: () => analyticsService.getTopItemsAnalytics(filters),
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const useBottomItemsAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number, limit = 5) => {
+  const range = getDateRange(period);
+  const filters: AnalyticsFilters & { limit?: number } = { ...range, limit };
+  if (branchId) filters.branch_id = branchId;
+
+  return useQuery({
+    queryKey: ['analytics', 'bottom-items', period, branchId, limit],
+    queryFn: () => analyticsService.getBottomItemsAnalytics(filters),
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const useCategoryRevenueAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number) => {
+  const range = getDateRange(period);
+  const filters: AnalyticsFilters = { ...range };
+  if (branchId) filters.branch_id = branchId;
+
+  return useQuery({
+    queryKey: ['analytics', 'category-revenue', period, branchId],
+    queryFn: () => analyticsService.getCategoryRevenueAnalytics(filters),
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const useBranchPerformanceAnalytics = (period: AnalyticsPeriod = 'week') => {
+  const range = getDateRange(period);
+
+  return useQuery({
+    queryKey: ['analytics', 'branch-performance', period],
+    queryFn: () => analyticsService.getBranchPerformanceAnalytics({ date_from: range.date_from, date_to: range.date_to }),
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const useDeliveryPickupAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number) => {
+  const range = getDateRange(period);
+  const filters: AnalyticsFilters = { ...range };
+  if (branchId) filters.branch_id = branchId;
+
+  return useQuery({
+    queryKey: ['analytics', 'delivery-pickup', period, branchId],
+    queryFn: () => analyticsService.getDeliveryPickupAnalytics(filters),
+    staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const usePaymentMethodAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number) => {
+  const range = getDateRange(period);
+  const filters: AnalyticsFilters = { ...range };
+  if (branchId) filters.branch_id = branchId;
+
+  return useQuery({
+    queryKey: ['analytics', 'payment-methods', period, branchId],
+    queryFn: () => analyticsService.getPaymentMethodAnalytics(filters),
+    staleTime: 2 * 60 * 1000,
+  });
+};

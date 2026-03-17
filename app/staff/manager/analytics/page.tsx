@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
     CalendarIcon,
     CurrencyCircleDollarIcon,
@@ -13,6 +14,10 @@ import {
     ArrowDownIcon,
 } from '@phosphor-icons/react';
 import { STATUS_CONFIG } from '@/app/staff/orders/constants';
+import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
+import { useAnalytics } from '@/lib/api/hooks/useAnalytics';
+import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import { analyticsService } from '@/lib/api/services/analytics.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,59 +34,10 @@ interface AnalyticsOrder {
     staffName: string;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-function daysAgo(d: number, h = 10, m = 0) {
-    const dt = new Date();
-    dt.setDate(dt.getDate() - d);
-    dt.setHours(h, m, 0, 0);
-    return dt;
-}
-
-const ALL_ORDERS: AnalyticsOrder[] = [
-    { id: 'CB847291', customer: 'Ama Serwaa',       source: 'WhatsApp',  status: 'delivered',         items: 4, total: 94,  placedAt: daysAgo(0, 8,  15), staffName: 'Kofi' },
-    { id: 'CB391045', customer: 'Kweku Asante',     source: 'Phone',     status: 'completed',         items: 2, total: 50,  placedAt: daysAgo(0, 9,  5),  staffName: 'Kofi' },
-    { id: 'CB204837', customer: 'Abena Boateng',    source: 'Instagram', status: 'preparing',         items: 1, total: 73,  placedAt: daysAgo(0, 10, 30), staffName: 'Esi'  },
-    { id: 'CB173920', customer: 'Yaw Darko',        source: 'Facebook',  status: 'preparing',         items: 4, total: 110, placedAt: daysAgo(0, 11, 0),  staffName: 'Esi'  },
-    { id: 'CB998812', customer: 'Efua Mensah',      source: 'Phone',     status: 'ready',             items: 2, total: 59,  placedAt: daysAgo(0, 11, 45), staffName: 'Kofi' },
-    { id: 'CB774433', customer: 'Kojo Appiah',      source: 'WhatsApp',  status: 'out_for_delivery',  items: 3, total: 117, placedAt: daysAgo(0, 12, 10), staffName: 'Esi'  },
-    { id: 'CB556677', customer: 'Adwoa Ofori',      source: 'Phone',     status: 'ready_for_pickup',  items: 2, total: 96,  placedAt: daysAgo(0, 12, 50), staffName: 'Kofi' },
-    { id: 'CB112233', customer: 'Fiifi Annan',      source: 'Online',    status: 'delivered',         items: 2, total: 76,  placedAt: daysAgo(0, 13, 20), staffName: 'Kofi' },
-    { id: 'CB332211', customer: 'Nana Asare',       source: 'POS',       status: 'cancelled',         items: 1, total: 35,  placedAt: daysAgo(0, 14, 0),  staffName: 'Esi'  },
-    { id: 'CB445566', customer: 'Akua Owusu',       source: 'WhatsApp',  status: 'completed',         items: 3, total: 145, placedAt: daysAgo(1, 9,  0),  staffName: 'Kofi' },
-    { id: 'CB667788', customer: 'Kwame Frimpong',   source: 'Phone',     status: 'delivered',         items: 2, total: 82,  placedAt: daysAgo(1, 11, 30), staffName: 'Esi'  },
-    { id: 'CB889900', customer: 'Abena Agyemang',   source: 'Facebook',  status: 'completed',         items: 4, total: 210, placedAt: daysAgo(1, 13, 0),  staffName: 'Kofi' },
-    { id: 'CB990011', customer: 'Yaa Asantewaa',    source: 'Online',    status: 'cancelled',         items: 2, total: 60,  placedAt: daysAgo(1, 15, 0),  staffName: 'Esi'  },
-    { id: 'CB112244', customer: 'Kusi Opoku',       source: 'Instagram', status: 'delivered',         items: 3, total: 127, placedAt: daysAgo(2, 10, 0),  staffName: 'Kofi' },
-    { id: 'CB223355', customer: 'Ekow Baiden',      source: 'Phone',     status: 'completed',         items: 1, total: 45,  placedAt: daysAgo(2, 12, 0),  staffName: 'Esi'  },
-    { id: 'CB334466', customer: 'Ama Darko',        source: 'WhatsApp',  status: 'delivered',         items: 2, total: 90,  placedAt: daysAgo(3, 9,  30), staffName: 'Kofi' },
-    { id: 'CB445577', customer: 'Nana Boateng',     source: 'POS',       status: 'completed',         items: 4, total: 180, placedAt: daysAgo(3, 11, 0),  staffName: 'Esi'  },
-    { id: 'CB556688', customer: 'Kwadwo Asante',    source: 'Online',    status: 'cancelled',         items: 1, total: 55,  placedAt: daysAgo(4, 14, 0),  staffName: 'Kofi' },
-    { id: 'CB667799', customer: 'Efua Osei',        source: 'Phone',     status: 'delivered',         items: 3, total: 98,  placedAt: daysAgo(5, 10, 0),  staffName: 'Esi'  },
-    { id: 'CB778800', customer: 'Adjoa Mensah',     source: 'WhatsApp',  status: 'completed',         items: 2, total: 74,  placedAt: daysAgo(6, 13, 0),  staffName: 'Kofi' },
-    { id: 'CB889911', customer: 'Kofi Acheampong',  source: 'Instagram', status: 'delivered',         items: 2, total: 88,  placedAt: daysAgo(8, 11, 0),  staffName: 'Esi'  },
-    { id: 'CB990022', customer: 'Akosua Osei',      source: 'Facebook',  status: 'completed',         items: 3, total: 132, placedAt: daysAgo(10, 9, 0),  staffName: 'Kofi' },
-    { id: 'CB001133', customer: 'Kojo Nyarko',      source: 'Phone',     status: 'delivered',         items: 1, total: 42,  placedAt: daysAgo(14, 10, 0), staffName: 'Esi'  },
-    { id: 'CB112344', customer: 'Abena Yirenkyi',   source: 'Online',    status: 'completed',         items: 4, total: 195, placedAt: daysAgo(20, 14, 0), staffName: 'Kofi' },
-];
-
-// ─── Chart / analytics mock data ──────────────────────────────────────────────
+// ─── Chart / analytics constants ───────────────────────────────────────────────
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const weekRevenue    = [1420, 1880, 960, 2100, 1750, 3240, 480];
-const lastWeekRevenue = [1200, 1650, 1100, 1890, 1600, 2980, 820];
-const TODAY_IDX = 5; // Saturday
-
 const HOURS = ['7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22'];
-const heatmapData: Record<string, number[]> = {
-    Mon: [2,  4,  6,  5,  8, 14, 12,  9,  7,  6,  8, 10,  9,  7,  5, 2],
-    Tue: [1,  3,  5,  6,  9, 16, 14, 10,  8,  5,  7, 11,  8,  6,  4, 1],
-    Wed: [0,  2,  4,  4,  7, 12, 11,  8,  6,  4,  6,  9,  7,  5,  3, 1],
-    Thu: [2,  5,  7,  6, 10, 18, 15, 11,  9,  7,  9, 12, 10,  8,  5, 2],
-    Fri: [3,  5,  8,  7, 11, 17, 16, 12, 10,  8, 10, 13, 11,  9,  6, 3],
-    Sat: [4,  7, 10,  9, 14, 22, 20, 15, 13, 11, 14, 18, 16, 12,  8, 4],
-    Sun: [1,  3,  5,  4,  6, 10,  9,  7,  5,  4,  5,  7,  6,  4,  2, 1],
-};
 
 const topItems = [
     { name: 'Jollof Rice',        units: 47, rev: 630, trend: +12 },
@@ -181,19 +137,29 @@ function KpiCard({
 
 // ─── Weekly revenue comparison ────────────────────────────────────────────────
 
-function WeeklyRevenue() {
+function WeeklyRevenue({
+    weekRevenue: weekRev,
+    lastWeekRevenue: lastRev,
+    todayIdx,
+}: {
+    weekRevenue: number[];
+    lastWeekRevenue: number[];
+    todayIdx: number;
+}) {
     const [hovered, setHovered] = useState<number | null>(null);
-    const max = Math.max(...weekRevenue, ...lastWeekRevenue);
+    const max = Math.max(...weekRev, ...lastRev, 1);
 
     return (
         <Card>
             <SectionHeader title="Revenue vs Last Week" sub="Daily — hover a bar for details" />
             <div className="flex items-end gap-1.5 h-24">
                 {DAYS.map((day, i) => {
-                    const thisH  = Math.round((weekRevenue[i]     / max) * 88);
-                    const lastH  = Math.round((lastWeekRevenue[i] / max) * 88);
-                    const isToday = i === TODAY_IDX;
-                    const diff   = Math.round(((weekRevenue[i] - lastWeekRevenue[i]) / lastWeekRevenue[i]) * 100);
+                    const thisVal = weekRev[i] ?? 0;
+                    const lastVal = lastRev[i] ?? 0;
+                    const thisH  = Math.round((thisVal / max) * 88);
+                    const lastH  = Math.round((lastVal / max) * 88);
+                    const isToday = i === todayIdx;
+                    const diff   = lastVal > 0 ? Math.round(((thisVal - lastVal) / lastVal) * 100) : 0;
                     return (
                         <div
                             key={day}
@@ -204,8 +170,8 @@ function WeeklyRevenue() {
                             {hovered === i && (
                                 <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 bg-neutral-card border border-brown-light/20 rounded-xl px-3 py-2 z-10 whitespace-nowrap text-[11px] text-text-dark shadow-lg">
                                     <p className="font-bold mb-1">{day}</p>
-                                    <p>This: <span className="text-primary font-semibold">₵{weekRevenue[i].toLocaleString()}</span></p>
-                                    <p>Last: <span className="text-neutral-gray">₵{lastWeekRevenue[i].toLocaleString()}</span></p>
+                                    <p>This: <span className="text-primary font-semibold">₵{(weekRev[i] ?? 0).toLocaleString()}</span></p>
+                                    <p>Last: <span className="text-neutral-gray">₵{(lastRev[i] ?? 0).toLocaleString()}</span></p>
                                     <p className={`font-semibold ${diff >= 0 ? 'text-secondary' : 'text-error'}`}>
                                         {diff >= 0 ? '↑' : '↓'} {Math.abs(diff)}%
                                     </p>
@@ -239,10 +205,27 @@ function WeeklyRevenue() {
 
 // ─── Peak hours heatmap ───────────────────────────────────────────────────────
 
-function PeakHoursHeatmap() {
+const HEATMAP_FALLBACK: Record<string, number[]> = {
+    Mon: [2,  4,  6,  5,  8, 14, 12,  9,  7,  6,  8, 10,  9,  7,  5, 2],
+    Tue: [1,  3,  5,  6,  9, 16, 14, 10,  8,  5,  7, 11,  8,  6,  4, 1],
+    Wed: [0,  2,  4,  4,  7, 12, 11,  8,  6,  4,  6,  9,  7,  5,  3, 1],
+    Thu: [2,  5,  7,  6, 10, 18, 15, 11,  9,  7,  9, 12, 10,  8,  5, 2],
+    Fri: [3,  5,  8,  7, 11, 17, 16, 12, 10,  8, 10, 13, 11,  9,  6, 3],
+    Sat: [4,  7, 10,  9, 14, 22, 20, 15, 13, 11, 14, 18, 16, 12,  8, 4],
+    Sun: [1,  3,  5,  4,  6, 10,  9,  7,  5,  4,  5,  7,  6,  4,  2, 1],
+};
+
+function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: number; count: number }> }) {
     const [selectedDay, setSelectedDay] = useState('Sat');
-    const data = heatmapData[selectedDay];
-    const max  = Math.max(...Object.values(heatmapData).flat());
+    const data = useMemo(() => {
+        if (ordersByHour?.length) {
+            const byHour: Record<number, number> = {};
+            for (const { hour, count } of ordersByHour) byHour[hour] = (byHour[hour] ?? 0) + count;
+            return HOURS.map((_, i) => byHour[7 + i] ?? 0);
+        }
+        return HEATMAP_FALLBACK[selectedDay] ?? HEATMAP_FALLBACK.Sat;
+    }, [selectedDay, ordersByHour]);
+    const max  = Math.max(...data, 1);
 
     function cellBg(val: number) {
         const i = val / max;
@@ -542,30 +525,90 @@ const PERIODS: PeriodTab[] = [
     { key: 'custom', label: 'All Time'   },
 ];
 
+function getDateRangeForPeriod(period: Period): { date_from: string; date_to: string } {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    if (period === 'today') return { date_from: today, date_to: today };
+    if (period === 'week') {
+        const ws = new Date(now);
+        ws.setDate(ws.getDate() - 6);
+        return { date_from: ws.toISOString().slice(0, 10), date_to: today };
+    }
+    if (period === 'month') {
+        const ms = new Date(now.getFullYear(), now.getMonth(), 1);
+        return { date_from: ms.toISOString().slice(0, 10), date_to: today };
+    }
+    const d90 = new Date(now);
+    d90.setDate(d90.getDate() - 90);
+    return { date_from: d90.toISOString().slice(0, 10), date_to: today };
+}
+
+function mapSalesByDayToWeekBars(salesByDay?: Array<{ date: string; total: number }>): number[] {
+    const bars = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
+    if (!salesByDay?.length) return bars;
+    for (const d of salesByDay) {
+        const date = new Date(d.date);
+        const dow = date.getDay();
+        const idx = (dow + 6) % 7;
+        bars[idx] = (bars[idx] ?? 0) + Number(d.total);
+    }
+    return bars;
+}
+
 export default function ManagerAnalyticsPage() {
     const [period, setPeriod] = useState<Period>('today');
     const [page,   setPage  ] = useState(0);
     const PAGE_SIZE = 8;
 
-    const todayRevenue  = weekRevenue[TODAY_IDX];
-    const lastSatRev    = lastWeekRevenue[TODAY_IDX];
-    const revTrend      = Math.round(((todayRevenue - lastSatRev) / lastSatRev) * 100);
+    const { staffUser } = useStaffAuth();
+    const branchId = staffUser?.branchId ? parseInt(staffUser.branchId, 10) : undefined;
+    const branchName = staffUser?.branch ?? '—';
 
-    // Orders table data
+    const { sales: todaySales, orders: todayOrderAnalytics } = useAnalytics('today', branchId);
+    const { sales: weekSales, orders: orderAnalytics } = useAnalytics('week', branchId);
+
+    const lastWeekRange = useMemo(() => {
+        const now = new Date();
+        const end = new Date(now);
+        end.setDate(end.getDate() - 7);
+        const start = new Date(end);
+        start.setDate(start.getDate() - 6);
+        return { date_from: start.toISOString().slice(0, 10), date_to: end.toISOString().slice(0, 10) };
+    }, []);
+
+    const { data: lastWeekSales } = useQuery({
+        queryKey: ['analytics', 'sales', 'last-week', branchId],
+        queryFn: () => analyticsService.getSalesAnalytics({ ...lastWeekRange, branch_id: branchId }),
+        staleTime: 2 * 60 * 1000,
+    });
+
+    const weekRevenue = useMemo(() => mapSalesByDayToWeekBars(weekSales?.sales_by_day), [weekSales?.sales_by_day]);
+    const lastWeekRevenue = useMemo(() => mapSalesByDayToWeekBars(lastWeekSales?.sales_by_day), [lastWeekSales?.sales_by_day]);
+    const TODAY_IDX = (new Date().getDay() + 6) % 7;
+    const todayRevenue  = weekRevenue[TODAY_IDX] ?? todaySales?.total_sales ?? 0;
+    const lastSatRev    = lastWeekRevenue[TODAY_IDX] ?? 0;
+    const revTrend      = lastSatRev > 0 ? Math.round(((todayRevenue - lastSatRev) / lastSatRev) * 100) : 0;
+
+    const orderRange = useMemo(() => getDateRangeForPeriod(period), [period]);
+    const { orders: apiOrders, isLoading: ordersLoading } = useEmployeeOrders({
+        branch_id: branchId,
+        date_from: orderRange.date_from,
+        date_to: orderRange.date_to,
+        per_page: 100,
+    });
+
     const filteredOrders = useMemo(() => {
-        const now        = new Date();
-        const todayStart = startOfDay(now);
-        if (period === 'today') return ALL_ORDERS.filter(o => o.placedAt >= todayStart);
-        if (period === 'week')  {
-            const ws = new Date(todayStart); ws.setDate(todayStart.getDate() - 6);
-            return ALL_ORDERS.filter(o => o.placedAt >= ws);
-        }
-        if (period === 'month') {
-            const ms = new Date(todayStart); ms.setDate(1);
-            return ALL_ORDERS.filter(o => o.placedAt >= ms);
-        }
-        return ALL_ORDERS;
-    }, [period]);
+        return apiOrders.map((o) => ({
+            id: o.id,
+            customer: o.customer,
+            source: o.source,
+            status: o.status,
+            items: o.items?.length ?? 0,
+            total: o.amount,
+            placedAt: new Date(o.createdAt),
+            staffName: '—',
+        }));
+    }, [apiOrders]);
 
     const activeOrders    = useMemo(() => filteredOrders.filter(o => o.status !== 'cancelled'), [filteredOrders]);
     const cancelledOrders = useMemo(() => filteredOrders.filter(o => o.status === 'cancelled'), [filteredOrders]);
@@ -590,7 +633,7 @@ export default function ManagerAnalyticsPage() {
                     <h1 className="text-text-dark text-xl font-bold font-body">Analytics</h1>
                     <p className="text-neutral-gray text-sm font-body mt-0.5 flex items-center gap-1.5">
                         <CalendarIcon size={13} weight="fill" />
-                        East Legon · Branch Manager
+                        {branchName} · Branch Manager
                     </p>
                 </div>
             </div>
@@ -604,15 +647,29 @@ export default function ManagerAnalyticsPage() {
                     trendLabel="vs last Sat"
                     accent
                 />
-                <KpiCard label="Orders Today"     value="24"      trend={8}  trendLabel="vs last Sat" />
-                <KpiCard label="Avg. Order Value"  value="₵76.77" trend={-4} trendLabel="vs last Sat" />
-                <KpiCard label="Fulfilment Rate"  value="91%"     trend={3}  trendLabel="vs last Sat" />
+                <KpiCard
+                    label="Orders Today"
+                    value={String(todayOrderAnalytics?.total_orders ?? todaySales?.total_orders ?? 0)}
+                    trend={0}
+                    trendLabel="vs last Sat"
+                />
+                <KpiCard
+                    label="Avg. Order Value"
+                    value={formatGHS(todaySales?.average_order_value ?? 0)}
+                    trend={0}
+                    trendLabel="vs last Sat"
+                />
+                <KpiCard label="Fulfilment Rate" value="—" trend={0} trendLabel="(API pending)" />
             </div>
 
             {/* ══ ROW 2 — Weekly revenue + heatmap ════════════════════════════ */}
             <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-3 mb-3">
-                <WeeklyRevenue />
-                <PeakHoursHeatmap />
+                <WeeklyRevenue
+                    weekRevenue={weekRevenue}
+                    lastWeekRevenue={lastWeekRevenue}
+                    todayIdx={TODAY_IDX}
+                />
+                <PeakHoursHeatmap ordersByHour={orderAnalytics?.orders_by_hour} />
             </div>
 
             {/* ══ ROW 3 — Prep time + Payment split + Fulfilment ══════════════ */}
@@ -697,7 +754,11 @@ export default function ManagerAnalyticsPage() {
                     ))}
                 </div>
 
-                {pageOrders.length === 0 ? (
+                {ordersLoading ? (
+                    <div className="px-4 py-12 text-center">
+                        <p className="text-neutral-gray text-sm font-body">Loading orders…</p>
+                    </div>
+                ) : pageOrders.length === 0 ? (
                     <div className="px-4 py-12 text-center">
                         <p className="text-neutral-gray text-sm font-body">No orders for this period.</p>
                     </div>
@@ -759,7 +820,7 @@ export default function ManagerAnalyticsPage() {
             )}
 
             <p className="text-neutral-gray/40 text-xs font-body text-center mt-6">
-                East Legon branch · Data refreshes every 60 seconds · Managers only
+                {branchName} branch · Data refreshes every 60 seconds · Managers only
             </p>
 
         </div>

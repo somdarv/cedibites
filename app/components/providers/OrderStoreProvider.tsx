@@ -38,31 +38,48 @@ export function OrderStoreProvider({ children }: { children: ReactNode }) {
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load orders on mount + subscribe for cross-tab updates
+    // Load orders on mount + subscribe for cross-tab updates (only when staff is authenticated)
     useEffect(() => {
         const service = getOrderService();
+        const STAFF_TOKEN_KEY = 'cedibites_staff_token';
+        const hasStaffToken = () => typeof window !== 'undefined' && !!localStorage.getItem(STAFF_TOKEN_KEY);
 
         const loadOrders = async () => {
-            const data = await service.getAll();
-            setOrders(data);
-            setIsLoading(false);
+            if (!hasStaffToken()) return;
+            try {
+                const data = await service.getAll();
+                setOrders(data);
+            } catch {
+                setOrders([]);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
-        loadOrders();
+        let unsubscribe: () => void = () => {};
 
-        // Subscribe for real-time updates (BroadcastChannel + storage event in mock, WebSocket in API)
-        const unsubscribe = service.subscribe((updatedOrders) => {
-            setOrders(updatedOrders);
-        });
+        if (hasStaffToken()) {
+            loadOrders();
+            unsubscribe = service.subscribe((updatedOrders) => setOrders(updatedOrders));
+        } else {
+            setIsLoading(false);
+        }
 
-        // Refresh when this tab regains focus — catches updates made in other tabs while hidden
+        const handleStaffLogin = () => {
+            loadOrders();
+            unsubscribe();
+            unsubscribe = service.subscribe((updatedOrders) => setOrders(updatedOrders));
+        };
+        window.addEventListener('staff-login', handleStaffLogin);
+
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') loadOrders();
+            if (document.visibilityState === 'visible' && hasStaffToken()) loadOrders();
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             unsubscribe();
+            window.removeEventListener('staff-login', handleStaffLogin);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);

@@ -11,7 +11,8 @@ import {
     SpinnerIcon,
 } from '@phosphor-icons/react';
 import Input from '@/app/components/base/Input';
-import { useStaffAuth, resolveMockStaff, roleHomeRoute } from '@/app/components/providers/StaffAuthProvider';
+import { useStaffAuth, roleHomeRoute } from '@/app/components/providers/StaffAuthProvider';
+import { staffService } from '@/lib/api/services/staff.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,28 +93,9 @@ export default function StaffLoginPage() {
         setErrors({});
 
         try {
-            // ── TODO: swap with real API call ─────────────────────────────────────
-            // const res = await fetch('/api/v1/staff/auth/login', {
-            //   method: 'POST',
-            //   credentials: 'include',
-            //   headers: { 'Content-Type': 'application/json' },
-            //   body: JSON.stringify({ identifier: form.identifier.trim(), password: form.password }),
-            // });
-            // if (!res.ok) throw new Error((await res.json()).error?.message || 'Invalid credentials');
-            // const { user } = await res.json();
-            // login(user);
-            // router.replace(roleHomeRoute(user.role));
-            // ─────────────────────────────────────────────────────────────────────
-
-            await new Promise(r => setTimeout(r, 1200));
-
-            const staffUser = resolveMockStaff(form.identifier.trim(), form.password);
-            if (!staffUser) {
-                throw new Error('Invalid credentials. Please check and try again.');
-            }
-
-            login(staffUser);
-            router.replace(roleHomeRoute(staffUser.role));
+            const { user } = await staffService.login(form.identifier.trim(), form.password);
+            login(user);
+            router.replace(roleHomeRoute(user.role as Parameters<typeof roleHomeRoute>[0]));
 
         } catch (err) {
             setErrors({
@@ -265,9 +247,9 @@ export default function StaffLoginPage() {
                         </p>
                         <div className="flex flex-col gap-0.5">
                             {[
-                                { label: 'Manager', hint: 'manager@cedibites.com · manager123' },
-                                { label: 'Sales',   hint: 'sales@cedibites.com · sales123'     },
-                                { label: 'Partner', hint: 'partner@cedibites.com · partner123' },
+                                { label: 'Admin',   hint: 'admin@cedibites.com · password'   },
+                                { label: 'Manager', hint: 'manager.1@cedibites.com · password' },
+                                { label: 'Employee', hint: 'employee.1.1@cedibites.com · password' },
                             ].map(a => (
                                 <p key={a.label} className="text-neutral-gray/70 text-[10px] font-body">
                                     <span className="text-primary/80 font-semibold">{a.label}:</span> {a.hint}

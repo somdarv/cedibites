@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import { useBranches } from '@/lib/api/hooks/useBranches';
 import { useMenu } from '@/lib/api/hooks/useMenu';
-import { menuCategories } from '@/lib/data/SampleMenu';
 import type { MenuItem as ApiMenuItem } from '@/types/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -28,7 +27,7 @@ export default function MenuAuditPage() {
             if (!branchMap.has(bid)) branchMap.set(bid, new Set());
             branchMap.get(bid)!.add(item.slug ?? String(item.id));
         });
-        return branches.map(b => ({
+        return branches.map((b: any) => ({
             id: String(b.id),
             name: b.name,
             address: b.address,
@@ -55,20 +54,28 @@ export default function MenuAuditPage() {
 
     const activeBranch = useMemo(() => {
         const id = activeBranchId ?? branchesWithMenu[0]?.id;
-        return branchesWithMenu.find(b => b.id === id) ?? null;
+        return branchesWithMenu.find((b: any) => b.id === id) ?? null;
     }, [activeBranchId, branchesWithMenu]);
 
     const availableSet = useMemo(() => activeBranch?.menuItemSlugs ?? new Set<string>(), [activeBranch]);
 
-    const categories = [
-        { id: 'all', label: 'All' },
-        ...menuCategories.filter(c => c.id !== 'all'),
-    ];
+    const categories = useMemo(() => {
+        const seen = new Set<string>();
+        const result: { id: string; label: string }[] = [{ id: 'all', label: 'All' }];
+        for (const item of apiItems) {
+            const name = item.category?.name ?? 'Uncategorized';
+            if (!seen.has(name)) {
+                seen.add(name);
+                result.push({ id: name.toLowerCase().replace(/\s+/g, '-'), label: name });
+            }
+        }
+        return result;
+    }, [apiItems]);
 
     const visibleItems = useMemo(() => {
         let slugs = allSlugs;
         if (activeCategory !== 'all') {
-            const cat = menuCategories.find(c => c.id === activeCategory);
+            const cat = categories.find(c => c.id === activeCategory);
             slugs = slugs.filter(slug => {
                 const item = itemsBySlug.get(slug);
                 return item && cat && item.category?.name === cat.label;
@@ -78,7 +85,7 @@ export default function MenuAuditPage() {
             slugs = slugs.filter(slug => !availableSet.has(slug));
         }
         return slugs.map(slug => itemsBySlug.get(slug)!).filter(Boolean);
-    }, [allSlugs, activeCategory, availableSet, showOnlyUnavailable, itemsBySlug]);
+    }, [allSlugs, activeCategory, availableSet, showOnlyUnavailable, itemsBySlug, categories]);
 
     const allItemsCount = allSlugs.length;
     const availableCount = allSlugs.filter(slug => availableSet.has(slug)).length;
@@ -114,7 +121,7 @@ export default function MenuAuditPage() {
 
                 {/* Branch tabs */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                    {branchesWithMenu.map(branch => {
+                    {branchesWithMenu.map((branch: any) => {
                         const bAvail = branch.menuItemIds.length;
                         const isActive = branch.id === effectiveActiveBranchId;
                         return (
@@ -279,7 +286,7 @@ export default function MenuAuditPage() {
                                     <th className="text-left px-4 py-3 font-semibold text-neutral-gray bg-white/5 sticky left-0 min-w-[200px]">
                                         Item
                                     </th>
-                                    {branchesWithMenu.map(b => (
+                                    {branchesWithMenu.map((b: any) => (
                                         <th key={b.id} className={`px-3 py-3 font-semibold text-center min-w-[90px] bg-white/5
                                             ${b.id === effectiveActiveBranchId ? 'text-primary' : 'text-neutral-gray'}`}>
                                             <div className="flex flex-col items-center gap-1">
@@ -316,7 +323,7 @@ export default function MenuAuditPage() {
                                                         <span className="ml-2 font-mono text-neutral-gray text-[10px]">#{slug}</span>
                                                     </div>
                                                 </td>
-                                                {branchesWithMenu.map(branch => {
+                                                {branchesWithMenu.map((branch: any) => {
                                                     const has = branch.menuItemSlugs.has(slug);
                                                     const isHighlighted = branch.id === effectiveActiveBranchId;
                                                     return (

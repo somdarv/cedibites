@@ -12,7 +12,7 @@ import {
 import type { Order, PaymentMethod, CreateOrderInput } from '@/types/order';
 import type { POSSession, POSCartItem } from './types';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { useBranch } from '@/app/components/providers/BranchProvider';
 
 // Generate unique IDs for cart items
 const generateId = () => `pos-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -71,6 +71,8 @@ interface POSProviderProps {
 }
 
 export function POSProvider({ children }: POSProviderProps) {
+  const { branches } = useBranch();
+
   // Session state
   const [session, setSession] = useState<POSSession | null>(null);
   const [isSessionLoaded, setIsSessionLoaded] = useState(false);
@@ -205,7 +207,7 @@ export function POSProvider({ children }: POSProviderProps) {
     // Simulate payment processing delay
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const branch = BRANCHES.find(b => b.id === session?.branchId);
+    const branch = branches.find(b => b.id === session?.branchId);
 
     const input: CreateOrderInput = {
       source: 'pos',
@@ -217,6 +219,7 @@ export function POSProvider({ children }: POSProviderProps) {
         quantity: item.quantity,
         unitPrice: item.price,
         image: item.image,
+        sizeId: item.sizeId,
         variantKey: item.variantKey,
       })),
       contact: {
@@ -232,6 +235,8 @@ export function POSProvider({ children }: POSProviderProps) {
       staffId: session?.staffId,
       staffName: session?.staffName,
       discount: discount && discount > 0 ? discount : undefined,
+      amountPaid,
+      momoNumber,
     };
 
     const order = await createOrder(input);
@@ -241,7 +246,7 @@ export function POSProvider({ children }: POSProviderProps) {
     setIsPaymentOpen(false);
 
     return order;
-  }, [cart, customerName, customerPhone, orderNotes, orderType, session, createOrder, clearCart]);
+  }, [cart, customerName, customerPhone, orderNotes, orderType, session, branches, createOrder, clearCart]);
 
   const updateOrderStatus = useCallback((orderId: string, status: Order['status']) => {
     const timestamps: Partial<Pick<Order, 'acceptedAt' | 'startedAt' | 'readyAt' | 'completedAt'>> = {};
@@ -251,14 +256,15 @@ export function POSProvider({ children }: POSProviderProps) {
 
   const seedTestOrders = useCallback(() => {
     if (!session) return;
-    const branch = BRANCHES.find(b => b.id === session.branchId);
+    const branch = branches.find(b => b.id === session.branchId);
 
+    // Use real menu item IDs from the branch
     const testOrders: CreateOrderInput[] = [
       {
         source: 'pos', fulfillmentType: 'dine_in', paymentMethod: 'cash',
         items: [
-          { menuItemId: 'm1', name: 'Jollof Rice with Chicken', quantity: 2, unitPrice: 85 },
-          { menuItemId: 'm2', name: 'Pineapple Ginger Juice', quantity: 1, unitPrice: 28 },
+          { menuItemId: '1', name: 'Jollof Rice with Chicken', quantity: 2, unitPrice: 85 },
+          { menuItemId: '2', name: 'Pineapple Ginger Juice', quantity: 1, unitPrice: 28 },
         ],
         contact: { name: 'Ama Darko', phone: '0244123456' },
         branchId: session.branchId, branchName: branch?.name ?? '',
@@ -267,26 +273,26 @@ export function POSProvider({ children }: POSProviderProps) {
       {
         source: 'pos', fulfillmentType: 'takeaway', paymentMethod: 'momo',
         items: [
-          { menuItemId: 'm3', name: 'Waakye Special', quantity: 1, unitPrice: 65 },
+          { menuItemId: '3', name: 'Waakye Special', quantity: 1, unitPrice: 65 },
         ],
-        contact: { name: 'Kweku Asante', phone: '' },
+        contact: { name: 'Kweku Asante', phone: '0244567890' },
         branchId: session.branchId, branchName: branch?.name ?? '',
         staffId: session.staffId, staffName: session.staffName,
       },
       {
         source: 'pos', fulfillmentType: 'dine_in', paymentMethod: 'card',
         items: [
-          { menuItemId: 'm4', name: 'Grilled Tilapia', quantity: 1, unitPrice: 120 },
-          { menuItemId: 'm5', name: 'Fried Plantain', quantity: 2, unitPrice: 25 },
+          { menuItemId: '4', name: 'Grilled Tilapia', quantity: 1, unitPrice: 120 },
+          { menuItemId: '5', name: 'Fried Plantain', quantity: 2, unitPrice: 25 },
         ],
-        contact: { name: 'Walk-in', phone: '', notes: 'Extra pepper please' },
+        contact: { name: 'Walk-in', phone: '0241234567', notes: 'Extra pepper please' },
         branchId: session.branchId, branchName: branch?.name ?? '',
         staffId: session.staffId, staffName: session.staffName,
       },
     ];
 
     testOrders.forEach(input => createOrder(input));
-  }, [session, createOrder]);
+  }, [session, branches, createOrder]);
 
   const login = useCallback((newSession: POSSession) => {
     sessionStorage.setItem('pos-session', JSON.stringify(newSession));

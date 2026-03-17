@@ -18,8 +18,10 @@ import {
     ArrowsDownUpIcon,
 } from '@phosphor-icons/react';
 import { getPromoService, type Promo } from '@/lib/services/promos/promo.service';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
-import { sampleMenuItems } from '@/lib/data/SampleMenu';
+import { useBranch } from '@/app/components/providers/BranchProvider';
+import { useMenuItems } from '@/lib/api/hooks/useMenuItems';
+import { DeleteConfirmDialog } from '@/app/components/ui/DeleteConfirmDialog';
+import { toast } from '@/lib/utils/toast';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,10 +47,8 @@ function addDays(iso: string, days: number): string {
 
 // Normalise legacy promos that predate the appliesTo field
 function normalisePromo(p: Promo): Promo {
-    return { appliesTo: p.itemIds.length > 0 ? 'items' : 'order', ...p };
+    return { ...p, appliesTo: p.itemIds.length > 0 ? 'items' : 'order' };
 }
-
-const MENU_CATEGORIES = Array.from(new Set(sampleMenuItems.map(i => i.category)));
 
 const EMPTY_FORM: Omit<Promo, 'id'> = {
     name: '',
@@ -85,13 +85,24 @@ function conditionLabel(promo: Promo): string {
 // ─── Item Picker ──────────────────────────────────────────────────────────────
 
 function ItemPicker({ selected, onChange }: { selected: string[]; onChange: (ids: string[]) => void }) {
+    const { items: menuItems, categories: menuCategories, isLoading } = useMenuItems();
     const toggle = (id: string) =>
         onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id]);
 
+    const categories = menuCategories.map(c => c.name);
+
+    if (isLoading) {
+        return (
+            <div className="border border-[#f0e8d8] rounded-xl overflow-y-auto max-h-52 bg-neutral-light flex items-center justify-center py-8 text-neutral-gray text-sm">
+                Loading menu…
+            </div>
+        );
+    }
+
     return (
         <div className="border border-[#f0e8d8] rounded-xl overflow-y-auto max-h-52 bg-neutral-light">
-            {MENU_CATEGORIES.map(cat => {
-                const items = sampleMenuItems.filter(i => i.category === cat);
+            {categories.map(cat => {
+                const items = menuItems.filter(i => i.category === cat);
                 return (
                     <div key={cat}>
                         <div className="px-3 py-1.5 text-[10px] font-bold font-body uppercase tracking-widest text-neutral-gray bg-[#f7f0e4] sticky top-0">
@@ -131,6 +142,7 @@ function PromoModal({
     onSave: (data: Omit<Promo, 'id'> & { id?: string }) => Promise<void>;
     onClose: () => void;
 }) {
+    const { branches } = useBranch();
     const [form, setForm] = useState({ ...initial });
     const [saving, setSaving] = useState(false);
     const isEdit = !!initial.id;
@@ -256,7 +268,7 @@ function PromoModal({
                         <div>
                             <label className="block text-neutral-gray text-xs font-body uppercase tracking-wider mb-1.5">Branches</label>
                             <div className="flex flex-wrap gap-2">
-                                {BRANCHES.map(b => {
+                                {branches.map(b => {
                                     const sel = form.branchIds?.includes(b.id);
                                     return (
                                         <button
@@ -436,6 +448,11 @@ export default function PromosPage() {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Promo | null>(null);
+    const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; promo: Promo | null; isLoading: boolean }>({
+        isOpen: false,
+        promo: null,
+        isLoading: false,
+    });
 
     const load = useCallback(async () => {
         const service = getPromoService();
@@ -448,23 +465,44 @@ export default function PromosPage() {
 
     const handleSave = async (data: Omit<Promo, 'id'> & { id?: string }) => {
         const service = getPromoService();
-        if (data.id) {
-            await service.update(data.id, data);
-        } else {
-            await service.create(data);
+        try {
+            if (data.id) {
+                await service.update(data.id, data);
+                toast.success(`${data.name} has been updated successfully`);
+            } else {
+                await service.create(data);
+                toast.success(`${data.name} has been created successfully`);
+            }
+            await load();
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to save promo');
+            throw error; // Re-throw to prevent modal from closing
         }
-        await load();
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Delete this promo?')) return;
-        await getPromoService().delete(id);
-        await load();
+    const handleDelete = async () => {
+        if (!deleteDialog.promo) return;
+        
+        setDeleteDialog(prev => ({ ...prev, isLoading: true }));
+        try {
+            await getPromoService().delete(deleteDialog.promo.id);
+            toast.success(`${deleteDialog.promo.name} has been deleted successfully`);
+            await load();
+            setDeleteDialog({ isOpen: false, promo: null, isLoading: false });
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to delete promo');
+            setDeleteDialog(prev => ({ ...prev, isLoading: false }));
+        }
     };
 
     const handleToggle = async (promo: Promo) => {
-        await getPromoService().update(promo.id, { isActive: !promo.isActive });
-        await load();
+        try {
+            await getPromoService().update(promo.id, { isActive: !promo.isActive });
+            toast.success(`${promo.name} has been ${!promo.isActive ? 'activated' : 'deactivated'} successfully`);
+            await load();
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to update promo status');
+        }
     };
 
     return (
@@ -561,7 +599,7 @@ export default function PromosPage() {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => handleDelete(promo.id)}
+                                        onClick={() => setDeleteDialog({ isOpen: true, promo, isLoading: false })}
                                         className="w-8 h-8 rounded-lg bg-neutral-light flex items-center justify-center text-neutral-gray hover:text-error cursor-pointer"
                                     >
                                         <TrashIcon size={14} weight="bold" />
@@ -581,6 +619,17 @@ export default function PromosPage() {
                     onClose={() => { setShowModal(false); setEditing(null); }}
                 />
             )}
+
+            {/* Delete Confirmation Dialog */}
+            <DeleteConfirmDialog
+                isOpen={deleteDialog.isOpen}
+                title="Delete promo?"
+                message="This will permanently delete {itemName} and remove it from all future orders. This action cannot be undone."
+                itemName={deleteDialog.promo?.name || ''}
+                onConfirm={handleDelete}
+                onCancel={() => setDeleteDialog({ isOpen: false, promo: null, isLoading: false })}
+                isLoading={deleteDialog.isLoading}
+            />
         </div>
     );
 }

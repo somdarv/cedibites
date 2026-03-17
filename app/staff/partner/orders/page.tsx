@@ -57,7 +57,7 @@ function StatusDot({ status }: { status: string }) {
     return (
         <span className="inline-flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full shrink-0 ${cfg.dot} ${cfg.pulse ? 'animate-pulse' : ''}`} />
-            <span className={`text-xs font-semibold font-body ${cfg.text ?? 'text-text-dark'}`}>{cfg.label}</span>
+            <span className="text-xs font-semibold font-body text-text-dark">{cfg.label}</span>
         </span>
     );
 }
@@ -100,10 +100,10 @@ function OrderRow({ order, isLast }: { order: ReturnType<typeof useOrderStore>['
                                 {order.contact.phone}
                             </span>
                         )}
-                        {order.fulfillment?.address && (
+                        {order.contact?.address && (
                             <span className="flex items-center gap-1.5 text-neutral-gray">
                                 <MapPinIcon size={12} weight="fill" />
-                                {order.fulfillment.address}
+                                {order.contact.address}
                             </span>
                         )}
                         <span className="text-neutral-gray capitalize">{order.fulfillmentType?.replace('_', ' ')}</span>
@@ -112,7 +112,7 @@ function OrderRow({ order, isLast }: { order: ReturnType<typeof useOrderStore>['
                     <div className="border-t border-[#f0e8d8] pt-3 flex flex-col gap-1.5">
                         {order.items.map((item, i) => (
                             <div key={i} className="flex items-center justify-between text-xs font-body">
-                                <span className="text-text-dark">{item.quantity}× {item.name}{item.size ? ` (${item.size})` : ''}</span>
+                                <span className="text-text-dark">{item.quantity}× {item.name}{item.sizeLabel ? ` (${item.sizeLabel})` : ''}</span>
                                 <span className="text-neutral-gray">{formatPrice(item.unitPrice * item.quantity)}</span>
                             </div>
                         ))}

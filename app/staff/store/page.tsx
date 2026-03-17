@@ -25,8 +25,9 @@ import {
     ClockIcon,
 } from '@phosphor-icons/react';
 import Input from '@/app/components/base/Input';
-import { sampleMenuItems, menuCategories, type MenuItem } from '@/lib/data/SampleMenu';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { useMenuItems } from '@/lib/api/hooks/useMenuItems';
+import type { DisplayMenuItem } from '@/lib/api/adapters/menu.adapter';
+import { useBranch } from '@/app/components/providers/BranchProvider';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ function generateOrderCode() {
 }
 
 // Returns the lowest applicable price for any menu item (flat, sized, or variant)
-function getBasePrice(item: MenuItem): number {
+function getBasePrice(item: DisplayMenuItem): number {
     if (item.price !== undefined) return item.price;
     if (item.variants) return Math.min(item.variants.plain ?? Infinity, item.variants.assorted ?? Infinity);
     if (item.sizes) return Math.min(...item.sizes.map(s => s.price));
@@ -145,6 +146,7 @@ function StepSetup({
     onBranch: (id: string) => void;
     onNext: () => void;
 }) {
+    const { branches } = useBranch();
     const canProceed = !!source && !!branchId;
 
     return (
@@ -183,7 +185,7 @@ function StepSetup({
                     Which branch fulfills this order?
                 </h2>
                 <div className="flex flex-col gap-2">
-                    {BRANCHES.map(branch => (
+                    {branches.map(branch => (
                         <button
                             key={branch.id}
                             type="button"
@@ -247,24 +249,33 @@ function StepMenu({
     onBack,
 }: {
     cart: StaffCartItem[];
-    onAdd: (item: MenuItem) => void;
+    onAdd: (item: DisplayMenuItem) => void;
     onRemove: (id: string) => void;
     onNext: () => void;
     onBack: () => void;
 }) {
+    const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems();
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('all');
     const searchRef = useRef<HTMLInputElement>(null);
 
+    const allCategories = useMemo(
+        () => [{ id: 'all', name: 'All' }, ...menuCategories],
+        [menuCategories]
+    );
+
     const filtered = useMemo(() => {
-        let items = sampleMenuItems;
-        if (category !== 'all') items = items.filter(i => i.category === category);
+        let items = menuItems;
+        if (category !== 'all') {
+            const catName = menuCategories.find(c => c.id === category)?.name ?? category;
+            items = items.filter(i => i.category === catName);
+        }
         if (search.trim()) {
             const q = search.toLowerCase();
             items = items.filter(i => i.name.toLowerCase().includes(q));
         }
         return items;
-    }, [search, category]);
+    }, [menuItems, menuCategories, search, category]);
 
     const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
@@ -288,7 +299,7 @@ function StepMenu({
 
             {/* Category tabs */}
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                {menuCategories.map(cat => (
+                {allCategories.map(cat => (
                     <button
                         key={cat.id}
                         type="button"
@@ -302,17 +313,20 @@ function StepMenu({
                             }
             `}
                     >
-                        {cat.label}
+                        {cat.name}
                     </button>
                 ))}
             </div>
 
             {/* Menu items */}
             <div className="flex flex-col gap-1.5">
-                {filtered.length === 0 && (
+                {menuLoading && (
+                    <p className="text-neutral-gray text-sm font-body text-center py-8">Loading menu…</p>
+                )}
+                {!menuLoading && filtered.length === 0 && (
                     <p className="text-neutral-gray text-sm font-body text-center py-8">No items found.</p>
                 )}
-                {filtered.map(item => {
+                {!menuLoading && filtered.map(item => {
                     const qty = getQty(item.id);
                     return (
                         <div
@@ -625,7 +639,8 @@ function StepReview({
     onBack: () => void;
     isSubmitting: boolean;
 }) {
-    const branch = BRANCHES.find(b => b.id === branchId);
+    const { branches } = useBranch();
+    const branch = branches.find(b => b.id === branchId);
     const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const deliveryFee = orderType === 'delivery' ? (branch?.deliveryFee ?? 0) : 0;
     const total = cartTotal + deliveryFee;
@@ -802,7 +817,8 @@ function OrderConfirmed({
     branchId: string;
     onNewOrder: () => void;
 }) {
-    const branch = BRANCHES.find(b => b.id === branchId);
+    const { branches } = useBranch();
+    const branch = branches.find(b => b.id === branchId);
 
     return (
         <div className="flex flex-col items-center text-center gap-6 py-8">
@@ -874,7 +890,7 @@ export default function NewOrderPage() {
     const [orderCode, setOrderCode] = useState<string | null>(null);
 
     // ── Cart handlers ──
-    const handleAddItem = useCallback((item: MenuItem) => {
+    const handleAddItem = useCallback((item: DisplayMenuItem) => {
         setCart(prev => {
             const existing = prev.find(c => c.id === item.id);
             if (existing) {

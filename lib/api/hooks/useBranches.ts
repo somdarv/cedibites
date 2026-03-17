@@ -1,9 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { branchService } from '../services/branch.service';
 
+export const useBranchStats = (branchId: number | null, asManager = false) => {
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['branch-stats', branchId, asManager],
+    queryFn: () => (asManager ? branchService.getManagerBranchStats(branchId!) : branchService.getBranchStats(branchId!)),
+    enabled: !!branchId,
+    staleTime: 60 * 1000,
+  });
+  return { stats: data?.data, isLoading, error, refetch };
+};
+
 export const useBranches = () => {
   const {
-    data: branchesData,
+    data: branches,
     isLoading,
     error,
     refetch,
@@ -13,9 +28,8 @@ export const useBranches = () => {
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Backend returns { data: [...] } structure
   return {
-    branches: branchesData?.data || [],
+    branches: branches || [],
     isLoading,
     error,
     refetch,
@@ -35,8 +49,38 @@ export const useBranch = (id: number) => {
   });
 
   return {
-    branch: branchData?.data,
+    branch: branchData,
     isLoading,
     error,
   };
+};
+
+export const useBranchTopItems = (branchId: number | null, params?: { date?: string; limit?: number }) => {
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['branch-top-items', branchId, params],
+    queryFn: () => branchService.getBranchTopItems(branchId!, params),
+    enabled: !!branchId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  return { topItems: data || [], isLoading, error, refetch };
+};
+
+export const useBranchRevenueChart = (branchId: number | null, params?: { period?: string }) => {
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['branch-revenue-chart', branchId, params],
+    queryFn: () => branchService.getBranchRevenueChart(branchId!, params),
+    enabled: !!branchId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  return { chartData: data || [], isLoading, error, refetch };
 };

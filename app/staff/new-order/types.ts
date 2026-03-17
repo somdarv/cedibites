@@ -9,6 +9,7 @@ export interface StaffCartItem {
     price: number;
     quantity: number;
     category: string;
+    sizeId?: number;       // menu_item_size_id for backend API
 }
 
 export interface CustomerDetails {

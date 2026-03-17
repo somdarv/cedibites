@@ -1,12 +1,12 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import type { MenuItem } from '@/lib/data/SampleMenu';
+import type { DisplayMenuItem } from '@/lib/api/adapters/menu.adapter';
 import type { OrderSource, FulfillmentType, PaymentMethod } from '@/types/order';
 import type { StaffCartItem, CustomerDetails } from './types';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
-import { BRANCHES } from '@/app/components/providers/BranchProvider';
+import { useBranch } from '@/app/components/providers/BranchProvider';
 import { getPromoService, type Promo } from '@/lib/services/promos/promo.service';
 import { getShiftService } from '@/lib/services/shifts/shift.service';
 
@@ -28,11 +28,14 @@ interface NewOrderContextType {
     promo: Promo | null;
     discount: number;
 
+    // Staff user (for role-based UI)
+    staffUser: any; // TODO: Type this properly
+
     // Actions
     setStep: (n: 1 | 2 | 3 | 4) => void;
     setSource: (s: OrderSource) => void;
     setBranchId: (id: string) => void;
-    addItem: (item: MenuItem, variantKey: string, price: number, variantLabel?: string) => void;
+    addItem: (item: DisplayMenuItem, variantKey: string, price: number, variantLabel?: string, sizeId?: number) => void;
     removeItem: (cartKey: string) => void;
     clearItem: (cartKey: string) => void;
     setOrderType: (t: FulfillmentType) => void;
@@ -57,9 +60,10 @@ const NewOrderContext = createContext<NewOrderContextType | undefined>(undefined
 export function NewOrderProvider({ children }: { children: ReactNode }) {
     const { createOrder } = useOrderStore();
     const { staffUser } = useStaffAuth();
+    const { branches } = useBranch();
 
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-    const [source, setSource] = useState<OrderSource | null>(null);
+    const [source, setSource] = useState<OrderSource | null>('phone'); // Default to phone for staff orders
     const [branchId, setBranchId] = useState<string | null>(null);
     const [cart, setCart] = useState<StaffCartItem[]>([]);
     const [orderType, setOrderType] = useState<FulfillmentType>('delivery');
@@ -69,6 +73,19 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
     const [orderCode, setOrderCode] = useState<string | null>(null);
     const [promo, setPromo] = useState<Promo | null>(null);
     const [discount, setDiscount] = useState(0);
+
+    // Auto-select branch for non-admin users
+    useEffect(() => {
+        if (!staffUser || branchId) return; // Skip if no user or branch already selected
+        
+        // Super admins can select any branch (don't auto-select)
+        if (staffUser.role === 'super_admin') return;
+        
+        // For managers and staff, auto-select their branch
+        if (staffUser.branchId) {
+            setBranchId(String(staffUser.branchId));
+        }
+    }, [staffUser, branchId]);
 
     // Resolve best promo whenever cart or branch changes
     useEffect(() => {
@@ -82,7 +99,7 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
         }).catch(() => { setPromo(null); setDiscount(0); });
     }, [branchId, cart]);
 
-    const addItem = useCallback((item: MenuItem, variantKey: string, price: number, variantLabel?: string) => {
+    const addItem = useCallback((item: DisplayMenuItem, variantKey: string, price: number, variantLabel?: string, sizeId?: number) => {
         const cartKey = `${item.id}|${variantKey}`;
         setCart(prev => {
             const existing = prev.find(c => c.cartKey === cartKey);
@@ -97,6 +114,7 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
                 price,
                 quantity: 1,
                 category: item.category,
+                sizeId,
             }];
         });
     }, []);
@@ -120,10 +138,14 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
 
     const submit = useCallback(async () => {
         if (!source || !branchId || !payment) return;
+        console.log('Submit function called with:', { source, branchId, payment, cartLength: cart.length });
+        
         setIsSubmitting(true);
         try {
-            const branch = BRANCHES.find(b => b.id === branchId);
-            const order = await createOrder({
+            const branch = branches.find(b => b.id === branchId);
+            console.log('Found branch:', branch);
+            
+            const orderData = {
                 source,
                 fulfillmentType: orderType,
                 paymentMethod: payment,
@@ -135,6 +157,7 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
                     variantKey: i.cartKey.split('|')[1],
                     sizeLabel: i.variantLabel,
                     category: i.category,
+                    sizeId: i.sizeId, // Include sizeId for backend validation
                 })),
                 contact: {
                     name: customer.name,
@@ -152,7 +175,14 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
                 discount: discount > 0 ? discount : undefined,
                 staffId: staffUser?.id,
                 staffName: staffUser?.name,
-            });
+                momoNumber: payment === 'momo' ? customer.phone : undefined, // Add MoMo number for mobile money payments
+            };
+            
+            console.log('Creating order with data:', orderData);
+            
+            const order = await createOrder(orderData);
+            console.log('Order created successfully:', order);
+            
             setOrderCode(order.orderNumber);
             // Track order in active shift
             if (staffUser && staffUser.role !== 'kitchen' && staffUser.role !== 'rider') {
@@ -160,12 +190,13 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
                     if (shift) getShiftService().addOrder(shift.id, order.orderNumber, order.total).catch(() => {});
                 }).catch(() => {});
             }
-        } catch {
+        } catch (error) {
+            console.error('Order creation failed:', error);
             // Handle error — show toast or inline error
         } finally {
             setIsSubmitting(false);
         }
-    }, [source, branchId, payment, orderType, cart, customer, discount, staffUser, createOrder]);
+    }, [source, branchId, payment, orderType, cart, customer, discount, staffUser, branches, createOrder]);
 
     const resetOrder = useCallback(() => {
         setStep(1);
@@ -183,6 +214,7 @@ export function NewOrderProvider({ children }: { children: ReactNode }) {
             step, source, branchId, cart, orderType, customer,
             payment, isSubmitting, orderCode,
             promo, discount,
+            staffUser,
             setStep, setSource, setBranchId,
             addItem, removeItem, clearItem,
             setOrderType, patchCustomer, setPayment,
