@@ -16,6 +16,8 @@ import { useCart, CartItem } from '@/app/components/providers/CartProvider';
 import { useBranch, Branch, BranchWithDistance } from '@/app/components/providers/BranchProvider';
 import { useLocation } from '@/app/components/providers/LocationProvider';
 import { useAuth } from '@/app/components/providers/AuthProvider';
+import { useCreateOrder } from '@/lib/api/hooks/useOrders';
+import type { PaymentMethod as UnifiedPaymentMethod, FulfillmentType } from '@/types/order';
 
 type OrderType = 'delivery' | 'pickup';
 type PaymentMethod = 'momo' | 'cash_delivery' | 'cash_pickup';
@@ -26,7 +28,7 @@ interface ContactDetails { name: string; phone: string; address: string; note: s
 
 const DELIVERY_FEE = 15;
 const TAX_RATE = 0.025;
-const formatPrice = (p: number) => `GHS ${p.toFixed(2)}`;
+const formatPrice = (p: number) => `₵${p.toFixed(2)}`;
 
 // ─── Input Field ──────────────────────────────────────────────────────────────
 function InputField({ icon, label, required, children }: { icon: React.ReactNode; label: string; required?: boolean; children: React.ReactNode }) {
@@ -250,7 +252,7 @@ function BranchSelectorSheet({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                                         <p className="text-xs text-neutral-gray mt-0.5 truncate">{branch.address}</p>
                                         <div className="flex items-center gap-2 mt-1.5 text-xs text-neutral-gray flex-wrap">
                                             {coordinates && <span>{branch.distance.toFixed(1)} km away</span>}
-                                            <span>·</span><span>{branch.deliveryTime}</span><span>·</span><span>GHS {branch.deliveryFee} delivery</span>
+                                            <span>·</span><span>{branch.deliveryTime}</span><span>·</span><span>₵{branch.deliveryFee} delivery</span>
                                         </div>
                                     </div>
                                     {!isCurrent && branch.isOpen && <CaretRightIcon size={16} className="text-neutral-gray shrink-0 mt-1" />}
@@ -441,7 +443,7 @@ function StepDetails({ orderType, setOrderType, contact, setContact, onNext }: {
                         {orderType === 'delivery' && (
                             <div className="flex items-center gap-2 text-sm text-neutral-gray">
                                 <span>Estimated: <strong className="text-text-dark dark:text-text-light">25 – 40 mins</strong></span>
-                                <span className="ml-auto text-xs font-semibold text-text-dark dark:text-text-light">GHS {selectedBranch.deliveryFee} delivery fee</span>
+                                <span className="ml-auto text-xs font-semibold text-text-dark dark:text-text-light">₵{selectedBranch.deliveryFee} delivery fee</span>
                             </div>
                         )}
                     </div>
@@ -703,7 +705,7 @@ function StepDone({ orderNumber, orderType, contact }: {
 
             {/* CTA buttons */}
             <div className="flex flex-col gap-3 w-full">
-                <Link href="/orders"
+                <Link href={`/orders/${orderNumber}`}
                     className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-2xl transition-all active:scale-[0.98]">
                     Track My Order <ArrowRightIcon weight="bold" size={16} />
                 </Link>
@@ -734,7 +736,10 @@ function EmptyCartGuard() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CheckoutPage() {
-    const { items, clearCart } = useCart();
+    const { items, clearCart, subtotal } = useCart();
+    const { selectedBranch } = useBranch();
+    const { coordinates } = useLocation();
+    const { createOrder } = useCreateOrder();
     const [step, setStep] = useState<Step>(1);
     const [orderType, setOrderType] = useState<OrderType>('delivery');
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('momo');
@@ -743,11 +748,31 @@ export default function CheckoutPage() {
     const [contact, setContact] = useState<ContactDetails>({ name: '', phone: '', address: '', note: '' });
 
     const handlePlaceOrder = useCallback(async () => {
+        if (!selectedBranch) return;
         setPlacing(true);
-        await new Promise(r => setTimeout(r, 1800));
-        setOrderNumber(`CB${Date.now().toString().slice(-6)}`);
-        clearCart(); setPlacing(false); setStep(3);
-    }, [clearCart]);
+        try {
+            // API creates order from cart - pass contact/delivery details only
+            const response = await createOrder({
+                branch_id: Number(selectedBranch.id),
+                order_type: orderType,
+                customer_name: contact.name,
+                customer_phone: contact.phone,
+                delivery_address: orderType === 'delivery' ? contact.address : undefined,
+                delivery_latitude: orderType === 'delivery' && coordinates ? coordinates.latitude : undefined,
+                delivery_longitude: orderType === 'delivery' && coordinates ? coordinates.longitude : undefined,
+                special_instructions: contact.note || undefined,
+                payment_method: paymentMethod,
+            });
+
+            setOrderNumber(response.data.order_number);
+            clearCart();
+            setStep(3);
+        } catch (err) {
+            console.error('Failed to place order:', err);
+        } finally {
+            setPlacing(false);
+        }
+    }, [selectedBranch, paymentMethod, orderType, contact, coordinates, createOrder, clearCart]);
 
     if (items.length === 0 && step !== 3) return <EmptyCartGuard />;
 

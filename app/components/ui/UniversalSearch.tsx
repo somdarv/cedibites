@@ -22,7 +22,10 @@ interface UniversalSearchProps {
     showPrices?: boolean;
 }
 
-const formatPrice = (price: number) => `GHS ${price.toFixed(2)}`;
+const formatPrice = (price: number | string | null | undefined) => {
+    const n = typeof price === 'number' ? price : Number(price);
+    return `₵${Number.isNaN(n) ? '0.00' : n.toFixed(2)}`;
+};
 
 // ─── Result row ───────────────────────────────────────────────────────────────
 function ResultRow({ item, onSelect }: { item: SearchableItem; onSelect: (item: SearchableItem) => void }) {
@@ -98,6 +101,7 @@ export default function UniversalSearch({
         recentSearches,
         addRecentSearch,
         clearRecentSearches,
+        error,
     } = useMenuDiscovery();
 
     const [isFocused, setIsFocused] = useState(false);
@@ -173,7 +177,7 @@ export default function UniversalSearch({
     };
 
     return (
-        <div ref={containerRef} className="py border- my-4 md:my-0 border-neutral-gray/20 w-full relative">
+        <div ref={containerRef} className="py-4 my-4 md:my-0 border-y border-neutral-gray/20 w-full relative">
 
             {/* Search input — unchanged styling */}
             <div className="relative w-full">
@@ -212,7 +216,14 @@ export default function UniversalSearch({
                     {/* Live search results */}
                     {hasQuery && (
                         <>
-                            {isSearching && !hasResults ? (
+                            {error ? (
+                                <div className="px-5 py-6 text-center">
+                                    <p className="text-sm font-semibold text-text-dark dark:text-text-light">
+                                        Failed to load menu
+                                    </p>
+                                    <p className="text-xs text-neutral-gray mt-1">Please check your connection and try again</p>
+                                </div>
+                            ) : isSearching && !hasResults ? (
                                 <div className="flex items-center gap-3 px-5 py-4 text-sm text-neutral-gray">
                                     <SpinnerGapIcon size={16} className="animate-spin text-primary" />
                                     Searching...

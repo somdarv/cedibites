@@ -12,22 +12,12 @@ import {
     WhatsappLogoIcon,
     ClockIcon,
 } from '@phosphor-icons/react';
+import { useBranches } from '@/lib/api/hooks/useBranches';
 
-// ============================================
-// DATA
-// ============================================
 const HOURS = [
     { days: 'Mon – Fri', time: '8:00 AM – 10:00 PM' },
     { days: 'Sat – Sun', time: '8:00 AM – 11:00 PM' },
     { days: 'Public Holidays', time: '9:00 AM – 9:00 PM' },
-];
-
-const BRANCHES = [
-    { name: 'Osu', address: '123 Oxford Street, Osu' },
-    { name: 'East Legon', address: '45 American House, East Legon' },
-    { name: 'Spintex', address: '78 Spintex Road' },
-    { name: 'Madina', address: 'Remy Junction, Madina' },
-    { name: 'Tema', address: 'Community 1, Tema' },
 ];
 
 const SOCIAL = [
@@ -43,10 +33,10 @@ const QUICK_LINKS = [
     { label: 'Find a Branch', href: '#' },
 ];
 
-// ============================================
-// COMPONENT
-// ============================================
 export default function Footer() {
+    const { branches } = useBranches();
+    const BRANCHES = branches.map((b: any) => ({ id: b.id, name: b.name, address: b.address || '' }));
+
     return (
         <footer className="bg-brand-darker border-t border-white/5 mt-8">
 
@@ -101,8 +91,8 @@ export default function Footer() {
                         Our Branches
                     </h4>
                     <ul className="flex flex-col gap-2.5">
-                        {BRANCHES.map((b) => (
-                            <li key={b.name}>
+                        {BRANCHES.map((b: any) => (
+                            <li key={b.id}>
                                 <p className="text-sm font-medium text-white/80">{b.name}</p>
                                 <p className="text-xs text-white/40">{b.address}</p>
                             </li>

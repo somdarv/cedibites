@@ -1,6 +1,12 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { authService } from '@/lib/api/services/auth.service';
+import { cartService } from '@/lib/api/services/cart.service';
+import { GUEST_SESSION_KEY } from '@/lib/api/client';
+import { getErrorMessage } from '@/lib/utils/error-handler';
+import type { User } from '@/types/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AuthUser {
@@ -23,38 +29,83 @@ interface AuthContextType {
     setAuthStep: (step: AuthStep) => void;
     pendingPhone: string;
     setPendingPhone: (phone: string) => void;
+    pendingEmail: string;
+    setPendingEmail: (email: string) => void;
 
     // Actions
-    sendOTP: (phone: string) => Promise<{ success: boolean; error?: string }>;
+    sendOTP: (phone: string, email?: string) => Promise<{ success: boolean; error?: string }>;
     verifyOTP: (code: string) => Promise<{ success: boolean; error?: string }>;
-    saveProfile: (name: string, phone: string) => void;
+    saveProfile: (name: string, phone: string) => Promise<{ success: boolean; error?: string }>;
 
     // Post-order quick save (from checkout)
     saveFromCheckout: (name: string, phone: string) => void;
 
-    // Dev helpers
-    devOTP: string; // visible in dev mode only
+    // Loading states
+    isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'cedibites-auth-user';
-const OTP_LENGTH = 6;
+
+// Helper to convert API User to AuthUser
+function mapApiUserToAuthUser(apiUser: User): AuthUser {
+    return {
+        name: apiUser.name,
+        phone: apiUser.phone,
+        savedAddresses: [],
+        createdAt: new Date(apiUser.created_at).getTime(),
+    };
+}
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
+    const queryClient = useQueryClient();
     const [user, setUser] = useState<AuthUser | null>(null);
     const [authStep, setAuthStep] = useState<AuthStep>('idle');
     const [pendingPhone, setPendingPhone] = useState('');
-    const [devOTP, setDevOTP] = useState('');
-    const [generatedOTP, setGeneratedOTP] = useState('');
+    const [pendingEmail, setPendingEmail] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [requiresRegistration, setRequiresRegistration] = useState(false);
+    const [hydrated, setHydrated] = useState(false);
 
     // ── Load persisted session ──
     useEffect(() => {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) setUser(JSON.parse(stored));
-        } catch { /* ignore */ }
+        const loadUser = async () => {
+            try {
+                // When staff is logged in, skip customer session validation to avoid
+                // triggering requests that could 401 and clear staff tokens on reload
+                const staffToken = localStorage.getItem('cedibites_staff_token');
+                if (staffToken) {
+                    setHydrated(true);
+                    return;
+                }
+
+                // Check if we have a customer token
+                const token = localStorage.getItem('cedibites_auth_token');
+                if (!token) {
+                    // Fallback to old localStorage user (for backward compatibility)
+                    const stored = localStorage.getItem(STORAGE_KEY);
+                    if (stored) setUser(JSON.parse(stored));
+                    setHydrated(true);
+                    return;
+                }
+
+                // Fetch user from API
+                const response = await authService.getUser();
+                const authUser = mapApiUserToAuthUser(response.data);
+                persistUser(authUser);
+                setHydrated(true);
+            } catch (error) {
+                // Token invalid or expired, clear it
+                localStorage.removeItem('cedibites_auth_token');
+                localStorage.removeItem(GUEST_SESSION_KEY);
+                localStorage.removeItem(STORAGE_KEY);
+                setHydrated(true);
+            }
+        };
+
+        loadUser();
     }, []);
 
     const persistUser = (u: AuthUser) => {
@@ -62,89 +113,139 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
     };
 
-    const logout = useCallback(() => {
-        setUser(null);
-        localStorage.removeItem(STORAGE_KEY);
-        setAuthStep('idle');
-        setPendingPhone('');
+    const logout = useCallback(async () => {
+        try {
+            // Call API logout if we have a token
+            const token = localStorage.getItem('cedibites_auth_token');
+            if (token) {
+                await authService.logout();
+            }
+        } catch (error) {
+            // Ignore logout errors, clear local state anyway
+            console.error('Logout error:', error);
+        } finally {
+            setUser(null);
+            localStorage.removeItem('cedibites_auth_token');
+            localStorage.removeItem(GUEST_SESSION_KEY);
+            localStorage.removeItem(STORAGE_KEY);
+            setAuthStep('idle');
+            setPendingPhone('');
+            setPendingEmail('');
+        }
     }, []);
 
     // ── Send OTP ──────────────────────────────────────────────────────────────
-    // Dev: generates locally and logs to console / exposes via devOTP state
-    // Prod: swap the body for your Africa's Talking / Hubtel SMS API call
-    const sendOTP = useCallback(async (phone: string): Promise<{ success: boolean; error?: string }> => {
+    const sendOTP = useCallback(async (phone: string, email?: string): Promise<{ success: boolean; error?: string }> => {
+        setIsLoading(true);
         try {
-            // Generate 6-digit OTP
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            setGeneratedOTP(otp);
+            await authService.sendOTP({ phone, email: email?.trim() || undefined });
             setPendingPhone(phone);
-
-            if (process.env.NODE_ENV === 'development') {
-                // DEV: show OTP in console + state (no real SMS)
-                console.log(`%c[CediBites OTP] ${otp}`, 'color: #e49925; font-size: 18px; font-weight: bold;');
-                setDevOTP(otp);
-
-                // ─────────────────────────────────────────────────────────────
-                // PRODUCTION: replace the block above with Africa's Talking:
-                //
-                // const AT = require('africastalking')({
-                //     apiKey: process.env.AT_API_KEY,
-                //     username: process.env.AT_USERNAME,
-                // });
-                // await AT.SMS.send({
-                //     to: [phone],
-                //     message: `Your CediBites verification code is: ${otp}`,
-                //     from: 'CediBites',
-                // });
-                //
-                // Or Hubtel SMS (once live):
-                // await fetch('https://api.hubtel.com/v1/messages/send', {
-                //     method: 'POST',
-                //     headers: { Authorization: `Basic ${btoa(clientId + ':' + clientSecret)}` },
-                //     body: JSON.stringify({ From: 'CediBites', To: phone, Content: `Your code: ${otp}` }),
-                // });
-                // ─────────────────────────────────────────────────────────────
-            }
-
+            setPendingEmail(email?.trim() ?? '');
             setAuthStep('otp');
             return { success: true };
-        } catch (err) {
-            return { success: false, error: 'Failed to send OTP. Please try again.' };
+        } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            return { success: false, error: errorMessage };
+        } finally {
+            setIsLoading(false);
         }
     }, []);
 
     // ── Verify OTP ────────────────────────────────────────────────────────────
     const verifyOTP = useCallback(async (code: string): Promise<{ success: boolean; error?: string }> => {
-        if (code !== generatedOTP) {
-            return { success: false, error: 'Incorrect code. Please try again.' };
-        }
+        setIsLoading(true);
+        try {
+            // Call API to verify OTP
+            const response = await authService.verifyOTP({ 
+                phone: pendingPhone, 
+                otp: code 
+            });
 
-        // OTP valid — check if user already has a saved profile
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            try {
-                const existing: AuthUser = JSON.parse(stored);
-                if (existing.phone === pendingPhone) {
-                    setUser(existing);
-                    setAuthStep('done');
-                    setDevOTP('');
-                    return { success: true };
+            // Check if user exists or needs registration
+            if ('requires_registration' in response.data && response.data.requires_registration) {
+                // New user - needs to provide name
+                setRequiresRegistration(true);
+                setAuthStep('naming');
+                return { success: true };
+            }
+
+            // Existing user - login successful
+            const { token, user: apiUser } = response.data as { token: string; user: User };
+
+            const guestSession = localStorage.getItem(GUEST_SESSION_KEY);
+            localStorage.setItem('cedibites_auth_token', token);
+
+            if (guestSession) {
+                try {
+                    await cartService.claimGuestCart(guestSession);
+                    queryClient.invalidateQueries({ queryKey: ['cart'] });
+                } catch {
+                    // Ignore claim errors - cart may be empty or already claimed
                 }
-            } catch { /* ignore */ }
-        }
+            }
+            localStorage.removeItem(GUEST_SESSION_KEY);
 
-        // New user — ask for name
-        setAuthStep('naming');
-        setDevOTP('');
-        return { success: true };
-    }, [generatedOTP, pendingPhone]);
+            // Convert and store user
+            const authUser = mapApiUserToAuthUser(apiUser);
+            persistUser(authUser);
+
+            setAuthStep('done');
+            return { success: true };
+        } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            return { success: false, error: errorMessage };
+        } finally {
+            setIsLoading(false);
+        }
+    }, [pendingPhone, queryClient]);
 
     // ── Save profile (after name entry) ──────────────────────────────────────
-    const saveProfile = useCallback((name: string, phone: string) => {
-        const newUser: AuthUser = { name, phone, savedAddresses: [], createdAt: Date.now() };
-        persistUser(newUser);
-        setAuthStep('done');
-    }, []);
+    const saveProfile = useCallback(async (name: string, phone: string): Promise<{ success: boolean; error?: string }> => {
+        if (!requiresRegistration) {
+            const newUser: AuthUser = { name, phone, savedAddresses: [], createdAt: Date.now() };
+            persistUser(newUser);
+            setAuthStep('done');
+            return { success: true };
+        }
+
+        setIsLoading(true);
+        try {
+            const response = await authService.register({
+                name,
+                phone: pendingPhone,
+                email: pendingEmail?.trim() || undefined,
+                otp: '',
+            });
+
+            const { token, user: apiUser } = response.data;
+
+            const guestSession = localStorage.getItem(GUEST_SESSION_KEY);
+            localStorage.setItem('cedibites_auth_token', token);
+
+            if (guestSession) {
+                try {
+                    await cartService.claimGuestCart(guestSession);
+                    queryClient.invalidateQueries({ queryKey: ['cart'] });
+                } catch {
+                    // Ignore claim errors - cart may be empty or already claimed
+                }
+            }
+            localStorage.removeItem(GUEST_SESSION_KEY);
+
+            const authUser = mapApiUserToAuthUser(apiUser);
+            persistUser(authUser);
+
+            setAuthStep('done');
+            setRequiresRegistration(false);
+            return { success: true };
+        } catch (error) {
+            console.error('Registration error:', error);
+            const errorMessage = getErrorMessage(error);
+            return { success: false, error: errorMessage };
+        } finally {
+            setIsLoading(false);
+        }
+    }, [requiresRegistration, pendingPhone, pendingEmail, queryClient]);
 
     // ── Quick save from checkout (no OTP needed — they just ordered) ──────────
     // Called from StepDone "Save for next time" prompt
@@ -156,12 +257,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return (
         <AuthContext.Provider value={{
-            user, isLoggedIn: !!user, logout,
-            authStep, setAuthStep,
-            pendingPhone, setPendingPhone,
-            sendOTP, verifyOTP, saveProfile,
+            user,
+            isLoggedIn: !!user,
+            logout,
+            authStep,
+            setAuthStep,
+            pendingPhone,
+            setPendingPhone,
+            pendingEmail,
+            setPendingEmail,
+            sendOTP,
+            verifyOTP,
+            saveProfile,
             saveFromCheckout,
-            devOTP,
+            isLoading,
         }}>
             {children}
         </AuthContext.Provider>
