@@ -22,24 +22,48 @@ export class ApiOrderService implements OrderService {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
   async getAll(filter?: OrderFilter): Promise<Order[]> {
-    const params: Record<string, string | number | string[] | undefined> = {
-      per_page: 200,
-    };
-    if (filter?.branchId) params.branch_id = filter.branchId;
-    if (filter?.branchName) params.branch_name = filter.branchName;
-    if (filter?.staffId) params.staff_id = filter.staffId;
-    if (filter?.status?.length) params.status = filter.status;
-    if (filter?.fulfillmentType?.length) params.order_type = filter.fulfillmentType;
-    if (filter?.source?.length) params.order_source = filter.source;
-    if (filter?.contactPhone) params.contact_phone = filter.contactPhone;
-    if (filter?.dateFrom) params.date_from = new Date(filter.dateFrom).toISOString().slice(0, 10);
-    if (filter?.dateTo) params.date_to = new Date(filter.dateTo).toISOString().slice(0, 10);
-    if (filter?.search) params.search = filter.search;
+    try {
+      // Determine which endpoint to use based on current route
+      let endpoint = '/employee/orders';
+      
+      if (typeof window !== 'undefined') {
+        const pathname = window.location.pathname;
+        
+        // Kitchen uses public endpoint
+        if (pathname.startsWith('/kitchen')) {
+          endpoint = '/kitchen/orders';
+        }
+        // Customer routes (home, menu, checkout, etc.) don't load orders
+        else if (!pathname.startsWith('/staff') && 
+                 !pathname.startsWith('/admin') && 
+                 !pathname.startsWith('/partner') && 
+                 !pathname.startsWith('/pos')) {
+          return [];
+        }
+      }
+      
+      const params: Record<string, string | number | string[] | undefined> = {
+        per_page: 200,
+      };
+      if (filter?.branchId) params.branch_id = filter.branchId;
+      if (filter?.branchName) params.branch_name = filter.branchName;
+      if (filter?.staffId) params.staff_id = filter.staffId;
+      if (filter?.status?.length) params.status = filter.status;
+      if (filter?.fulfillmentType?.length) params.order_type = filter.fulfillmentType;
+      if (filter?.source?.length) params.order_source = filter.source;
+      if (filter?.contactPhone) params.contact_phone = filter.contactPhone;
+      if (filter?.dateFrom) params.date_from = new Date(filter.dateFrom).toISOString().slice(0, 10);
+      if (filter?.dateTo) params.date_to = new Date(filter.dateTo).toISOString().slice(0, 10);
+      if (filter?.search) params.search = filter.search;
 
-    const response = await apiClient.get('/employee/orders', { params });
-    const payload = extractData<{ data?: ApiOrder[] }>(response);
-    const list = payload?.data ?? (Array.isArray(payload) ? payload : []);
-    return (list as ApiOrder[]).map(apiOrderToUnifiedOrder);
+      const response = await apiClient.get(endpoint, { params });
+      const payload = extractData<{ data?: ApiOrder[] }>(response);
+      const list = payload?.data ?? (Array.isArray(payload) ? payload : []);
+      return (list as ApiOrder[]).map(apiOrderToUnifiedOrder);
+    } catch (error: any) {
+      console.error('Failed to load orders:', error);
+      return [];
+    }
   }
 
   async getById(id: string): Promise<Order | null> {
