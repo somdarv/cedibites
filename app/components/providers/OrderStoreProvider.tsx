@@ -38,42 +38,32 @@ export function OrderStoreProvider({ children }: { children: ReactNode }) {
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load orders on mount + subscribe for cross-tab updates (only when staff is authenticated)
+    // Load orders on mount + subscribe for cross-tab updates
     useEffect(() => {
         const service = getOrderService();
-        const STAFF_TOKEN_KEY = 'cedibites_staff_token';
-        const hasStaffToken = () => typeof window !== 'undefined' && !!localStorage.getItem(STAFF_TOKEN_KEY);
 
         const loadOrders = async () => {
-            if (!hasStaffToken()) return;
             try {
                 const data = await service.getAll();
                 setOrders(data);
-            } catch {
+            } catch (error) {
+                console.error('Failed to load orders:', error);
                 setOrders([]);
             } finally {
                 setIsLoading(false);
             }
         };
 
-        let unsubscribe: () => void = () => {};
-
-        if (hasStaffToken()) {
-            loadOrders();
-            unsubscribe = service.subscribe((updatedOrders) => setOrders(updatedOrders));
-        } else {
-            setIsLoading(false);
-        }
+        loadOrders();
+        const unsubscribe = service.subscribe((updatedOrders) => setOrders(updatedOrders));
 
         const handleStaffLogin = () => {
             loadOrders();
-            unsubscribe();
-            unsubscribe = service.subscribe((updatedOrders) => setOrders(updatedOrders));
         };
         window.addEventListener('staff-login', handleStaffLogin);
 
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && hasStaffToken()) loadOrders();
+            if (document.visibilityState === 'visible') loadOrders();
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
