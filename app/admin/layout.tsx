@@ -18,6 +18,9 @@ import {
     CaretRightIcon,
     ShieldCheckIcon,
     TagIcon,
+    CashRegisterIcon,
+    MonitorIcon,
+    ClipboardTextIcon,
 } from '@phosphor-icons/react';
 import { StaffAuthProvider, useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 
@@ -40,16 +43,23 @@ const BOTTOM_NAV = ADMIN_NAV.filter(n =>
     ['/admin/dashboard', '/admin/orders', '/admin/branches', '/admin/menu', '/admin/settings'].includes(n.href)
 );
 
+const ADMIN_DISPLAYS = [
+    { href: '/pos/terminal',  label: 'POS Terminal',    icon: CashRegisterIcon,  external: true },
+    { href: '/kitchen/display', label: 'Kitchen Display', icon: MonitorIcon, external: true },
+    { href: '/order-manager', label: 'Order Manager',   icon: ClipboardTextIcon, external: true },
+];
+
 // ─── Sidebar link ─────────────────────────────────────────────────────────────
 
 function SidebarLink({
-    href, label, icon: Icon, active,
+    href, label, icon: Icon, active, external,
 }: {
-    href: string; label: string; icon: React.ElementType; active: boolean;
+    href: string; label: string; icon: React.ElementType; active: boolean; external?: boolean;
 }) {
     return (
         <Link
             href={href}
+            {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             className={`
                 group flex items-center gap-3 py-2.5 rounded-xl
                 text-sm font-medium font-body transition-all duration-150
@@ -151,6 +161,21 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                             label={item.label}
                             icon={item.icon}
                             active={pathname === item.href || pathname.startsWith(item.href + '/')}
+                        />
+                    ))}
+
+                    <div className="my-2 border-t border-[#f0e8d8]" />
+                    <p className="text-[10px] font-body font-medium text-neutral-gray/60 uppercase tracking-wider px-3 pb-1">
+                        Displays
+                    </p>
+                    {ADMIN_DISPLAYS.map(item => (
+                        <SidebarLink
+                            key={item.href}
+                            href={item.href}
+                            label={item.label}
+                            icon={item.icon}
+                            active={false}
+                            external={item.external}
                         />
                     ))}
                 </nav>

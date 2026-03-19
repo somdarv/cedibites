@@ -89,6 +89,9 @@ export interface Order {
     paymentMethod: PaymentMethod;
     isPaid: boolean;
     paymentStatus: PaymentStatus;
+    paymentId?: number;         // DB payment record ID — used for polling (RMP mobile money)
+    amountPaid?: number;        // POS: cash tendered by customer
+    momoNumber?: string;        // POS: mobile money number used
 
     // Items & pricing
     items: OrderItem[];
