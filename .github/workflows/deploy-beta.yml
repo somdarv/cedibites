@@ -18,6 +18,6 @@ jobs:
           script: |
             cd /var/www/beta/nextjs/cedibites
             git pull origin beta
-            npm install
+            npm ci
             npm run build
             pm2 restart cedibites-beta-frontend
