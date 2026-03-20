@@ -753,7 +753,7 @@ function EmptyCartGuard() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CheckoutPage() {
     const { items, clearCart, subtotal } = useCart();
-    const { selectedBranch } = useBranch();
+    const { selectedBranch, branches } = useBranch();
     const { coordinates } = useLocation();
     const { createOrder } = useCreateOrder();
     const [step, setStep] = useState<Step>(1);
@@ -763,13 +763,15 @@ export default function CheckoutPage() {
     const [orderNumber, setOrderNumber] = useState('');
     const [contact, setContact] = useState<ContactDetails>({ name: '', phone: '', address: '', note: '' });
 
+    const effectiveBranch = selectedBranch ?? branches.find(b => b.isOpen) ?? branches[0] ?? null;
+
     const handlePlaceOrder = useCallback(async (momoPhone?: string) => {
-        if (!selectedBranch) return;
+        if (!effectiveBranch) return;
         setPlacing(true);
         try {
             // Create order via API
             const response = await createOrder({
-                branch_id: Number(selectedBranch.id),
+                branch_id: Number(effectiveBranch.id),
                 order_type: orderType,
                 customer_name: contact.name,
                 customer_phone: contact.phone,
@@ -791,7 +793,7 @@ export default function CheckoutPage() {
                 const paymentResponse = await apiClient.post(
                     `/orders/${order.id}/payments/hubtel/initiate`,
                     {
-                        description: `Order ${order.order_number} - ${selectedBranch.name}`,
+                        description: `Order ${order.order_number} - ${effectiveBranch.name}`,
                         customer_name: contact.name,
                         customer_phone: formattedPhone,
                     }
@@ -816,7 +818,7 @@ export default function CheckoutPage() {
         } finally {
             setPlacing(false);
         }
-    }, [selectedBranch, paymentMethod, orderType, contact, coordinates, createOrder, clearCart]);
+    }, [effectiveBranch, paymentMethod, orderType, contact, coordinates, createOrder, clearCart]);
 
     if (items.length === 0 && step !== 3) return <EmptyCartGuard />;
 

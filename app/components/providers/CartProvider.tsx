@@ -1,11 +1,10 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useCallback, ReactNode } from 'react';
 import type { SearchableItem } from './MenuDiscoveryProvider';
 import { useCart as useApiCart } from '@/lib/api/hooks/useCart';
-import { useAuth } from './AuthProvider';
 import { useBranch } from './BranchProvider';
-import { ensureGuestSessionId, getGuestSessionId } from '@/lib/api/client';
+import { ensureGuestSessionId } from '@/lib/api/client';
 import { transformApiCartToLocal } from '@/lib/api/transformers/cart.transformer';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -21,8 +20,8 @@ export interface CartItem {
 }
 
 export interface CartValidationResult {
-    available: CartItem[];      // items that ARE available at the new branch
-    unavailable: CartItem[];    // items that are NOT available at the new branch
+    available: CartItem[];
+    unavailable: CartItem[];
 }
 
 interface CartContextType {
@@ -38,224 +37,71 @@ interface CartContextType {
     totalItems: number;
     subtotal: number;
     isLoading: boolean;
-    isSyncing: boolean;
-    mode: 'api' | 'local';
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
-const CART_KEY = 'cedibites-cart';
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function CartProvider({ children }: { children: ReactNode }) {
-    const [items, setItems] = useState<CartItem[]>([]);
-    const [hydrated, setHydrated] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
-    
-    // Get auth and branch context
-    const { isLoggedIn } = useAuth();
-    const { selectedBranch } = useBranch();
-    const [guestSessionReady, setGuestSessionReady] = useState(false);
-
-    // Ensure guest session on mount so guests use backend cart
-    useEffect(() => {
-        if (!isLoggedIn && typeof window !== 'undefined') {
-            ensureGuestSessionId();
-            setGuestSessionReady(true);
-        }
-    }, [isLoggedIn]);
-
-    const hasGuestSession = guestSessionReady && !!getGuestSessionId();
-
-    // Use backend cart when: logged in OR has guest session (all carts in backend)
-    const mode: 'api' | 'local' = isLoggedIn || hasGuestSession ? 'api' : 'local';
-
-    // API cart hook (enabled for auth OR guest session)
+    const { selectedBranch, branches } = useBranch();
     const apiCart = useApiCart();
-    
-    // In api mode always derive items from the API; never fall back to localStorage
-    const effectiveItems = mode === 'api'
-        ? (apiCart.cart ? transformApiCartToLocal(apiCart.cart) : [])
-        : items;
-    
-    const isLoading = mode === 'api' ? apiCart.isLoading : false;
 
-    // Hydrate from localStorage (fallback for legacy local carts)
-    useEffect(() => {
-        try {
-            const saved = localStorage.getItem(CART_KEY);
-            if (saved) setItems(JSON.parse(saved));
-        } catch { /* ignore */ }
-        setHydrated(true);
-    }, []);
-
-    // Persist to localStorage
-    useEffect(() => {
-        if (hydrated && mode === 'local') {
-            localStorage.setItem(CART_KEY, JSON.stringify(items));
-        }
-    }, [items, hydrated, mode]);
-
-    // ── Cart Synchronization on Login ──────────────────────────────────────────
-    useEffect(() => {
-        const syncCartOnLogin = async () => {
-            if (!isLoggedIn || !selectedBranch || isSyncing) return;
-            
-            // Check if we have local cart items to sync
-            const localCartJson = localStorage.getItem(CART_KEY);
-            if (!localCartJson) return;
-            
-            try {
-                const localCart: CartItem[] = JSON.parse(localCartJson);
-                if (localCart.length === 0) return;
-                
-                setIsSyncing(true);
-                
-                // Add each local cart item to the backend
-                for (const localItem of localCart) {
-                    try {
-                        await apiCart.addItem({
-                            branch_id: Number(selectedBranch.id),
-                            menu_item_id: parseInt(localItem.item.id),
-                            quantity: localItem.quantity,
-                            unit_price: localItem.price,
-                            menu_item_size_id: localItem.selectedSize !== 'default' 
-                                ? (localItem.item.sizes?.find(s => s.key === localItem.selectedSize) as { id?: number })?.id 
-                                : undefined,
-                        });
-                    } catch (error) {
-                        console.error('Failed to sync cart item:', error);
-                    }
-                }
-                
-                // Clear local cart after successful sync
-                localStorage.removeItem(CART_KEY);
-                setItems([]);
-            } catch (error) {
-                console.error('Failed to sync cart on login:', error);
-            } finally {
-                setIsSyncing(false);
-            }
-        };
-        
-        syncCartOnLogin();
-    }, [isLoggedIn, selectedBranch, isSyncing, apiCart]);
-
-    // ── Guest Cart Sync ─────────────────────────────────────────────────────────
-    // When a guest session is first established, migrate any localStorage items to the API
-    useEffect(() => {
-        const syncGuestCart = async () => {
-            if (!hasGuestSession || isLoggedIn || !selectedBranch || isSyncing) return;
-
-            const localCartJson = localStorage.getItem(CART_KEY);
-            if (!localCartJson) return;
-
-            try {
-                const localCart: CartItem[] = JSON.parse(localCartJson);
-                if (localCart.length === 0) return;
-
-                setIsSyncing(true);
-
-                for (const localItem of localCart) {
-                    try {
-                        await apiCart.addItem({
-                            branch_id: Number(selectedBranch.id),
-                            menu_item_id: parseInt(localItem.item.id),
-                            quantity: localItem.quantity,
-                            unit_price: localItem.price,
-                            menu_item_size_id: localItem.selectedSize !== 'default'
-                                ? (localItem.item.sizes?.find(s => s.key === localItem.selectedSize) as { id?: number })?.id
-                                : undefined,
-                        });
-                    } catch (error) {
-                        console.error('Failed to sync guest cart item:', error);
-                    }
-                }
-
-                localStorage.removeItem(CART_KEY);
-                setItems([]);
-            } catch (error) {
-                console.error('Failed to sync guest cart:', error);
-            } finally {
-                setIsSyncing(false);
-            }
-        };
-
-        syncGuestCart();
-    }, [hasGuestSession, isLoggedIn, selectedBranch, isSyncing, apiCart]);
+    const items: CartItem[] = apiCart.cart ? transformApiCartToLocal(apiCart.cart) : [];
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     const makeCartItemId = (itemId: string, sizeKey: string) => `${itemId}__${sizeKey}`;
 
+    const effectiveBranch = selectedBranch ?? branches.find(b => b.isOpen) ?? branches[0] ?? null;
+
     const addToCart = useCallback(async (item: SearchableItem, sizeKey: string) => {
+        if (!effectiveBranch) {
+            console.error('Cannot add to cart: no branch available');
+            return;
+        }
+
+        ensureGuestSessionId();
+
         const cartItemId = makeCartItemId(item.id, sizeKey);
         const sizeData = item.sizes?.find((s: any) => s.key === sizeKey);
         const price = sizeData?.price ?? item.price ?? 0;
-        const sizeLabel = sizeData?.label ?? sizeKey;
+        const menuItemSizeId = (sizeData as { id?: number })?.id
+            ? parseInt(String((sizeData as { id?: number }).id))
+            : undefined;
 
-        if (mode === 'api' && selectedBranch) {
-            // Ensure guest has session ID before API call
-            if (!isLoggedIn) ensureGuestSessionId();
-            // API mode: always use backend
-            try {
-                const existing = effectiveItems.find(i => i.cartItemId === cartItemId);
-                const menuItemSizeId = (sizeData as { id?: number })?.id ? parseInt(String((sizeData as { id?: number }).id)) : undefined;
+        const existing = items.find(i => i.cartItemId === cartItemId);
 
-                if (existing?.apiCartItemId) {
-                    // Increment existing item via its API id
-                    await apiCart.updateItem({
-                        itemId: existing.apiCartItemId,
-                        data: { quantity: existing.quantity + 1 }
-                    });
-                } else {
-                    // Add new item (API deduplicates if already present)
-                    await apiCart.addItem({
-                        branch_id: Number(selectedBranch.id),
-                        menu_item_id: parseInt(item.id),
-                        menu_item_size_id: menuItemSizeId,
-                        quantity: 1,
-                        unit_price: price,
-                    });
-                }
-            } catch (error) {
-                console.error('Failed to add to cart via API:', error);
+        try {
+            if (existing?.apiCartItemId) {
+                await apiCart.updateItem({
+                    itemId: existing.apiCartItemId,
+                    data: { quantity: existing.quantity + 1 },
+                });
+            } else {
+                await apiCart.addItem({
+                    branch_id: Number(effectiveBranch.id),
+                    menu_item_id: parseInt(item.id),
+                    menu_item_size_id: menuItemSizeId,
+                    quantity: 1,
+                    unit_price: price,
+                });
             }
-        } else {
-            // Local mode: use localStorage
-            addToLocalCart(item, sizeKey, cartItemId, price, sizeLabel);
+        } catch (error) {
+            console.error('Failed to add to cart:', error);
         }
-    }, [mode, selectedBranch, effectiveItems, apiCart]);
-
-    const addToLocalCart = (item: SearchableItem, sizeKey: string, cartItemId: string, price: number, sizeLabel: string) => {
-        setItems(prev => {
-            const existing = prev.find(i => i.cartItemId === cartItemId);
-            if (existing) {
-                return prev.map(i =>
-                    i.cartItemId === cartItemId ? { ...i, quantity: i.quantity + 1 } : i
-                );
-            }
-            return [...prev, { cartItemId, item, selectedSize: sizeKey, sizeLabel, price, quantity: 1 }];
-        });
-    };
+    }, [effectiveBranch, items, apiCart]);
 
     const removeFromCart = useCallback(async (cartItemId: string) => {
-        if (mode === 'api') {
-            // API mode: always use backend
-            const cartItem = effectiveItems.find(i => i.cartItemId === cartItemId);
-            if (!cartItem?.apiCartItemId) {
-                return;
-            }
-            try {
-                await apiCart.removeItem(cartItem.apiCartItemId);
-            } catch (error) {
-                console.error('Failed to remove from cart via API:', error);
-            }
-        } else {
-            // Local mode: use localStorage
-            setItems(prev => prev.filter(i => i.cartItemId !== cartItemId));
+        const cartItem = items.find(i => i.cartItemId === cartItemId);
+        if (!cartItem?.apiCartItemId) return;
+
+        try {
+            await apiCart.removeItem(cartItem.apiCartItemId);
+        } catch (error) {
+            console.error('Failed to remove from cart:', error);
         }
-    }, [mode, apiCart, effectiveItems]);
+    }, [items, apiCart]);
 
     const updateQuantity = useCallback(async (cartItemId: string, quantity: number) => {
         if (quantity <= 0) {
@@ -263,65 +109,44 @@ export function CartProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        if (mode === 'api') {
-            // API mode: always use backend
-            const cartItem = effectiveItems.find(i => i.cartItemId === cartItemId);
-            if (!cartItem?.apiCartItemId) {
-                return;
-            }
-            try {
-                await apiCart.updateItem({
-                    itemId: cartItem.apiCartItemId,
-                    data: { quantity }
-                });
-            } catch (error) {
-                console.error('Failed to update quantity via API:', error);
-            }
-        } else {
-            // Local mode: use localStorage
-            setItems(prev => prev.map(i =>
-                i.cartItemId === cartItemId ? { ...i, quantity } : i
-            ));
+        const cartItem = items.find(i => i.cartItemId === cartItemId);
+        if (!cartItem?.apiCartItemId) return;
+
+        try {
+            await apiCart.updateItem({
+                itemId: cartItem.apiCartItemId,
+                data: { quantity },
+            });
+        } catch (error) {
+            console.error('Failed to update quantity:', error);
         }
-    }, [mode, apiCart, removeFromCart, effectiveItems]);
+    }, [items, apiCart, removeFromCart]);
 
     const clearCart = useCallback(async () => {
-        if (mode === 'api') {
-            // API mode: always use backend
-            try {
-                await apiCart.clearCart();
-            } catch (error) {
-                console.error('Failed to clear cart via API:', error);
-            }
-        } else {
-            // Local mode: use localStorage
-            setItems([]);
-            localStorage.removeItem(CART_KEY);
+        try {
+            await apiCart.clearCart();
+        } catch (error) {
+            console.error('Failed to clear cart:', error);
         }
-    }, [mode, apiCart]);
+    }, [apiCart]);
 
-    // Remove a specific set of items by their cartItemIds
-    const removeUnavailableItems = useCallback((cartItemIds: string[]) => {
-        const idSet = new Set(cartItemIds);
-        setItems(prev => prev.filter(i => !idSet.has(i.cartItemId)));
-    }, []);
+    // No-op kept for interface compatibility — items are derived from the API
+    const removeUnavailableItems = useCallback((_cartItemIds: string[]) => {}, []);
 
     const isInCart = useCallback((itemId: string, sizeKey: string) =>
-        effectiveItems.some(i => i.cartItemId === makeCartItemId(itemId, sizeKey)),
-        [effectiveItems]);
+        items.some(i => i.cartItemId === makeCartItemId(itemId, sizeKey)),
+        [items]);
 
     const getCartItem = useCallback((itemId: string, sizeKey: string) =>
-        effectiveItems.find(i => i.cartItemId === makeCartItemId(itemId, sizeKey)),
-        [effectiveItems]);
+        items.find(i => i.cartItemId === makeCartItemId(itemId, sizeKey)),
+        [items]);
 
-    // ── Branch validation ──────────────────────────────────────────────────────
-    // Given a branch's menuItemIds, split cart into available vs unavailable
     const validateCartForBranch = useCallback((branchMenuItemIds: string[]): CartValidationResult => {
         const availableSet = new Set(branchMenuItemIds);
         const available: CartItem[] = [];
         const unavailable: CartItem[] = [];
 
-        effectiveItems.forEach(cartItem => {
+        items.forEach(cartItem => {
             if (availableSet.has(cartItem.item.id)) {
                 available.push(cartItem);
             } else {
@@ -330,15 +155,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
 
         return { available, unavailable };
-    }, [effectiveItems]);
+    }, [items]);
 
-    // ── Computed ───────────────────────────────────────────────────────────────
-    const totalItems = effectiveItems.reduce((sum, i) => sum + i.quantity, 0);
-    const subtotal = effectiveItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
+    const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
     return (
         <CartContext.Provider value={{
-            items: effectiveItems,
+            items,
             addToCart,
             removeFromCart,
             updateQuantity,
@@ -349,9 +173,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             validateCartForBranch,
             totalItems,
             subtotal,
-            isLoading,
-            isSyncing,
-            mode,
+            isLoading: apiCart.isLoading,
         }}>
             {children}
         </CartContext.Provider>
