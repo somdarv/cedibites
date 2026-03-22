@@ -20,7 +20,7 @@ import {
     type StaffMember,
     type StaffRole,
     defaultPermissions,
-} from '@/lib/data/mockStaff';
+} from '@/types/staff';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { employeeService } from '@/lib/api/services/employee.service';
 import { useQuery } from '@tanstack/react-query';

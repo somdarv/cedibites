@@ -30,7 +30,7 @@ import {
     roleDisplayName,
     employmentStatusLabel,
     defaultPermissions,
-} from '@/lib/data/mockStaff';
+} from '@/types/staff';
 import { useEmployees } from '@/lib/api/hooks/useEmployees';
 import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
 import { useRoles, usePermissions } from '@/lib/api/hooks/useRoles';

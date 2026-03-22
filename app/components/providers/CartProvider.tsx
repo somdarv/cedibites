@@ -66,7 +66,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const cartItemId = makeCartItemId(item.id, sizeKey);
         const sizeData = item.sizes?.find((s: any) => s.key === sizeKey);
         const price = sizeData?.price ?? item.price ?? 0;
-        const menuItemSizeId = (sizeData as { id?: number })?.id
+        const menuItemOptionId = (sizeData as { id?: number })?.id
             ? parseInt(String((sizeData as { id?: number }).id))
             : undefined;
 
@@ -82,7 +82,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 await apiCart.addItem({
                     branch_id: Number(effectiveBranch.id),
                     menu_item_id: parseInt(item.id),
-                    menu_item_size_id: menuItemSizeId,
+                    menu_item_option_id: menuItemOptionId,
                     quantity: 1,
                     unit_price: price,
                 });

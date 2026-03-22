@@ -1,5 +1,5 @@
 import apiClient, { ApiError } from '../client';
-import type { StaffRole } from '@/lib/data/mockStaff';
+import type { StaffRole } from '@/types/staff';
 
 export interface StaffUser {
   id: string;

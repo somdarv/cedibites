@@ -46,7 +46,6 @@ interface DisplayRow {
   menuItemId: string;
   sizeId?: number;
   variantKey?: string;
-  isNew?: boolean;
 }
 
 // Expand items with sizes/variants into individual tappable rows
@@ -59,19 +58,18 @@ function expandItem(item: DisplayMenuItem): DisplayRow[] {
       menuItemId: item.id,
       sizeId: size.id,
       variantKey: size.key,
-      isNew: item.isNew,
     }));
   }
   if (item.hasVariants && item.variants) {
     const rows: DisplayRow[] = [];
     if (item.variants.plain !== undefined)
-      rows.push({ key: `${item.id}|plain`, name: `${item.name} (Plain)`, price: item.variants.plain, menuItemId: item.id, variantKey: 'plain', isNew: item.isNew });
+      rows.push({ key: `${item.id}|plain`, name: `${item.name} (Plain)`, price: item.variants.plain, menuItemId: item.id, variantKey: 'plain' });
     if (item.variants.assorted !== undefined)
-      rows.push({ key: `${item.id}|assorted`, name: `${item.name} (Assorted)`, price: item.variants.assorted, menuItemId: item.id, variantKey: 'assorted', isNew: item.isNew });
+      rows.push({ key: `${item.id}|assorted`, name: `${item.name} (Assorted)`, price: item.variants.assorted, menuItemId: item.id, variantKey: 'assorted' });
     return rows;
   }
   if (item.price !== undefined)
-    return [{ key: item.id, name: item.name, price: item.price, menuItemId: item.id, isNew: item.isNew }];
+    return [{ key: item.id, name: item.name, price: item.price, menuItemId: item.id }];
   return [];
 }
 
@@ -155,7 +153,7 @@ export default function POSTerminalPage() {
   );
 
   const allCategories = useMemo(
-    () => [{ id: 'all', name: 'Popular' }, ...menuCategories.filter(c => c.id !== 'all')],
+    () => [{ id: 'all', name: 'All' }, ...menuCategories.filter(c => c.id !== 'all')],
     [menuCategories]
   );
 
@@ -163,7 +161,7 @@ export default function POSTerminalPage() {
   const filteredItems = useMemo(() => {
     return branchMenuItems.filter(item => {
       const matchesCategory = activeCategory === 'all'
-        ? item.popular  // "All" tab shows popular items
+        ? true
         : item.category === (menuCategories.find(c => c.id === activeCategory)?.name ?? activeCategory);
       const matchesSearch = !searchQuery ||
         item.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -351,7 +349,7 @@ export default function POSTerminalPage() {
                   }
                 `}
               >
-                {cat.id === 'all' ? 'Popular' : cat.name}
+                {cat.id === 'all' ? 'All' : cat.name}
               </button>
             ))}
           </div>
@@ -381,9 +379,6 @@ export default function POSTerminalPage() {
                 >
                   <p className={`font-semibold text-base leading-snug line-clamp-2 ${isSelected ? 'text-primary' : 'text-text-dark'}`}>
                     {row.name}
-                    {row.isNew && !isSelected && (
-                      <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded-md bg-primary text-brown text-[10px] font-semibold">NEW</span>
-                    )}
                   </p>
                   <div className="flex items-center justify-between">
                     <p className="text-primary font-bold text-base">{formatGHS(row.price)}</p>

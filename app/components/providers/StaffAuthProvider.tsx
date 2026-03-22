@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { type StaffRole } from '@/lib/data/mockStaff';
+import { type StaffRole } from '@/types/staff';
 import { clearStaffToken, staffService } from '@/lib/api/services/staff.service';
 import { getShiftService } from '@/lib/services/shifts/shift.service';
 
