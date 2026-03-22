@@ -105,7 +105,7 @@ export function transformMenuItemToSearchable(menuItem: MenuItem): SearchableIte
 /**
  * Derive option key from API cart item
  */
-function deriveOptionKey(apiItem: ApiCartItem & { menu_item_option?: { option_key?: string; option_label?: string } }): string {
+function deriveOptionKey(apiItem: ApiCartItem & { menu_item_option?: { option_key?: string; option_label?: string } | null }): string {
   if (apiItem.option_key) return apiItem.option_key;
   const option = apiItem.menu_item_option;
   if (option?.option_key) return option.option_key;

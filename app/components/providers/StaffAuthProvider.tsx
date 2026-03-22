@@ -21,6 +21,7 @@ export interface StaffUser {
     phone?: string;
     pin?: string;
     joinedAt?: string;
+    must_reset_password?: boolean;
 }
 
 interface StaffAuthContextValue {
