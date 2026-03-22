@@ -71,7 +71,7 @@ export function apiOrderToUnifiedOrder(apiOrder: ApiOrder): UnifiedOrder {
       notes: apiOrder.delivery_note ?? apiOrder.special_instructions,
     },
     branch: {
-      id: String(apiOrder.branch_id),
+      id: String(apiOrder.branch?.id ?? apiOrder.branch_id),
       name: apiOrder.branch?.name ?? 'Branch',
       address: apiOrder.branch?.address ?? '',
       phone: apiOrder.branch?.phone ?? '',

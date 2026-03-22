@@ -13,6 +13,7 @@ import BranchSelectorModal from "./components/ui/BranchSelectorModal";
 import { AuthProvider } from "./components/providers/AuthProvider";
 import { OrderStoreProvider } from "./components/providers/OrderStoreProvider";
 import { QueryProvider } from "./components/providers/QueryProvider";
+import { RouterInitializer } from "./components/providers/RouterInitializer";
 
 const caprasimo = Caprasimo({
   weight: '400',
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           strategy="beforeInteractive"
         />
         <QueryProvider>
+        <RouterInitializer />
         <ModalProvider>
           <AuthProvider>
             <LocationProvider autoRequest={false}>

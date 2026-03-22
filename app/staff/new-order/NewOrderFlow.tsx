@@ -26,7 +26,7 @@ import { useStaffRoutes } from '@/app/components/providers/StaffAuthProvider';
 import { useBranch } from '@/app/components/providers/BranchProvider';
 import { useMenuItems } from '@/lib/api/hooks/useMenuItems';
 import type { DisplayMenuItem } from '@/lib/api/adapters/menu.adapter';
-import type { OrderSource, PaymentMethod } from '@/types/order';
+import type { PaymentMethod } from '@/types/order';
 import { formatGHS, ORDER_SOURCES } from './utils';
 import OrderConfirmed from './steps/OrderConfirmed';
 
@@ -437,25 +437,31 @@ export default function NewOrderFlow() {
                     </div>
 
                     {/* Branch */}
-                    {(staffUser?.role === 'super_admin' || staffUser?.role === 'call_center') ? (
-                        <div className="mb-3">
-                            <select
-                                value={branchId ?? ''}
-                                onChange={e => setBranchId(e.target.value)}
-                                className="w-full h-9 px-3 rounded-xl bg-neutral-light text-text-dark border border-neutral-gray/20 focus:border-primary/50 outline-none text-xs transition-colors"
-                            >
-                                <option value="" disabled>Select branch…</option>
-                                {branches.filter(b => b.isOpen).map(b => (
-                                    <option key={b.id} value={b.id}>{b.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    ) : (
-                        <div className="mb-3 px-3 py-2 rounded-xl bg-neutral-light border border-neutral-gray/20 text-xs text-text-dark">
-                            <span className="text-neutral-gray">Branch: </span>
-                            <span className="font-medium">{branches.find(b => b.id === branchId)?.name || 'Loading...'}</span>
-                        </div>
-                    )}
+                    {(() => {
+                        const assignedIds = staffUser?.branchIds ?? (staffUser?.branchId ? [staffUser.branchId] : []);
+                        const selectableBranches = branches.filter(b => b.isOpen && assignedIds.includes(b.id));
+                        const isLocked = assignedIds.length <= 1;
+
+                        return isLocked ? (
+                            <div className="mb-3 px-3 py-2 rounded-xl bg-neutral-light border border-neutral-gray/20 text-xs text-text-dark">
+                                <span className="text-neutral-gray">Branch: </span>
+                                <span className="font-medium">{branches.find(b => b.id === branchId)?.name || 'Loading...'}</span>
+                            </div>
+                        ) : (
+                            <div className="mb-3">
+                                <select
+                                    value={branchId ?? ''}
+                                    onChange={e => setBranchId(e.target.value)}
+                                    className="w-full h-9 px-3 rounded-xl bg-neutral-light text-text-dark border border-neutral-gray/20 focus:border-primary/50 outline-none text-xs transition-colors"
+                                >
+                                    <option value="" disabled>Select branch…</option>
+                                    {selectableBranches.map(b => (
+                                        <option key={b.id} value={b.id}>{b.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        );
+                    })()}
 
                     {/* Address — delivery only */}
                     {orderType === 'delivery' && (

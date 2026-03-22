@@ -37,6 +37,9 @@ import { useMenuItems } from '@/lib/api/hooks/useMenuItems';
 import { printReceipt } from '@/lib/utils/printReceipt';
 import { getPromoService, type Promo } from '@/lib/services/promos/promo.service';
 import { SignOutDialog } from '../components/SignOutDialog';
+import BranchSelectPage from '@/app/components/ui/BranchSelectPage';
+import BranchSwitcherDialog from '@/app/components/ui/BranchSwitcherDialog';
+import { isValidGhanaPhone, normalizeGhanaPhone } from '@/app/lib/phone';
 
 // Flat row — one per orderable option (no picker modal needed)
 interface DisplayRow {
@@ -115,6 +118,7 @@ export default function POSTerminalPage() {
   const [activePromo, setActivePromo] = useState<Promo | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [isSignOutOpen, setIsSignOutOpen] = useState(false);
+  const [isBranchSwitcherOpen, setIsBranchSwitcherOpen] = useState(false);
 
   // Redirect if no session (but not if we just need branch selection)
   useEffect(() => {
@@ -133,6 +137,12 @@ export default function POSTerminalPage() {
       setPromoDiscount(getPromoService().calculateDiscount(p, cartTotal));
     }).catch(() => { setActivePromo(null); setPromoDiscount(0); });
   }, [cart, session?.branchId, cartTotal]);
+
+  // Branches this staff member can switch between (empty branchIds = admin = all branches)
+  const switchableBranches = useMemo(() => {
+    if (!session?.branchIds?.length) return branches;
+    return branches.filter(b => (session.branchIds ?? []).includes(b.id));
+  }, [session, branches]);
 
   // Get branch info and its allowed menu item IDs
   const branchInfo = useMemo(
@@ -234,28 +244,15 @@ export default function POSTerminalPage() {
   }
 
   if (isNeedsBranchSelection) {
+    const selectableBranches = branches.filter(
+      b => !session?.branchIds?.length || session.branchIds.includes(b.id)
+    );
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-neutral-light p-6">
-        <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 flex flex-col gap-6">
-          <div className="text-center">
-            <StorefrontIcon className="w-12 h-12 text-primary mx-auto mb-3" />
-            <h1 className="text-xl font-bold text-text-dark">Select Branch</h1>
-            <p className="text-sm text-text-muted mt-1">Choose which branch POS to operate</p>
-          </div>
-          <div className="flex flex-col gap-3">
-            {branches.map(branch => (
-              <button
-                key={branch.id}
-                onClick={() => selectBranch(branch.id)}
-                className="w-full text-left px-5 py-4 rounded-2xl border-2 border-neutral-gray/20 hover:border-primary hover:bg-primary/5 transition-colors"
-              >
-                <div className="font-semibold text-text-dark">{branch.name}</div>
-                <div className="text-xs text-text-muted mt-0.5">{branch.address}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <BranchSelectPage
+        branches={selectableBranches}
+        onSelect={selectBranch}
+        subtitle="Choose which branch POS to operate"
+      />
     );
   }
 
@@ -266,15 +263,19 @@ export default function POSTerminalPage() {
         {/* Header */}
         <header className="shrink-0 px-4 py-3 border-b border-neutral-gray/20 flex items-center justify-between gap-4 bg-white">
           {/* Left - Branch & Staff */}
-          <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => switchableBranches.length > 1 ? setIsBranchSwitcherOpen(true) : undefined}
+            className={`flex items-center gap-3 shrink-0 rounded-xl transition-colors ${switchableBranches.length > 1 ? 'hover:bg-neutral-light active:bg-neutral-gray/20 cursor-pointer px-2 py-1 -mx-2 -my-1' : 'cursor-default'}`}
+            title={switchableBranches.length > 1 ? 'Switch Branch' : undefined}
+          >
             <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
               <StorefrontIcon className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="text-left">
               <p className="text-text-dark font-medium text-sm">{branchInfo?.name ?? 'Branch'}</p>
               <p className="text-neutral-gray text-xs">{session.staffName}</p>
             </div>
-          </div>
+          </button>
 
           {/* Center - Search */}
           <div className="flex-1">
@@ -649,6 +650,14 @@ export default function POSTerminalPage() {
         onConfirm={() => { logout(); router.replace('/pos'); }}
       />
 
+      <BranchSwitcherDialog
+        isOpen={isBranchSwitcherOpen}
+        branches={switchableBranches}
+        currentBranchId={session?.branchId}
+        onSelect={selectBranch}
+        onClose={() => setIsBranchSwitcherOpen(false)}
+      />
+
       {/* Payment Modal */}
       {isPaymentOpen && (
         <PaymentModal
@@ -735,12 +744,12 @@ function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
       }
       await onPayment('cash', paid);
     } else if (selectedMethod === 'mobile_money') {
-      if (momoNumber.length < 10) {
-        alert('Please enter a valid phone number');
+      if (!isValidGhanaPhone(momoNumber)) {
+        alert('Please enter a valid Ghanaian phone number (e.g. 0241234567 or +233241234567)');
         setIsProcessing(false);
         return;
       }
-      await onPayment('mobile_money', undefined, momoNumber);
+      await onPayment('mobile_money', undefined, normalizeGhanaPhone(momoNumber));
     } else {
       await onPayment('card');
     }

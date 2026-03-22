@@ -18,6 +18,8 @@ export interface CreateMenuItemData {
   is_available?: boolean;
   tag_ids?: number[];
   add_on_ids?: number[];
+  pricing_type?: 'simple' | 'options';
+  price?: number;
 }
 
 export interface UpdateMenuItemData extends Partial<CreateMenuItemData> {}

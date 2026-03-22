@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
     PlusIcon,
@@ -71,7 +72,10 @@ interface ItemFormState {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function hasPricingOptions(item: DisplayMenuItem): boolean {
-    return !!(item.sizes?.length) || !!(item.hasVariants && item.variants);
+    if (!item.sizes?.length && !(item.hasVariants && item.variants)) return false;
+    // A single 'standard' option is the backend representation of simple/single pricing
+    if (item.sizes?.length === 1 && item.sizes[0].key === 'standard') return false;
+    return true;
 }
 
 function getOptionRows(item: DisplayMenuItem): OptionRow[] {
@@ -609,6 +613,7 @@ function ItemModal({
 // ─── Bulk import modal ────────────────────────────────────────────────────────
 
 function BulkImportModal({ onClose, branchId }: { onClose: () => void; branchId: number }) {
+    const router = useRouter();
     const fileRef = useRef<HTMLInputElement>(null);
     const [step, setStep] = useState<'upload' | 'preview'>('upload');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -652,7 +657,7 @@ function BulkImportModal({ onClose, branchId }: { onClose: () => void; branchId:
                 toast.success(`Import completed! Imported: ${imported}, Failed: ${failed}, Skipped: ${skipped}`);
                 onClose();
                 // Refresh menu items
-                window.location.reload();
+                router.refresh();
             })
             .catch(error => {
                 console.error('Bulk import failed:', error);
@@ -898,6 +903,8 @@ export default function AdminMenuPage() {
             .map((slug) => menuTags.find(tag => tag.slug === slug)?.id)
             .filter((id): id is number => typeof id === 'number');
 
+        const isSinglePrice = item.price != null && !item.sizes?.length;
+
         const apiData: CreateMenuItemData = {
             branch_id: Number(selectedBranchId),
             category_id: categoryId,
@@ -907,6 +914,7 @@ export default function AdminMenuPage() {
             is_available: item.globallyAvailable,
             tag_ids: selectedTagIds,
             add_on_ids: (item.availableAddOns ?? []).map(x => Number(x)).filter(Number.isFinite),
+            ...(isSinglePrice ? { pricing_type: 'simple', price: item.price } : {}),
         };
 
         // Check if this is a new item or update
@@ -926,7 +934,7 @@ export default function AdminMenuPage() {
                     : [{ id: 0, key: 'standard', label: 'Standard', price: item.price ?? 0, image: item.image }];
 
                 const syncOptions = async () => {
-                    if (!desiredOptions.length) {
+                    if (!desiredOptions.length || isSinglePrice) {
                         return;
                     }
 
