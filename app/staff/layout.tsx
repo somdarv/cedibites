@@ -179,7 +179,7 @@ function StaffLayoutShell({ children }: { children: React.ReactNode }) {
 
                 {/* Logo */}
                 <div className="flex items-center gap-2.5 px-4 py-5 border-b border-brown-light/15">
-                    <Image src="/cblogo.webp" alt="CediBites" width={44} height={44} className="shrink-0" />
+                    <Image src="/cblogo.webp" alt="CediBites" width={44} height={44} className="shrink-0" priority />
                     <div>
                         <p className="font-body font-bold text-primary text-lg leading-none">CediBites</p>
                         <p className="text-neutral-gray text-[10px] font-body mt-0.5">Staff Portal</p>
