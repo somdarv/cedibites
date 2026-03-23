@@ -11,7 +11,7 @@ import type { User } from '@/types/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface AuthUser {
-    id: number;
+    id?: number;
     name: string;
     phone: string;
     savedAddresses?: string[];
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // ── Reverb session sync ──
     useEffect(() => {
-        if (!user) return;
+        if (!user?.id) return;
 
         const echo = getCustomerEcho();
         if (!echo) return;
