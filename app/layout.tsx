@@ -3,14 +3,8 @@ import Script from 'next/script';
 import { Cabin, Caprasimo } from 'next/font/google';
 import localFont from 'next/font/local';
 import "./globals.css";
-import { ModalProvider } from "./components/providers/ModalProvider";
 import { LocationProvider } from "./components/providers/LocationProvider";
 import { BranchProvider } from "./components/providers/BranchProvider";
-import { MenuDiscoveryProvider } from "./components/providers/MenuDiscoveryProvider";
-import { CartProvider } from "./components/providers/CartProvider";
-import LocationRequestModal from "./components/ui/LocationRequestModal";
-import BranchSelectorModal from "./components/ui/BranchSelectorModal";
-import { AuthProvider } from "./components/providers/AuthProvider";
 import { OrderStoreProvider } from "./components/providers/OrderStoreProvider";
 import { QueryProvider } from "./components/providers/QueryProvider";
 import { RouterInitializer } from "./components/providers/RouterInitializer";
@@ -53,24 +47,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           strategy="afterInteractive"
         />
         <QueryProvider>
-        <RouterInitializer />
-        <ModalProvider>
-          <AuthProvider>
-            <LocationProvider autoRequest={false}>
-              <BranchProvider>
-                <OrderStoreProvider>
-                  <MenuDiscoveryProvider>
-                    <CartProvider>
-                    <LocationRequestModal />
-                    <BranchSelectorModal />
-                    {children}
-                    </CartProvider>
-                  </MenuDiscoveryProvider>
-                </OrderStoreProvider>
-              </BranchProvider>
-            </LocationProvider>
-          </AuthProvider>
-        </ModalProvider>
+          <RouterInitializer />
+          <LocationProvider autoRequest={false}>
+            <BranchProvider>
+              <OrderStoreProvider>
+                {children}
+              </OrderStoreProvider>
+            </BranchProvider>
+          </LocationProvider>
         </QueryProvider>
       </body>
     </html>

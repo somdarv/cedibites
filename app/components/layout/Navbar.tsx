@@ -99,7 +99,7 @@ export default function Navbar() {
                         {/* Logo — unchanged */}
                         <div className='flex shrink-0 items-center gap-x-2'>
                             <Link href="/" className='text-2xl flex items-center gap-2 text-primary'>
-                                <Image src="/cblogo.webp" alt="CediBites Logo" width={44} height={44} className='object-contain' />
+                                <Image src="/cblogo.webp" alt="CediBites Logo" width={44} height={44} className='object-contain' priority />
                                 <p className='hidde md:flex text-3xl md:text-3xl font-bold font-body'>CediBites</p>
                             </Link>
                         </div>

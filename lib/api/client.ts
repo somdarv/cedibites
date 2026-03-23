@@ -122,7 +122,10 @@ apiClient.interceptors.response.use(
     if (status === 401) {
       if (typeof window !== 'undefined') {
         const pathname = window.location.pathname;
-        
+        const staffToken = localStorage.getItem('cedibites_staff_token');
+        const requestAuth = (error.config?.headers?.Authorization as string | undefined) ?? '';
+        const usedStaffToken = !!staffToken && requestAuth === `Bearer ${staffToken}`;
+
         const isStaffRoute = pathname.startsWith('/staff') ||
           pathname.startsWith('/admin') ||
           pathname.startsWith('/partner') ||
@@ -130,8 +133,10 @@ apiClient.interceptors.response.use(
           pathname.startsWith('/kitchen') ||
           pathname.startsWith('/order-manager');
 
-        if (isStaffRoute) {
-          // Don't redirect if already on a login page or POS root (login page)
+        if (isStaffRoute && usedStaffToken) {
+          // Only redirect when the request actually used the staff token —
+          // prevents customer-auth calls (with wrong token on staff routes) from
+          // triggering a logout.
           const isOnLoginPage = pathname.includes('/login') || pathname === '/pos';
 
           if (!isOnLoginPage) {
@@ -139,13 +144,14 @@ apiClient.interceptors.response.use(
             localStorage.removeItem('cedibites-staff-session');
             navigateTo('/staff/login');
           }
-        } else {
+        } else if (!isStaffRoute) {
           localStorage.removeItem('cedibites_auth_token');
           localStorage.removeItem('cedibites-auth-user');
           if (pathname !== '/') {
             navigateTo('/');
           }
         }
+        // else: staff route but request used customer token — let the caller handle it
       }
       throw new ApiError(status, 'Unauthorized. Please login again.');
     }
