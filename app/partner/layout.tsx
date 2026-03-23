@@ -37,7 +37,7 @@ function SidebarLink({ href, label, icon: Icon, active }: {
             href={href}
             className={`group flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium font-body transition-all duration-150 ${
                 active
-                    ? 'bg-[#fff8ec] text-primary px-3 border-l-[3px] border-primary ml-0 pl-[9px]'
+                    ? 'bg-[#fff8ec] text-primary px-3 border-l-[3px] border-primary ml-0 pl-2.25'
                     : 'text-neutral-gray hover:bg-neutral-light hover:text-text-dark px-3'
             }`}
         >
@@ -93,7 +93,7 @@ function PartnerShell({ children }: { children: React.ReactNode }) {
 
                 {/* Logo + subtitle */}
                 <div className="flex items-center gap-2.5 px-4 py-5 border-b border-[#f0e8d8]">
-                    <Image src="/cblogo.webp" alt="CediBites" width={40} height={40} className="shrink-0" />
+                    <Image src="/cblogo.webp" alt="CediBites" width={40} height={40} className="shrink-0" priority />
                     <div>
                         <p className="font-brand text-primary text-lg leading-none">CediBites</p>
                         <p className="text-neutral-gray text-[10px] font-body mt-0.5 flex items-center gap-1">
