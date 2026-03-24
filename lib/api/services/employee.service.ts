@@ -77,12 +77,16 @@ function apiEmployeeToStaffMember(api: ApiEmployee): StaffMember {
   // Map permissions from API to frontend permissions structure
   const permissions = api.user.permissions ?? [];
   const staffPermissions = {
-    canPlaceOrders: permissions.includes('create_orders'),
-    canAdvanceOrders: permissions.includes('update_orders'),
-    canAccessPOS: permissions.includes('view_orders'),
-    canViewReports: permissions.includes('view_analytics'),
-    canManageMenu: permissions.includes('manage_menu'),
-    canManageStaff: permissions.includes('manage_employees'),
+    canPlaceOrders:    permissions.includes('create_orders'),
+    canAdvanceOrders:  permissions.includes('update_orders'),
+    canAccessPOS:      permissions.includes('access_pos'),
+    canViewReports:    permissions.includes('view_analytics'),
+    canManageMenu:     permissions.includes('manage_menu'),
+    canManageStaff:    permissions.includes('manage_employees'),
+    canManageShifts:   permissions.includes('manage_shifts'),
+    canManageSettings: permissions.includes('manage_settings'),
+    canViewMyShifts:   permissions.includes('view_my_shifts'),
+    canViewMySales:    permissions.includes('view_my_sales'),
   };
 
   return {
@@ -138,12 +142,16 @@ export function staffRoleToBackendRole(role: StaffRole): BackendRole {
 export function mapPermissionsToBackend(permissions: StaffPermissions): string[] {
   const backendPermissions: string[] = [];
   
-  if (permissions.canPlaceOrders) backendPermissions.push('create_orders');
-  if (permissions.canAdvanceOrders) backendPermissions.push('update_orders');
-  if (permissions.canAccessPOS) backendPermissions.push('view_orders'); // POS access needs view orders
-  if (permissions.canViewReports) backendPermissions.push('view_analytics');
-  if (permissions.canManageMenu) backendPermissions.push('manage_menu');
-  if (permissions.canManageStaff) backendPermissions.push('manage_employees');
+  if (permissions.canPlaceOrders)    backendPermissions.push('create_orders');
+  if (permissions.canAdvanceOrders)  backendPermissions.push('update_orders');
+  if (permissions.canAccessPOS)      backendPermissions.push('access_pos');
+  if (permissions.canViewReports)    backendPermissions.push('view_analytics');
+  if (permissions.canManageMenu)     backendPermissions.push('manage_menu');
+  if (permissions.canManageStaff)    backendPermissions.push('manage_employees');
+  if (permissions.canManageShifts)   backendPermissions.push('manage_shifts');
+  if (permissions.canManageSettings) backendPermissions.push('manage_settings');
+  if (permissions.canViewMyShifts)   backendPermissions.push('view_my_shifts');
+  if (permissions.canViewMySales)    backendPermissions.push('view_my_sales');
   
   return backendPermissions;
 }

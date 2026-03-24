@@ -1,13 +1,18 @@
 import apiClient, { ApiError } from '../client';
 import type { StaffRole } from '@/types/staff';
 
+export interface StaffBranch {
+  id: string;
+  name: string;
+  address: string;
+}
+
 export interface StaffUser {
   id: string;
   name: string;
   role: StaffRole;
-  branch: string;
-  branchId: string;
-  branchIds?: string[];
+  branches: StaffBranch[];
+  permissions: string[];
   email?: string;
   phone?: string;
   pin?: string;

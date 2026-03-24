@@ -320,8 +320,8 @@ function ArchiveConfirm({
 
 export default function ManagerStaffPage() {
     const { staffUser } = useStaffAuth();
-    const currentBranch = staffUser?.branch ?? 'East Legon';
-    const branchId = staffUser?.branchId;
+    const currentBranch = staffUser?.branches[0]?.name ?? '';
+    const branchId = staffUser?.branches[0]?.id;
     
     const { data: apiStaff = [], isLoading } = useQuery({
         queryKey: ['branch-employees', branchId],

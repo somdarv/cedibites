@@ -5,11 +5,17 @@ import { ApiStaffService } from './staff.service.api';
 export type { StaffMember, StaffStatus, StaffRole } from '@/types/staff';
 import type { StaffMember, StaffStatus, StaffRole } from '@/types/staff';
 
+export interface StaffBranch {
+    id: string;
+    name: string;
+    address: string;
+}
+
 export interface StaffUser {
     id: string;
     name: string;
     role: StaffRole;
-    branch: string;
+    branches: StaffBranch[];
 }
 
 export interface StaffFilter {

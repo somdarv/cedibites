@@ -15,6 +15,10 @@ export interface StaffPermissions {
     canViewReports:   boolean;
     canManageMenu:    boolean;
     canManageStaff:   boolean;
+    canManageShifts:  boolean;
+    canManageSettings: boolean;
+    canViewMyShifts:  boolean;
+    canViewMySales:   boolean;
 }
 
 export interface StaffMember {
@@ -51,18 +55,18 @@ export function defaultPermissions(role: StaffRole): StaffPermissions {
     switch (role) {
         case 'admin':
         case 'super_admin':
-            return { canPlaceOrders: true,  canAdvanceOrders: true,  canAccessPOS: true,  canViewReports: true,  canManageMenu: true,  canManageStaff: true  };
-        case 'branch_partner':
-            return { canPlaceOrders: false, canAdvanceOrders: false, canAccessPOS: false, canViewReports: true,  canManageMenu: false, canManageStaff: false };
+            return { canPlaceOrders: true,  canAdvanceOrders: true,  canAccessPOS: true,  canViewReports: true,  canManageMenu: true,  canManageStaff: true,  canManageShifts: true,  canManageSettings: true,  canViewMyShifts: true,  canViewMySales: true  };
         case 'manager':
-            return { canPlaceOrders: true,  canAdvanceOrders: true,  canAccessPOS: true,  canViewReports: true,  canManageMenu: true,  canManageStaff: true  };
+            return { canPlaceOrders: true,  canAdvanceOrders: true,  canAccessPOS: true,  canViewReports: true,  canManageMenu: true,  canManageStaff: true,  canManageShifts: true,  canManageSettings: true,  canViewMyShifts: true,  canViewMySales: false };
+        case 'branch_partner':
+            return { canPlaceOrders: false, canAdvanceOrders: false, canAccessPOS: false, canViewReports: true,  canManageMenu: false, canManageStaff: false, canManageShifts: false, canManageSettings: false, canViewMyShifts: false, canViewMySales: false };
         case 'call_center':
-            return { canPlaceOrders: true,  canAdvanceOrders: false, canAccessPOS: true,  canViewReports: false, canManageMenu: false, canManageStaff: false };
+            return { canPlaceOrders: true,  canAdvanceOrders: false, canAccessPOS: false, canViewReports: false, canManageMenu: false, canManageStaff: false, canManageShifts: false, canManageSettings: false, canViewMyShifts: true,  canViewMySales: true  };
         case 'employee':
-            return { canPlaceOrders: true,  canAdvanceOrders: true,  canAccessPOS: true,  canViewReports: false, canManageMenu: false, canManageStaff: false };
+            return { canPlaceOrders: true,  canAdvanceOrders: true,  canAccessPOS: true,  canViewReports: false, canManageMenu: false, canManageStaff: false, canManageShifts: false, canManageSettings: false, canViewMyShifts: true,  canViewMySales: true  };
         case 'kitchen':
         case 'rider':
-            return { canPlaceOrders: false, canAdvanceOrders: false, canAccessPOS: false, canViewReports: false, canManageMenu: false, canManageStaff: false };
+            return { canPlaceOrders: false, canAdvanceOrders: false, canAccessPOS: false, canViewReports: false, canManageMenu: false, canManageStaff: false, canManageShifts: false, canManageSettings: false, canViewMyShifts: false, canViewMySales: false };
     }
 }
 

@@ -156,7 +156,7 @@ export default function StaffProfilePage() {
 
     if (!staffUser) return null;
 
-    const branchDisplay = Array.isArray(staffUser.branch) ? staffUser.branch.join(', ') : staffUser.branch;
+    const branchDisplay = staffUser.branches.map(b => b.name).join(', ');
 
     return (
         <div className="px-4 md:px-8 py-6 max-w-2xl mx-auto">
