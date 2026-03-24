@@ -155,8 +155,8 @@ export function BranchProvider({ children }: { children: ReactNode }) {
         if (branches.length === 0) return; // Wait for branches to load
 
         const savedId = localStorage.getItem('selected-branch-id');
-        if (savedId && !selectedBranch) {
-            const branch = branches.find(b => b.id === savedId);
+        if (!selectedBranch) {
+            const branch = (savedId && branches.find(b => b.id === savedId)) || branches[0];
             if (branch) setSelectedBranch(branch);
         }
     }, [branches, selectedBranch]);
