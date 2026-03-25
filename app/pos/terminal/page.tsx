@@ -867,7 +867,7 @@ function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
             <div className="pt-2 space-y-2">
               <input
                 type="tel"
-                placeholder="Customer phone number"
+                placeholder="MoMo phone number"
                 value={momoNumber}
                 onChange={e => {
                   setMomoNumber(e.target.value);
