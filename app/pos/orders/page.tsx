@@ -37,7 +37,6 @@ export default function POSOrdersPage() {
     session,
     isSessionValid,
     isSessionLoaded,
-    seedTestOrders,
   } = usePOS();
   const { logout } = useStaffAuth();
   const { branches } = useBranch();
@@ -116,13 +115,6 @@ export default function POSOrdersPage() {
             </div>
           </div>
 
-          <button
-            onClick={seedTestOrders}
-            className="w-10 h-10 rounded-xl bg-neutral-gray/10 flex items-center justify-center text-neutral-gray hover:text-text-dark hover:bg-neutral-gray/20 transition-colors"
-            title="Load test orders"
-          >
-            <FlaskIcon className="w-5 h-5" />
-          </button>
 
           <button
             onClick={() => setIsSignOutOpen(true)}
