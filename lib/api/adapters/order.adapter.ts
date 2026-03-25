@@ -13,6 +13,7 @@ export interface TimelineEvent {
   status: string;
   at: string;
   by: string;
+  byName?: string;
 }
 
 export interface AdminOrder {
@@ -22,6 +23,7 @@ export interface AdminOrder {
   email?: string;
   address: string;
   branch: string;
+  assignedEmployee?: string;
   source: OrderSource;
   items: AdminOrderItem[];
   amount: number;
@@ -123,17 +125,19 @@ function formatStatusLabel(status: string): string {
 
 function buildTimeline(
   createdAt: string,
-  statusHistory?: Array<{ status: string; changed_at?: string; created_at?: string; changed_by_type?: string }>
+  statusHistory?: Array<{ status: string; changed_at?: string; created_at?: string; changed_by_type?: string; changed_by?: { name?: string } }>
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
   if (statusHistory?.length) {
     for (const h of statusHistory) {
       const at = (h as { changed_at?: string; created_at?: string }).changed_at ?? (h as { created_at?: string }).created_at ?? createdAt;
-      const by = h.changed_by_type === 'employee' ? 'Staff' : h.changed_by_type === 'customer' ? 'Customer' : 'System';
+      const byType = h.changed_by_type === 'employee' ? 'Staff' : h.changed_by_type === 'customer' ? 'Customer' : 'System';
+      const byName = h.changed_by?.name;
       events.push({
         status: formatStatusLabel(h.status),
         at: formatTime(at),
-        by,
+        by: byType,
+        byName,
       });
     }
   } else {
@@ -180,7 +184,7 @@ export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
   const paymentMethod = (primaryPayment?.payment_method ?? 'momo').toLowerCase().replace(/\s+/g, '_');
   const payment = PAYMENT_METHOD_MAP[paymentMethod] ?? paymentMethod.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-  const statusHistory = (api as { status_history?: Array<{ status: string; created_at: string; causer?: { name?: string } }> }).status_history;
+  const statusHistory = (api as { status_history?: Array<{ status: string; created_at: string; changed_by?: { name?: string }; changed_by_type?: string }> }).status_history;
   const timeline = buildTimeline(api.created_at, statusHistory);
 
   return {
@@ -191,6 +195,7 @@ export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
     email: api.customer?.email,
     address: api.delivery_address ?? '—',
     branch: api.branch?.name ?? '—',
+    assignedEmployee: (api as { assigned_employee?: { name?: string } }).assigned_employee?.name,
     source,
     items,
     amount,
