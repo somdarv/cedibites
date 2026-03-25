@@ -202,7 +202,7 @@ export type OrderType = 'delivery' | 'pickup';
 
 export type PaymentMethod = 'mobile_money' | 'cash';
 
-export type PaymentStatus = 'pending' | 'paid' | 'completed' | 'failed' | 'refunded';
+export type PaymentStatus = 'pending' | 'paid' | 'completed' | 'failed' | 'refunded' | 'no_charge';
 
 export interface OrderItem {
   id: number;

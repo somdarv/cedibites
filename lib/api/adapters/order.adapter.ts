@@ -1,7 +1,7 @@
 import type { Order, OrderItem, Payment } from '@/types/api';
 
 export type OrderSource = 'Online' | 'POS' | 'WhatsApp' | 'Instagram' | 'Facebook' | 'Phone';
-export type PaymentMethod = 'Mobile Money' | 'Cash on Delivery' | 'Cash at Pickup';
+export type PaymentMethod = 'Mobile Money' | 'Cash on Delivery' | 'Cash at Pickup' | 'Cash' | 'Card' | 'Wallet' | 'GhQR' | 'No Charge';
 
 export interface AdminOrderItem {
   name: string;
@@ -25,8 +25,9 @@ export interface AdminOrder {
   source: OrderSource;
   items: AdminOrderItem[];
   amount: number;
+  amountPaid: number;
   payment: PaymentMethod;
-  paymentStatus: 'paid' | 'pending' | 'failed';
+  paymentStatus: 'paid' | 'pending' | 'failed' | 'refunded' | 'no_charge';
   hubtelRef?: string;
   status: string;
   placedAt: string;
@@ -47,8 +48,16 @@ const SOURCE_MAP: Record<string, OrderSource> = {
 
 const PAYMENT_METHOD_MAP: Record<string, PaymentMethod> = {
   momo: 'Mobile Money',
+  mobile_money: 'Mobile Money',
   cash_delivery: 'Cash on Delivery',
+  cash_on_delivery: 'Cash on Delivery',
   cash_pickup: 'Cash at Pickup',
+  cash_at_pickup: 'Cash at Pickup',
+  cash: 'Cash',
+  card: 'Card',
+  wallet: 'Wallet',
+  ghqr: 'GhQR',
+  no_charge: 'No Charge',
 };
 
 function formatTime(iso: string): string {
@@ -150,9 +159,13 @@ export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
   const primaryPayment = api.payments?.[0] ?? api.payment;
   const paymentStatus = primaryPayment?.payment_status === 'completed' || primaryPayment?.payment_status === 'paid'
     ? 'paid'
-    : primaryPayment?.payment_status === 'failed'
-      ? 'failed'
-      : 'pending';
+    : primaryPayment?.payment_status === 'no_charge'
+      ? 'no_charge'
+      : primaryPayment?.payment_status === 'failed'
+        ? 'failed'
+        : primaryPayment?.payment_status === 'refunded'
+          ? 'refunded'
+          : 'pending';
 
   const items: AdminOrderItem[] = (api.items ?? []).map((item) => ({
     name: getItemName(item),
@@ -161,10 +174,11 @@ export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
   }));
 
   const amount = Number(api.total_amount ?? api.subtotal ?? 0);
+  const amountPaid = Number(primaryPayment?.amount ?? 0);
   const orderSource = (api.order_source ?? 'online').toLowerCase().replace(/\s+/g, '_');
   const source = SOURCE_MAP[orderSource] ?? 'Online';
   const paymentMethod = (primaryPayment?.payment_method ?? 'momo').toLowerCase().replace(/\s+/g, '_');
-  const payment = PAYMENT_METHOD_MAP[paymentMethod] ?? 'Mobile Money';
+  const payment = PAYMENT_METHOD_MAP[paymentMethod] ?? paymentMethod.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   const statusHistory = (api as { status_history?: Array<{ status: string; created_at: string; causer?: { name?: string } }> }).status_history;
   const timeline = buildTimeline(api.created_at, statusHistory);
@@ -180,6 +194,7 @@ export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
     source,
     items,
     amount,
+    amountPaid,
     payment,
     paymentStatus,
     hubtelRef: primaryPayment?.transaction_id,

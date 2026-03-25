@@ -31,7 +31,8 @@ import {
 
 type OrderStatus = 'received' | 'preparing' | 'ready' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'completed' | 'cancelled';
 type OrderSource = 'Online' | 'POS' | 'WhatsApp' | 'Instagram' | 'Facebook' | 'Phone';
-type PaymentMethod = 'Mobile Money' | 'Cash on Delivery' | 'Cash at Pickup';
+type PaymentMethod = 'Mobile Money' | 'Cash on Delivery' | 'Cash at Pickup' | 'Cash' | 'Card' | 'Wallet' | 'GhQR' | 'No Charge';
+type PaymentStatus = 'Paid' | 'Pending' | 'Failed' | 'Refunded' | 'No Charge';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,8 @@ const SOURCE_STYLES: Record<OrderSource, string> = {
 
 const ALL_STATUSES: OrderStatus[] = ['received', 'preparing', 'ready', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'completed', 'cancelled'];
 const ALL_SOURCES: OrderSource[] = ['Online', 'POS', 'WhatsApp', 'Instagram', 'Facebook', 'Phone'];
-const ALL_PAYMENTS: PaymentMethod[] = ['Mobile Money', 'Cash on Delivery', 'Cash at Pickup'];
+const ALL_PAYMENTS: PaymentMethod[] = ['Mobile Money', 'Cash', 'Card', 'Wallet', 'GhQR', 'No Charge'];
+const ALL_PAYMENT_STATUSES: PaymentStatus[] = ['Paid', 'Pending', 'Failed', 'Refunded', 'No Charge'];
 
 const SOURCE_TO_API: Record<OrderSource, string> = {
     Online: 'online',
@@ -66,6 +68,14 @@ const SOURCE_TO_API: Record<OrderSource, string> = {
     Instagram: 'instagram',
     Facebook: 'facebook',
     Phone: 'phone',
+};
+
+const PAYMENT_STATUS_TO_API: Record<PaymentStatus, string> = {
+    Paid: 'completed',
+    Pending: 'pending',
+    Failed: 'failed',
+    Refunded: 'refunded',
+    'No Charge': 'no_charge',
 };
 
 const PAGE_SIZE = 25;
@@ -234,9 +244,23 @@ function OrderDetailPanel({
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-neutral-gray text-xs font-body">Status</span>
-                                <span className={`text-xs font-semibold font-body capitalize ${order.paymentStatus === 'paid' ? 'text-secondary' : order.paymentStatus === 'failed' ? 'text-error' : 'text-warning'}`}>
-                                    {order.paymentStatus}
+                                <span className={`text-xs font-semibold font-body capitalize ${
+                                    order.paymentStatus === 'paid' ? 'text-secondary' : 
+                                    order.paymentStatus === 'failed' ? 'text-error' : 
+                                    order.paymentStatus === 'pending' ? 'text-warning' : 
+                                    order.paymentStatus === 'refunded' ? 'text-blue-600' :
+                                    'text-neutral-gray'
+                                }`}>
+                                    {order.paymentStatus === 'no_charge' ? 'No Charge' : order.paymentStatus}
                                 </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-neutral-gray text-xs font-body">Order Total</span>
+                                <span className="text-text-dark text-xs font-semibold font-body">{formatGHS(order.amount)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-neutral-gray text-xs font-body">Amount Paid</span>
+                                <span className="text-primary text-xs font-bold font-body">{formatGHS(order.amountPaid)}</span>
                             </div>
                             {order.hubtelRef && (
                                 <div className="flex justify-between">
@@ -372,6 +396,7 @@ export default function AdminOrdersPage() {
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [selectedSources, setSelectedSources] = useState<string[]>([]);
     const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
+    const [selectedPaymentStatuses, setSelectedPaymentStatuses] = useState<string[]>([]);
     const [datePreset, setDatePreset] = useState('Today');
     const [page, setPage] = useState(0);
     const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
@@ -400,6 +425,10 @@ export default function AdminOrdersPage() {
             const mappedSources = selectedSources.map((s) => SOURCE_TO_API[s as OrderSource]);
             params.order_source = mappedSources.join(',');
         }
+        if (selectedPaymentStatuses.length) {
+            const mappedStatuses = selectedPaymentStatuses.map((s) => PAYMENT_STATUS_TO_API[s as PaymentStatus]);
+            params.payment_status = mappedStatuses;
+        }
         if (selectedBranches.length === 1 && branchIdByName[selectedBranches[0]]) {
             params.branch_id = branchIdByName[selectedBranches[0]];
         }
@@ -407,7 +436,7 @@ export default function AdminOrdersPage() {
         if (range.date_from) params.date_from = range.date_from;
         if (range.date_to) params.date_to = range.date_to;
         return params;
-    }, [search, selectedStatuses, selectedSources, selectedBranches, datePreset, page, branchIdByName]);
+    }, [search, selectedStatuses, selectedSources, selectedBranches, selectedPaymentStatuses, datePreset, page, branchIdByName]);
 
     const { orders, meta, isLoading } = useEmployeeOrders(orderParams);
 
@@ -428,7 +457,7 @@ export default function AdminOrdersPage() {
         set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
     }
 
-    const activeFilterCount = selectedBranches.length + selectedStatuses.length + selectedSources.length + selectedPayments.length;
+    const activeFilterCount = selectedBranches.length + selectedStatuses.length + selectedSources.length + selectedPayments.length + selectedPaymentStatuses.length;
 
     const handleExportCsv = useCallback(async () => {
         setIsExporting(true);
@@ -438,6 +467,9 @@ export default function AdminOrdersPage() {
             if (selectedStatuses.length) exportParams.status = selectedStatuses;
             if (selectedSources.length) {
                 exportParams.order_source = selectedSources.map((s) => SOURCE_TO_API[s as OrderSource]).join(',');
+            }
+            if (selectedPaymentStatuses.length) {
+                exportParams.payment_status = selectedPaymentStatuses.map((s) => PAYMENT_STATUS_TO_API[s as PaymentStatus]);
             }
             if (selectedBranches.length === 1 && branchIdByName[selectedBranches[0]]) {
                 exportParams.branch_id = branchIdByName[selectedBranches[0]];
@@ -484,7 +516,7 @@ export default function AdminOrdersPage() {
         } finally {
             setIsExporting(false);
         }
-    }, [search, selectedStatuses, selectedSources, selectedBranches, selectedPayments, datePreset, branchIdByName]);
+    }, [search, selectedStatuses, selectedSources, selectedBranches, selectedPayments, selectedPaymentStatuses, datePreset, branchIdByName]);
 
     return (
         <div className="px-4 md:px-8 py-6 max-w-7xl mx-auto">
@@ -546,19 +578,20 @@ export default function AdminOrdersPage() {
 
                 {/* Expanded filters */}
                 {showFilters && (
-                    <div className="border-t border-[#f0e8d8] pt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="border-t border-[#f0e8d8] pt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                         <FilterGroup label="Branch" options={branches} selected={selectedBranches} onToggle={(b: any) => toggleFilter(selectedBranches, setSelectedBranches, b.name)} keyFn={(b: any) => b.id} valueFn={(b: any) => b.name} labelFn={(b: any) => b.name} />
                         <FilterGroup label="Status" options={ALL_STATUSES} selected={selectedStatuses} onToggle={v => toggleFilter(selectedStatuses, setSelectedStatuses, v)} labelFn={v => STATUS_STYLES[v]?.label ?? v} />
                         <FilterGroup label="Source" options={ALL_SOURCES} selected={selectedSources} onToggle={v => toggleFilter(selectedSources, setSelectedSources, v)} />
-                        <FilterGroup label="Payment" options={ALL_PAYMENTS} selected={selectedPayments} onToggle={v => toggleFilter(selectedPayments, setSelectedPayments, v)} />
+                        <FilterGroup label="Payment Method" options={ALL_PAYMENTS} selected={selectedPayments} onToggle={v => toggleFilter(selectedPayments, setSelectedPayments, v)} />
+                        <FilterGroup label="Payment Status" options={ALL_PAYMENT_STATUSES} selected={selectedPaymentStatuses} onToggle={v => toggleFilter(selectedPaymentStatuses, setSelectedPaymentStatuses, v)} />
                     </div>
                 )}
             </div>
 
             {/* Table */}
             <div className="bg-neutral-card border border-[#f0e8d8] rounded-2xl overflow-hidden mb-4">
-                <div className="hidden md:grid grid-cols-[1.2fr_1fr_0.9fr_1.3fr_1fr_1.2fr_1fr_1fr] gap-3 px-4 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
-                    {['Order #', 'Branch', 'Source', 'Customer', 'Payment', 'Status', 'Amount', 'Time'].map(h => (
+                <div className="hidden md:grid grid-cols-[1fr_0.9fr_0.8fr_1.2fr_0.9fr_0.9fr_1fr_1fr_0.8fr] gap-3 px-4 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
+                    {['Order #', 'Branch', 'Source', 'Customer', 'Payment Method', 'Payment Status', 'Status', 'Order / Paid', 'Time'].map(h => (
                         <span key={h} className="text-neutral-gray text-[10px] font-bold font-body uppercase tracking-wider">{h}</span>
                     ))}
                 </div>
@@ -576,7 +609,7 @@ export default function AdminOrdersPage() {
                         <div
                             key={order.id}
                             onClick={() => setSelectedOrder(order)}
-                            className={`px-4 py-3.5 flex flex-col md:grid md:grid-cols-[1.2fr_1fr_0.9fr_1.3fr_1fr_1.2fr_1fr_1fr] gap-2 md:gap-3 md:items-center cursor-pointer hover:bg-neutral-light/60 transition-colors ${i < pageOrders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
+                            className={`px-4 py-3.5 flex flex-col md:grid md:grid-cols-[1fr_0.9fr_0.8fr_1.2fr_0.9fr_0.9fr_1fr_1fr_0.8fr] gap-2 md:gap-3 md:items-center cursor-pointer hover:bg-neutral-light/60 transition-colors ${i < pageOrders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
                         >
                             <div className="flex items-center gap-2 md:block">
                                 <span className="text-text-dark text-sm font-bold font-body">#{order.id}</span>
@@ -588,9 +621,21 @@ export default function AdminOrdersPage() {
                                 <p className="text-text-dark text-xs font-semibold font-body truncate">{order.customer}</p>
                                 <p className="text-neutral-gray text-[10px] font-body">{order.phone}</p>
                             </div>
-                            <span className="text-neutral-gray text-[10px] font-body">{order.payment.split(' ')[0]}</span>
+                            <span className="text-neutral-gray text-[10px] font-body">{order.payment}</span>
+                            <span className={`text-[10px] font-semibold font-body capitalize ${
+                                order.paymentStatus === 'paid' ? 'text-secondary' : 
+                                order.paymentStatus === 'failed' ? 'text-error' : 
+                                order.paymentStatus === 'pending' ? 'text-warning' : 
+                                order.paymentStatus === 'refunded' ? 'text-blue-600' :
+                                'text-neutral-gray'
+                            }`}>
+                                {order.paymentStatus === 'no_charge' ? 'No Charge' : order.paymentStatus}
+                            </span>
                             <StatusBadge status={order.status} />
-                            <span className="text-text-dark text-sm font-bold font-body">{formatGHS(order.amount)}</span>
+                            <div className="flex flex-col">
+                                <span className="text-text-dark text-sm font-bold font-body">{formatGHS(order.amount)}</span>
+                                <span className="text-neutral-gray text-[10px] font-body">Paid: {formatGHS(order.amountPaid)}</span>
+                            </div>
                             <span className="text-neutral-gray text-xs font-body">{order.placedAt}</span>
                         </div>
                     ))
