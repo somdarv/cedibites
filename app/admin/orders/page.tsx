@@ -217,6 +217,16 @@ function OrderDetailPanel({
                         </div>
                     </div>
 
+                    {/* Assigned Employee */}
+                    {order.assignedEmployee && (
+                        <div>
+                            <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-2">Assigned Staff</p>
+                            <div className="bg-neutral-light rounded-xl p-3">
+                                <p className="text-text-dark text-sm font-semibold font-body">{order.assignedEmployee}</p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Items */}
                     <div>
                         <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-2">Items</p>
@@ -283,7 +293,9 @@ function OrderDetailPanel({
                                     </div>
                                     <div className="pb-3">
                                         <p className="text-text-dark text-xs font-semibold font-body">{ev.status}</p>
-                                        <p className="text-neutral-gray text-[10px] font-body">{ev.at} · {ev.by}</p>
+                                        <p className="text-neutral-gray text-[10px] font-body">
+                                            {ev.at} · {ev.by}{ev.byName ? ` (${ev.byName})` : ''}
+                                        </p>
                                     </div>
                                 </div>
                             ))}
