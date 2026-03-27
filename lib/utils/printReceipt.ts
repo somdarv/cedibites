@@ -8,6 +8,12 @@ export interface ReceiptBranch {
   phone?: string;
 }
 
+export type ReceiptKind = 'original' | 'reprint';
+
+export interface PrintReceiptOptions {
+  kind?: ReceiptKind;
+}
+
 function formatDateTime(d: Date): string {
   const date = d.toLocaleDateString('en-GH', { day: 'numeric', month: 'long', year: 'numeric' });
   const time = d.toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
@@ -22,7 +28,8 @@ const paymentLabel: Record<string, string> = {
   no_charge: 'NO CHARGE',
 };
 
-function receiptHTML(order: Order, branch: ReceiptBranch): string {
+function receiptHTML(order: Order, branch: ReceiptBranch, kind: ReceiptKind): string {
+  const sectionTitle = kind === 'reprint' ? 'Reprinted Receipt' : 'Original Receipt';
   const createdAt = new Date(order.placedAt);
 
   const itemRows = order.items.map(item => {
@@ -151,7 +158,7 @@ function receiptHTML(order: Order, branch: ReceiptBranch): string {
   </table>
 
   <div class="divider"></div>
-  <div class="section-title">Original Receipt</div>
+  <div class="section-title">${sectionTitle}</div>
   <div class="thin-divider"></div>
 
   <table class="items-table">
@@ -210,14 +217,19 @@ function receiptHTML(order: Order, branch: ReceiptBranch): string {
 </html>`;
 }
 
-export function printReceipt(order: Order, branch: ReceiptBranch | string): void {
+export function printReceipt(
+  order: Order,
+  branch: ReceiptBranch | string,
+  options?: PrintReceiptOptions,
+): void {
   const resolvedBranch: ReceiptBranch = typeof branch === 'string' ? { name: branch } : branch;
+  const kind: ReceiptKind = options?.kind === 'reprint' ? 'reprint' : 'original';
   const win = window.open('', '_blank', 'width=420,height=700');
   if (!win) {
     toast.error('Popup blocked — please allow popups for this site to print receipts.');
     return;
   }
-  win.document.write(receiptHTML(order, resolvedBranch));
+  win.document.write(receiptHTML(order, resolvedBranch, kind));
   win.document.close();
   win.focus();
   setTimeout(() => {

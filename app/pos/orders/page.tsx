@@ -224,7 +224,7 @@ function OrderCard({ order, branchName }: OrderCardProps) {
       <div className="px-4 pb-3 flex items-center justify-between gap-2 border-t border-neutral-gray/10 pt-2.5 mt-1">
         <span className="font-bold text-primary">{formatGHS(order.total)}</span>
         <button
-          onClick={() => printReceipt(order, branchName)}
+          onClick={() => printReceipt(order, branchName, { kind: 'reprint' })}
           className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium text-neutral-gray border border-neutral-gray/20 hover:text-text-dark hover:border-neutral-gray/40 transition-colors"
           title="Reprint Receipt"
         >
