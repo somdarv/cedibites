@@ -21,6 +21,7 @@ const restaurantJsonLd = {
   priceRange: 'GH₵60 - GH₵255',
   currenciesAccepted: 'GHS',
   paymentAccepted: 'Cash, Mobile Money',
+  telephone: ['+233548162282', '+233500165512'],
   image: 'https://app.cedibites.com/og-default.png',
   address: {
     '@type': 'PostalAddress',
