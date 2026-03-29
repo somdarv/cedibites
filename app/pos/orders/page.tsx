@@ -25,8 +25,12 @@ import { printReceipt } from '@/lib/utils/printReceipt';
 import { FULFILLMENT_LABELS } from '@/lib/constants/order.constants';
 import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
 import { mapApiOrderToOrder } from '@/lib/api/adapters/order.adapter';
+import { formatOrderLineItemSummary } from '@/lib/utils/orderItemDisplay';
 
 function formatOrderTime(placedAt: number): string {
+  if (!placedAt) {
+    return '—';
+  }
   const d = new Date(placedAt);
   return d.toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
@@ -56,7 +60,7 @@ export default function POSOrdersPage() {
 
   // Fetch today's completed orders from API
   const today = new Date().toISOString().split('T')[0];
-  const { orders: apiOrders, isLoading } = useEmployeeOrders({
+  const { orders: rawOrders, isLoading } = useEmployeeOrders({
     branch_id: session?.branchId ? Number(session.branchId) : undefined,
     status: ['completed', 'delivered'],
     date_from: today,
@@ -65,8 +69,8 @@ export default function POSOrdersPage() {
   });
 
   const fulfilledOrders = useMemo(
-    () => apiOrders.map(mapApiOrderToOrder).sort((a, b) => b.placedAt - a.placedAt),
-    [apiOrders]
+    () => rawOrders.map(mapApiOrderToOrder).sort((a, b) => b.placedAt - a.placedAt),
+    [rawOrders]
   );
 
   const todayRevenue = useMemo(
@@ -168,9 +172,7 @@ interface OrderCardProps {
 }
 
 function OrderCard({ order, branchName }: OrderCardProps) {
-  const itemSummary = order.items
-    .map(i => `${i.name} ×${i.quantity}`)
-    .join(', ');
+  const itemSummary = order.items.map((i) => formatOrderLineItemSummary(i)).join(', ');
 
   return (
     <div className="bg-white rounded-2xl border border-neutral-gray/15 shadow-sm overflow-hidden">
@@ -221,7 +223,7 @@ function OrderCard({ order, branchName }: OrderCardProps) {
       <div className="px-4 pb-3 flex items-center justify-between gap-2 border-t border-neutral-gray/10 pt-2.5 mt-1">
         <span className="font-bold text-primary">{formatGHS(order.total)}</span>
         <button
-          onClick={() => printReceipt(order, branchName)}
+          onClick={() => printReceipt(order, branchName, { kind: 'reprint' })}
           className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium text-neutral-gray border border-neutral-gray/20 hover:text-text-dark hover:border-neutral-gray/40 transition-colors"
           title="Reprint Receipt"
         >

@@ -151,12 +151,16 @@ function buildTimeline(
 }
 
 function getItemName(item: OrderItem): string {
-  const snapshot = (item as { menu_item_snapshot?: { name?: string } }).menu_item_snapshot;
-  const name = snapshot?.name ?? item.menu_item?.name;
-  const size = item.menu_item_option_snapshot?.option_label
+  const name = item.menu_item_snapshot?.name ?? item.menu_item?.name ?? 'Item';
+  const size =
+    item.menu_item_option_snapshot?.option_label
+    ?? item.option_snapshot?.option_label
     ?? item.menu_item_option?.option_label;
-  if (size) return `${name ?? 'Item'} (${size})`;
-  return name ?? 'Item';
+  if (size) {
+    return `${name} (${size})`;
+  }
+
+  return name;
 }
 
 export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
@@ -212,40 +216,47 @@ export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
 }
 
 
-/**
- * Map API order to POS/Kitchen Order type
- */
+/** ISO timestamp from raw API (`created_at`). */
+function orderCreatedIso(api: { created_at?: string; createdAt?: string }): string | undefined {
+  return api.created_at ?? api.createdAt;
+}
+
+/** Map OrderResource payload to unified POS `Order` (line items: menu snapshot/name and option fields kept separate). */
 export function mapApiOrderToOrder(api: any): import('@/types/order').Order {
+  const createdIso = orderCreatedIso(api);
+
   const primaryPayment = api.payments?.[0] ?? api.payment;
-  
-  // Helper to get item name with size
-  const getOrderItemName = (item: any): string => {
-    const snapshot = item.menu_item_snapshot;
-    const menuItem = item.menu_item;
-    const name = snapshot?.name ?? menuItem?.name ?? 'Item';
-    const sizeLabel = item.menu_item_option_snapshot?.option_label ?? item.option?.option_label;
-    if (sizeLabel) return `${name} (${sizeLabel})`;
-    return name;
-  };
-  
+
   return {
     id: String(api.id),
     orderNumber: api.order_number ?? String(api.id),
     status: api.status ?? 'received',
     source: (api.order_source ?? 'pos') as import('@/types/order').OrderSource,
     fulfillmentType: (api.order_type ?? 'pickup') as import('@/types/order').FulfillmentType,
-    paymentMethod: (primaryPayment?.payment_method ?? 'cash') as import('@/types/order').PaymentMethod,
+    paymentMethod: (primaryPayment?.payment_method ?? api.payment_method ?? 'cash') as import('@/types/order').PaymentMethod,
     isPaid: primaryPayment?.payment_status === 'completed' || primaryPayment?.payment_status === 'no_charge',
     paymentStatus: (primaryPayment?.payment_status === 'completed' || primaryPayment?.payment_status === 'no_charge' ? 'completed' : primaryPayment?.payment_status ?? 'pending') as import('@/types/order').PaymentStatus,
     paymentId: primaryPayment?.id,
+    amountPaid: primaryPayment?.amount != null ? Number(primaryPayment.amount) : undefined,
+    staffName:
+      typeof api.assignedEmployee === 'string'
+        ? api.assignedEmployee
+        : api.assigned_employee?.name,
     items: (api.items ?? []).map((item: any) => ({
       id: String(item.id),
       menuItemId: String(item.menu_item_id),
-      name: getOrderItemName(item),
+      name: item.menu_item_snapshot?.name ?? item.menu_item?.name ?? '',
       quantity: Number(item.quantity ?? 1),
       unitPrice: Number(item.unit_price ?? 0),
       sizeId: item.menu_item_option_id,
-      sizeLabel: item.menu_item_option_snapshot?.option_label ?? item.option?.option_label,
+      sizeLabel:
+        item.menu_item_option_snapshot?.option_label
+        ?? item.option_snapshot?.option_label
+        ?? item.option?.option_label,
+      variantKey:
+        item.menu_item_option_snapshot?.option_key
+        ?? item.option_snapshot?.option_key
+        ?? item.option?.option_key,
       notes: item.special_instructions,
       category: item.menu_item?.category,
     })),
@@ -271,7 +282,7 @@ export function mapApiOrderToOrder(api: any): import('@/types/order').Order {
         longitude: Number(api.branch?.longitude ?? 0),
       },
     },
-    placedAt: api.created_at ? new Date(api.created_at).getTime() : Date.now(),
+    placedAt: createdIso ? new Date(createdIso).getTime() : 0,
     acceptedAt: api.accepted_at ? new Date(api.accepted_at).getTime() : undefined,
     startedAt: api.started_at ? new Date(api.started_at).getTime() : undefined,
     readyAt: api.ready_at ? new Date(api.ready_at).getTime() : undefined,

@@ -51,8 +51,12 @@ const ROLE_STYLES: Record<StaffRole, string> = {
     rider:          'bg-secondary/15 text-secondary',
 };
 
-function initials(name: string) {
-    return name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+function initials(name?: string | null) {
+    const safeName = (name ?? '').trim();
+    if (!safeName) {
+        return 'NA';
+    }
+    return safeName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 }
 
 function branchDisplay(branch: string | string[]) {
@@ -180,7 +184,11 @@ function memberToForm(s: StaffMember): StaffFormState {
     }
 
     return {
-        name: s.name, phone: s.phone, email: s.email, password: '', passwordConfirm: '',
+        name: s.name,
+        phone: s.phone ?? '',
+        email: s.email ?? '',
+        password: '',
+        passwordConfirm: '',
         role: s.role,
         branch: branchValue,
         employmentStatus: s.employmentStatus,
@@ -743,7 +751,11 @@ export default function AdminStaffPage() {
         let list = staff.filter(s => matchesTab(s, tab));
         if (search.trim()) {
             const q = search.toLowerCase();
-            list = list.filter(s => s.name.toLowerCase().includes(q) || s.phone.includes(q) || s.email.toLowerCase().includes(q));
+            list = list.filter(
+                s => s.name.toLowerCase().includes(q)
+                    || (s.phone ?? '').includes(q)
+                    || (s.email ?? '').toLowerCase().includes(q)
+            );
         }
         return list;
     }, [staff, tab, search]);

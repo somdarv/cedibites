@@ -1,11 +1,18 @@
-import type { Order } from '@/types/order';
+import type { Order, OrderItem } from '@/types/order';
 import { FULFILLMENT_LABELS } from '@/lib/constants/order.constants';
 import { toast } from '@/lib/utils/toast';
+import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
 
 export interface ReceiptBranch {
   name: string;
   address?: string;
   phone?: string;
+}
+
+export type ReceiptKind = 'original' | 'reprint';
+
+export interface PrintReceiptOptions {
+  kind?: ReceiptKind;
 }
 
 function formatDateTime(d: Date): string {
@@ -22,11 +29,26 @@ const paymentLabel: Record<string, string> = {
   no_charge: 'NO CHARGE',
 };
 
-function receiptHTML(order: Order, branch: ReceiptBranch): string {
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Receipt item cell HTML — DB-backed option label when present (getOrderItemLineLabel). */
+export function formatReceiptItemLabel(item: OrderItem): string {
+  return escapeHtml(getOrderItemLineLabel(item));
+}
+
+
+function receiptHTML(order: Order, branch: ReceiptBranch, kind: ReceiptKind): string {
+  const sectionTitle = kind === 'reprint' ? 'Reprinted Receipt' : 'Original Receipt';
   const createdAt = new Date(order.placedAt);
 
   const itemRows = order.items.map(item => {
-    const label = item.sizeLabel ? `${item.name} (${item.sizeLabel})` : item.name;
+    const label = formatReceiptItemLabel(item);
     const lineTotal = (item.unitPrice * item.quantity).toFixed(2);
     return `
       <tr>
@@ -38,13 +60,6 @@ function receiptHTML(order: Order, branch: ReceiptBranch): string {
   }).join('');
 
   const subtotal = order.subtotal ?? order.total;
-  // Prices are tax-inclusive; back-calculate the included tax amounts.
-  // Ghana GRA: VAT 15% + NHIL 2.5% + GETFund 2.5% = 20% total
-  // Included tax = price × 20/120
-  const includedTax = order.tax ?? subtotal * (20 / 120);
-  const vatAmount     = includedTax * (15 / 20);
-  const nhilAmount    = includedTax * (2.5 / 20);
-  const getFundAmount = includedTax * (2.5 / 20);
   const deliveryFee = order.deliveryFee ?? 0;
   const discount = order.discount ?? 0;
   const total = order.total;
@@ -127,7 +142,7 @@ function receiptHTML(order: Order, branch: ReceiptBranch): string {
 <body>
 
   <div class="center brand">CediBites</div>
-  <div class="center invoice-title">TAX INVOICE</div>
+  <div class="center invoice-title">RECEIPT</div>
   <div class="center branch-info">${branch.name}</div>
   ${branch.address ? `<div class="center branch-info">${branch.address}</div>` : ''}
   ${branch.phone ? `<div class="center branch-info">Phone: ${branch.phone}</div>` : ''}
@@ -158,7 +173,7 @@ function receiptHTML(order: Order, branch: ReceiptBranch): string {
   </table>
 
   <div class="divider"></div>
-  <div class="section-title">Original Receipt</div>
+  <div class="section-title">${sectionTitle}</div>
   <div class="thin-divider"></div>
 
   <table class="items-table">
@@ -187,18 +202,6 @@ function receiptHTML(order: Order, branch: ReceiptBranch): string {
     <tr class="grand-total">
       <td colspan="3">TOTAL</td>
       <td class="amount">${total.toFixed(2)}</td>
-    </tr>
-    <tr>
-      <td colspan="3" style="padding-top:4px;font-size:10px;">Incl. VAT (15%)</td>
-      <td class="amount" style="font-size:10px;">${vatAmount.toFixed(2)}</td>
-    </tr>
-    <tr>
-      <td colspan="3" style="font-size:10px;">Incl. NHIL (2.5%)</td>
-      <td class="amount" style="font-size:10px;">${nhilAmount.toFixed(2)}</td>
-    </tr>
-    <tr>
-      <td colspan="3" style="font-size:10px;">Incl. GETFund (2.5%)</td>
-      <td class="amount" style="font-size:10px;">${getFundAmount.toFixed(2)}</td>
     </tr>
     ${amountPaidRow}
     ${changeRow}
@@ -229,14 +232,19 @@ function receiptHTML(order: Order, branch: ReceiptBranch): string {
 </html>`;
 }
 
-export function printReceipt(order: Order, branch: ReceiptBranch | string): void {
+export function printReceipt(
+  order: Order,
+  branch: ReceiptBranch | string,
+  options?: PrintReceiptOptions,
+): void {
   const resolvedBranch: ReceiptBranch = typeof branch === 'string' ? { name: branch } : branch;
+  const kind: ReceiptKind = options?.kind === 'reprint' ? 'reprint' : 'original';
   const win = window.open('', '_blank', 'width=420,height=700');
   if (!win) {
     toast.error('Popup blocked — please allow popups for this site to print receipts.');
     return;
   }
-  win.document.write(receiptHTML(order, resolvedBranch));
+  win.document.write(receiptHTML(order, resolvedBranch, kind));
   win.document.close();
   win.focus();
   setTimeout(() => {
