@@ -138,14 +138,14 @@ export default function StaffLoginPage() {
 
                 {/* Logo block */}
                 <div className="flex flex-col items-center mb-10">
-                    {/* <Image
+                    <Image
                         src="/cblogo.webp"
                         alt="CediBites"
                         width={72}
                         height={72}
                         className="mb-4"
                         priority
-                    /> */}
+                    />
                     <h1 className="text-primary text-3xl font-bold font-body tracking-tight">CediBites</h1>
                     <p className="text-neutral-gray text-sm mt-1 font-body">Staff Portal</p>
                 </div>
