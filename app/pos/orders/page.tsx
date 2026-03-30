@@ -32,7 +32,7 @@ function formatOrderTime(placedAt: number): string {
     return '—';
   }
   const d = new Date(placedAt);
-  return d.toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return d.toLocaleTimeString('en-GH', { timeZone: 'Africa/Accra', hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 export default function POSOrdersPage() {

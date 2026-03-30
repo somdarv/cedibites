@@ -65,7 +65,7 @@ const PAYMENT_METHOD_MAP: Record<string, PaymentMethod> = {
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleTimeString('en-GB', { timeZone: 'Africa/Accra', hour: 'numeric', minute: '2-digit' });
 }
 
 function formatPlacedAt(iso: string): string {
@@ -80,7 +80,7 @@ function formatPlacedAt(iso: string): string {
   if (d.toDateString() === yesterday.toDateString()) {
     return `Yesterday ${formatTime(iso)}`;
   }
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-GB', { timeZone: 'Africa/Accra', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatTimeAgo(iso: string): string {
@@ -107,7 +107,7 @@ function formatPlacedAtFull(iso: string): string {
   if (d.toDateString() === yesterday.toDateString()) {
     return `Yesterday ${formatTime(iso)}`;
   }
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-GB', { timeZone: 'Africa/Accra', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function formatStatusLabel(status: string): string {
