@@ -21,8 +21,6 @@ import {
     CashRegisterIcon,
     MonitorIcon,
     ClipboardTextIcon,
-    PlusCircleIcon,
-    HashStraightIcon,
     ReceiptIcon,
 } from '@phosphor-icons/react';
 import { useState } from 'react';
@@ -36,8 +34,6 @@ const ADMIN_NAV = [
     { href: '/admin/orders',     label: 'Orders',     icon: ListIcon                  },
     { href: '/admin/branches',   label: 'Branches',   icon: BuildingsIcon             },
     { href: '/admin/menu',       label: 'Menu',       icon: ForkKnifeIcon             },
-    { href: '/admin/menu-add-ons', label: 'Menu Add-ons', icon: PlusCircleIcon          },
-    { href: '/admin/menu-tags',    label: 'Menu Tags',    icon: HashStraightIcon         },
     { href: '/admin/staff',      label: 'Staff',      icon: UsersThreeIcon            },
     { href: '/admin/customers',  label: 'Customers',  icon: UserCircleIcon            },
     { href: '/admin/promos',        label: 'Promos',        icon: TagIcon                   },
@@ -169,7 +165,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                             href={item.href}
                             label={item.label}
                             icon={item.icon}
-                            active={pathname === item.href || pathname.startsWith(item.href + '/')}
+                            active={
+                                pathname === item.href ||
+                                pathname.startsWith(item.href + '/') ||
+                                (item.href === '/admin/menu' && (
+                                    pathname === '/admin/menu-add-ons' ||
+                                    pathname === '/admin/menu-tags'
+                                ))
+                            }
                         />
                     ))}
 

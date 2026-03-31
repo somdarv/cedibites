@@ -308,8 +308,8 @@ export default function AdminDashboardPage() {
                     </Link>
                 </div>
                 <div className="bg-neutral-card border border-[#f0e8d8] rounded-2xl overflow-hidden">
-                    <div className="hidden md:grid grid-cols-[1.5fr_1fr_1fr_1.2fr_1fr_1fr] gap-4 px-4 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
-                        {['Customer', 'Branch', 'Source', 'Status', 'Time', 'Amount'].map(h => (
+                    <div className="hidden md:grid grid-cols-[1.5fr_1fr_1fr_1.2fr_0.9fr_1fr_1fr] gap-4 px-4 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
+                        {['Customer', 'Branch', 'Source', 'Status', 'Staff', 'Time', 'Amount'].map(h => (
                             <span key={h} className="text-neutral-gray text-[10px] font-bold font-body uppercase tracking-wider">{h}</span>
                         ))}
                     </div>
@@ -319,7 +319,7 @@ export default function AdminDashboardPage() {
                         liveOrders.map((order, i) => (
                             <div
                                 key={order.id}
-                                className={`px-4 py-3 flex flex-col md:grid md:grid-cols-[1.5fr_1fr_1fr_1.2fr_1fr_1fr] gap-2 md:gap-4 md:items-center hover:bg-neutral-light/60 transition-colors ${i < liveOrders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
+                                className={`px-4 py-3 flex flex-col md:grid md:grid-cols-[1.5fr_1fr_1fr_1.2fr_0.9fr_1fr_1fr] gap-2 md:gap-4 md:items-center hover:bg-neutral-light/60 transition-colors ${i < liveOrders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
                             >
                                 <div className="min-w-0">
                                     <p className="text-text-dark text-sm font-semibold font-body truncate">{order.customer}</p>
@@ -328,6 +328,7 @@ export default function AdminDashboardPage() {
                                 <span className="text-text-dark text-xs font-body">{order.branch}</span>
                                 <SourceBadge source={order.source as OrderSource} />
                                 <StatusDot status={order.status} />
+                                <span className="text-text-dark text-xs font-body truncate">{order.assigned_employee ?? '—'}</span>
                                 <span className="text-neutral-gray text-xs font-body">{order.time_ago} ago</span>
                                 <span className="text-text-dark text-sm font-bold font-body">₵{order.amount}</span>
                             </div>
@@ -378,8 +379,17 @@ function RevenueChart({ salesByDay }: { salesByDay?: Array<{ date: string; total
                 {dayLabels.map((day, di) => {
                     const val = values[di] ?? 0;
                     const h = Math.round((val / chartMax) * 112) || 4;
+                    const compactLabel = val === 0 ? null : val >= 1000 ? `₵${(val / 1000).toFixed(1)}k` : `₵${val}`;
                     return (
-                        <div key={`${day}-${di}`} className="flex-1 flex flex-col items-center gap-1">
+                        <div key={`${day}-${di}`} className="flex-1 flex flex-col items-center gap-1 relative group">
+                            {/* Hover tooltip */}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-brand-dark text-white text-[10px] font-semibold font-body px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                {formatGHS(val)}
+                            </div>
+                            {/* Compact value label above bar */}
+                            {compactLabel && (
+                                <span className="text-[8px] text-primary font-bold font-body leading-none mb-0.5">{compactLabel}</span>
+                            )}
                             <div className="w-full rounded-sm bg-primary/85" style={{ height: h, minHeight: 4, transition: 'height 0.3s ease' }} />
                             <span className="text-[9px] text-neutral-gray font-body">{day}</span>
                         </div>

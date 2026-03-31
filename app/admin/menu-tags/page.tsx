@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { PlusIcon, PencilSimpleIcon, TrashIcon, ToggleLeftIcon, ToggleRightIcon } from '@phosphor-icons/react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { menuTagService } from '@/lib/api/services/menuTag.service';
 import type { MenuTag } from '@/types/api';
 import { toast } from '@/lib/utils/toast';
@@ -33,6 +34,33 @@ function toForm(tag?: MenuTag): TagFormState {
 
 function toSlug(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+const MENU_SUB_TABS = [
+  { href: '/admin/menu',         label: 'Items'   },
+  { href: '/admin/menu-add-ons', label: 'Add-ons' },
+  { href: '/admin/menu-tags',    label: 'Tags'    },
+];
+
+function MenuSubTabs() {
+  const pathname = usePathname();
+  return (
+    <div className="flex gap-1.5 mb-6">
+      {MENU_SUB_TABS.map(tab => (
+        <Link
+          key={tab.href}
+          href={tab.href}
+          className={`px-4 py-2 rounded-xl text-sm font-medium font-body transition-all ${
+            pathname === tab.href
+              ? 'bg-primary text-white'
+              : 'bg-neutral-card border border-[#f0e8d8] text-neutral-gray hover:text-text-dark'
+          }`}
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </div>
+  );
 }
 
 export default function AdminMenuTagsPage() {
@@ -140,13 +168,12 @@ export default function AdminMenuTagsPage() {
 
   return (
     <div className="px-4 md:px-8 py-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-text-dark text-2xl font-bold font-body">Menu Tags</h1>
+          <h1 className="text-text-dark text-2xl font-bold font-body">Menu Management</h1>
           <p className="text-neutral-gray text-sm font-body mt-1">Manage tags and assignment rules for menu items</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/admin/menu" className="text-sm text-primary hover:underline">Back to menu</Link>
           <button
             type="button"
             onClick={openNew}
@@ -157,6 +184,8 @@ export default function AdminMenuTagsPage() {
           </button>
         </div>
       </div>
+
+      <MenuSubTabs />
 
       <div className="bg-neutral-card border border-[#f0e8d8] rounded-2xl overflow-hidden">
         {loading ? (
