@@ -29,7 +29,12 @@
       "Bash(find c:UsersiamjnDesktopWEBZcedibites_apicedibites_api/database/migrations -name *branch* -type f)",
       "Bash(find c:UsersiamjnDesktopWEBZcedibites_apicedibites_api -name *operating* -o -name *hours*)",
       "Bash(ls \"c:\\\\Users\\\\iamjn\\\\Desktop\\\\WEBZ\\\\cedibites_api\\\\cedibites_api\\\\app\\\\Console\\\\Commands\"\" 2>/dev/null || echo \"empty or missing \")",
-      "Bash(grep -rn \"cancelOrder\\\\|cancel_order\\\\|cancelOrder\\\\|/cancel\" /c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites/lib --include=*.ts)"
+      "Bash(grep -rn \"cancelOrder\\\\|cancel_order\\\\|cancelOrder\\\\|/cancel\" /c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites/lib --include=*.ts)",
+      "Bash(/dev/null -type f)",
+      "Read(//c/Users/iamjn/AppData/Local/Temp/claude/c--Users-iamjn-Desktop-WEBZ-CediBites-cedibites/38022479-b111-48f7-a460-3f0b1f117428/tasks/**)",
+      "Bash(ls \"/c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites/app/\\(customer\\)/orders/\")",
+      "Bash(find /c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites/app/kitchen/ -name *.tsx -o -name *.ts)",
+      "Bash(/dev/null -type d)"
     ]
   }
 }

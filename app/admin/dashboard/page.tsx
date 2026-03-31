@@ -244,7 +244,7 @@ export default function AdminDashboardPage() {
                     icon={XCircleIcon}
                     label="Cancelled Today"
                     value={isLoading ? '…' : String(displayKpis.cancelledToday)}
-                    sub={liveKpis.cancelledToday > 0 ? formatGHS(liveKpis.cancelledValue) + ' lost' : undefined}
+                    sub={(kpis?.cancelled_revenue_today ?? liveKpis.cancelledValue) > 0 ? formatGHS(kpis?.cancelled_revenue_today ?? liveKpis.cancelledValue) + ' lost' : undefined}
                     subAlert={liveKpis.cancelReqCount > 0 ? `${liveKpis.cancelReqCount} pending approval` : undefined}
                 />
             </div>
