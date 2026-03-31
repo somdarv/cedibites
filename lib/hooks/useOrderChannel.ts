@@ -34,31 +34,43 @@ export function useOrderChannel(branchId: string | null) {
 
   // Real-time updates via Reverb
   useEffect(() => {
-    if (!branchId) {
-      return;
-    }
+    if (!branchId) return;
 
-    const echo = getEcho();
-    if (!echo) {
-      return;
-    }
+    function subscribe() {
+      const echo = getEcho();
+      if (!echo) return false;
 
-    const channel = echo.private(`orders.branch.${branchId}`);
+      const channel = echo.private(`orders.branch.${branchId}`);
 
-    channel.listen('.order.updated', (event: { type: string; order: ApiOrder }) => {
-      const order = apiOrderToUnifiedOrder(event.order);
+      channel.listen('.order.updated', (event: { type: string; order: ApiOrder }) => {
+        const order = apiOrderToUnifiedOrder(event.order);
 
-      setOrders((prev) => {
-        const rest = prev.filter((o) => o.id !== order.id);
-        if (TERMINAL_STATUSES.includes(order.status)) {
-          return rest;
-        }
-        return [...rest, order];
+        setOrders((prev) => {
+          const rest = prev.filter((o) => o.id !== order.id);
+          if (TERMINAL_STATUSES.includes(order.status)) {
+            return rest;
+          }
+          return [...rest, order];
+        });
       });
-    });
+
+      return true;
+    }
+
+    // Attempt subscription immediately
+    const subscribed = subscribe();
+
+    // If token wasn't available yet, retry when staff-login fires
+    if (!subscribed) {
+      const handler = () => subscribe();
+      window.addEventListener('staff-login', handler);
+      return () => {
+        window.removeEventListener('staff-login', handler);
+      };
+    }
 
     return () => {
-      echo.leave(`orders.branch.${branchId}`);
+      getEcho()?.leave(`orders.branch.${branchId}`);
     };
   }, [branchId]);
 

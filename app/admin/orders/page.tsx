@@ -365,10 +365,7 @@ function OrderDetailPanel({
                     onCancel={() => setShowConfirm(null)}
                     onConfirm={async (reason) => {
                         await cancelOrder({ id: order.dbId, reason });
-                        toast.success(`Order #${order.id} cancelled`);
                         queryClient.invalidateQueries({ queryKey: ['employee-orders'] });
-                        setShowConfirm(null);
-                        onClose();
                     }}
                 />
             )}

@@ -121,6 +121,7 @@ export default function ManagerDashboardPage() {
     const todayRevenue = stats?.today_revenue ?? 0;
     const todayOrders = stats?.today_orders ?? 0;
     const todayCancelled = stats?.today_cancelled ?? 0;
+    const todayCancelledRevenue = stats?.today_cancelled_revenue ?? 0;
     const avgOrderValue = todayOrders > 0 ? todayRevenue / todayOrders : 0;
     const monthRevenue = stats?.month_revenue ?? 0;
 
@@ -147,7 +148,7 @@ export default function ManagerDashboardPage() {
                     <StatCard icon={CurrencyCircleDollarIcon} label="Revenue" value={formatGHS(todayRevenue)} sub="Today" />
                     <StatCard icon={ReceiptIcon} label="Orders" value={String(todayOrders)} sub="Today" />
                     <StatCard icon={TrendUpIcon} label="Avg. Value" value={formatGHS(avgOrderValue)} sub="Per order" />
-                    <StatCard icon={XCircleIcon} label="Cancelled" value={String(todayCancelled)} sub="Today" />
+                    <StatCard icon={XCircleIcon} label="Cancelled" value={String(todayCancelled)} sub={todayCancelledRevenue > 0 ? formatGHS(todayCancelledRevenue) + ' lost' : 'Today'} />
                 </div>
             </div>
 

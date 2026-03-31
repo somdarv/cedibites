@@ -155,8 +155,6 @@ export default function POSOrdersPage() {
           onCancel={() => setCancelTarget(null)}
           onConfirm={async (reason) => {
             await cancelOrder({ id: Number(cancelTarget.id), reason });
-            toast.success(`Order #${cancelTarget.orderNumber} cancelled`);
-            setCancelTarget(null);
           }}
         />
       )}
@@ -175,6 +173,7 @@ export default function POSOrdersPage() {
               key={order.id}
               order={order}
               branchName={branchInfo?.name ?? 'CediBites'}
+              staffName={session.staffName}
               onCancelRequested={setCancelTarget}
             />
           ))
@@ -189,10 +188,11 @@ export default function POSOrdersPage() {
 interface OrderCardProps {
   order: Order;
   branchName: string;
+  staffName: string;
   onCancelRequested: (order: Order) => void;
 }
 
-function OrderCard({ order, branchName, onCancelRequested }: OrderCardProps) {
+function OrderCard({ order, branchName, staffName, onCancelRequested }: OrderCardProps) {
   const itemSummary = order.items.map((i) => formatOrderLineItemSummary(i)).join(', ');
 
   return (
@@ -251,29 +251,31 @@ function OrderCard({ order, branchName, onCancelRequested }: OrderCardProps) {
         </div>
       )}
 
-      {/* Bottom row: total + actions */}
-      <div className="px-4 pb-3 flex items-center justify-between gap-2 border-t border-neutral-gray/10 pt-2.5 mt-1">
+      {/* Bottom row: total + reprint */}
+      <div className="px-4 pb-2 flex items-center justify-between gap-2 border-t border-neutral-gray/10 pt-2.5 mt-1">
         <span className="font-bold text-primary">{formatGHS(order.total)}</span>
-        <div className="flex items-center gap-2">
-          {order.status !== 'cancelled' && (
-            <button
-              onClick={() => onCancelRequested(order)}
-              className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium text-error border border-error/25 hover:bg-error/8 transition-colors"
-              title="Cancel Order"
-            >
-              Cancel
-            </button>
-          )}
+        <button
+          onClick={() => printReceipt({ ...order, staffName: order.staffName ?? staffName }, branchName, { kind: 'reprint' })}
+          className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium text-neutral-gray border border-neutral-gray/20 hover:text-text-dark hover:border-neutral-gray/40 transition-colors"
+          title="Reprint Receipt"
+        >
+          <PrinterIcon className="w-3.5 h-3.5" />
+          Reprint
+        </button>
+      </div>
+
+      {/* Cancel row — separated to avoid accidental taps */}
+      {order.status !== 'cancelled' && (
+        <div className="px-4 pb-3">
           <button
-            onClick={() => printReceipt(order, branchName, { kind: 'reprint' })}
-            className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-xs font-medium text-neutral-gray border border-neutral-gray/20 hover:text-text-dark hover:border-neutral-gray/40 transition-colors"
-            title="Reprint Receipt"
+            onClick={() => onCancelRequested(order)}
+            className="w-full py-2 rounded-lg text-xs font-medium text-error/70 hover:text-error hover:bg-error/5 transition-colors border border-dashed border-error/20 hover:border-error/40"
+            title="Cancel Order"
           >
-            <PrinterIcon className="w-3.5 h-3.5" />
-            Reprint
+            Cancel order
           </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }

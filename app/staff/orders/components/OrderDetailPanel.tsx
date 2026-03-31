@@ -420,14 +420,7 @@ export default function OrderDetailPanel() {
                     theme="dark"
                     onCancel={() => setShowCancel(false)}
                     onConfirm={async (reason) => {
-                        try {
-                            await cancelOrder({ id: Number(order.id), reason });
-                            toast.success(`Order #${order.orderNumber} cancelled`);
-                            setShowCancel(false);
-                            onClose();
-                        } catch {
-                            toast.error('Failed to cancel order. Please try again.');
-                        }
+                        await cancelOrder({ id: Number(order.id), reason });
                     }}
                 />
             )}

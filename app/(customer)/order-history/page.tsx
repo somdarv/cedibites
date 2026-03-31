@@ -337,8 +337,6 @@ export default function OrderHistoryPage() {
                     onCancel={() => setCancelTarget(null)}
                     onConfirm={async (reason) => {
                         await cancelOrder({ id: cancelTarget.id, reason });
-                        toast.success('Order cancelled');
-                        setCancelTarget(null);
                     }}
                 />
             )}

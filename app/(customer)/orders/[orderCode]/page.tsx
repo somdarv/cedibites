@@ -11,13 +11,13 @@ import {
     MapPinIcon,
     PackageIcon,
     SpinnerGapIcon,
+    ProhibitIcon,
 } from '@phosphor-icons/react';
 import { timeAgo, buildOrderTimeline } from '@/types/order';
 import OrderTimeline from '@/app/components/order/OrderTimeline';
 import OrderDetails from '@/app/components/order/OrderDetails';
 import Button from '@/app/components/base/Button';
 import CancelOrderModal from '@/app/components/ui/CancelOrderModal';
-import { toast } from '@/lib/utils/toast';
 import type { Order as ApiOrder } from '@/types/api';
 import type { Order as MockOrder, OrderTimelineEvent, OrderStatus as MockOrderStatus } from '@/types/order';
 
@@ -243,6 +243,21 @@ export default function OrderTrackingPage({ params }: PageProps) {
                     {/* Left Column - Map & Details */}
                     <div className="lg:col-span-2 space-y-6">
 
+                        {/* Cancelled Banner */}
+                        {order.status === 'cancelled' && (
+                            <div className="bg-error/5 rounded-2xl p-6 border border-error/20 flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center shrink-0">
+                                    <ProhibitIcon size={20} weight="fill" className="text-error" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-error">Order Cancelled</p>
+                                    <p className="text-sm text-neutral-gray mt-0.5">
+                                        This order has been cancelled. If you have any questions, please contact us.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Live Status Card */}
                         {isOutForDelivery && isDelivery && (
                             <div className="bg-linear-to-br from-primary/10 to-primary/5 rounded-2xl p-6 border border-primary/20">
@@ -388,8 +403,6 @@ export default function OrderTrackingPage({ params }: PageProps) {
                     onCancel={() => setShowCancel(false)}
                     onConfirm={async (reason) => {
                         await cancelOrder({ id: Number(order.id), reason });
-                        toast.success('Order cancelled');
-                        setShowCancel(false);
                         refetch();
                     }}
                 />
