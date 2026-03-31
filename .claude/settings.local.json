@@ -40,7 +40,8 @@
       "Bash(php artisan:*)",
       "Bash(grep '\"\"laravel/framework\"\"' composer.json)",
       "Bash(xargs cat:*)",
-      "Bash(grep -n \"pending\\\\|status.*enum\\\\|ENUM\" /c/Users/iamjn/Desktop/WEBZ/cedibites_api/cedibites_api/database/migrations/*orders*)"
+      "Bash(grep -n \"pending\\\\|status.*enum\\\\|ENUM\" /c/Users/iamjn/Desktop/WEBZ/cedibites_api/cedibites_api/database/migrations/*orders*)",
+      "Bash(grep -r \"resend\\\\|sms\\\\|SMS\" c:/Users/iamjn/Desktop/WEBZ/cedibites_api/cedibites_api/app/ --include=*.php -l)"
     ]
   }
 }

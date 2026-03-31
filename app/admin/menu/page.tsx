@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
     PlusIcon,
@@ -778,6 +778,35 @@ function BulkImportModal({ onClose, branchId }: { onClose: () => void; branchId:
     );
 }
 
+// ─── Menu sub-tabs ────────────────────────────────────────────────────────────
+
+const MENU_SUB_TABS = [
+    { href: '/admin/menu',         label: 'Items'   },
+    { href: '/admin/menu-add-ons', label: 'Add-ons' },
+    { href: '/admin/menu-tags',    label: 'Tags'    },
+];
+
+function MenuSubTabs() {
+    const pathname = usePathname();
+    return (
+        <div className="flex gap-1.5 mb-6">
+            {MENU_SUB_TABS.map(tab => (
+                <Link
+                    key={tab.href}
+                    href={tab.href}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium font-body transition-all ${
+                        pathname === tab.href
+                            ? 'bg-primary text-white'
+                            : 'bg-neutral-card border border-[#f0e8d8] text-neutral-gray hover:text-text-dark'
+                    }`}
+                >
+                    {tab.label}
+                </Link>
+            ))}
+        </div>
+    );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminMenuPage() {
@@ -1128,25 +1157,19 @@ export default function AdminMenuPage() {
         <div className="px-4 md:px-8 py-6 max-w-6xl mx-auto">
 
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
                     <h1 className="text-text-dark text-2xl font-bold font-body">Menu Management</h1>
                     <p className="text-neutral-gray text-sm font-body mt-0.5">{active.length} item{active.length !== 1 ? 's' : ''}</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link
-                        href="/admin/menu-add-ons"
-                        className="flex items-center gap-2 px-4 py-2.5 bg-neutral-card border border-[#f0e8d8] text-text-dark rounded-xl text-sm font-medium font-body hover:border-primary/40 transition-colors"
-                    >
-                        Manage Add-ons
-                    </Link>
                     <button type="button" onClick={() => setShowImport(true)}
                         className="flex items-center gap-2 px-4 py-2.5 bg-neutral-card border border-[#f0e8d8] text-text-dark rounded-xl text-sm font-medium font-body hover:border-primary/40 transition-colors cursor-pointer">
                         <UploadSimpleIcon size={15} weight="bold" className="text-primary" />
                         Bulk Import
                     </button>
-                    <button 
-                        type="button" 
+                    <button
+                        type="button"
                         onClick={() => setEditItem('new')}
                         disabled={categoriesLoading}
                         className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-medium font-body hover:bg-primary-hover transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1156,6 +1179,9 @@ export default function AdminMenuPage() {
                     </button>
                 </div>
             </div>
+
+            {/* Menu sub-tabs */}
+            <MenuSubTabs />
 
             {/* Branch filter */}
             <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 mb-4">

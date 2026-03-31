@@ -6,6 +6,7 @@ export type PaymentMethod = 'Mobile Money' | 'Cash on Delivery' | 'Cash at Picku
 
 export interface AdminOrderItem {
   name: string;
+  sizeLabel?: string;
   qty: number;
   price: number;
 }
@@ -177,11 +178,18 @@ export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
           ? 'refunded'
           : 'pending';
 
-  const items: AdminOrderItem[] = (api.items ?? []).map((item) => ({
-    name: getItemName(item),
-    qty: item.quantity,
-    price: Number(item.unit_price ?? 0),
-  }));
+  const items: AdminOrderItem[] = (api.items ?? []).map((item) => {
+    const sizeLabel =
+      item.menu_item_option_snapshot?.option_label
+      ?? item.option_snapshot?.option_label
+      ?? item.menu_item_option?.option_label;
+    return {
+      name: item.menu_item_snapshot?.name ?? item.menu_item?.name ?? 'Item',
+      sizeLabel,
+      qty: item.quantity,
+      price: Number(item.unit_price ?? 0),
+    };
+  });
 
   const amount = Number(api.total_amount ?? api.subtotal ?? 0);
   const amountPaid = Number(primaryPayment?.amount ?? 0);
