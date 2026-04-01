@@ -19,6 +19,8 @@ import { useAnalytics } from '@/lib/api/hooks/useAnalytics';
 import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
 import { mapApiOrderToAdminOrder } from '@/lib/api/adapters/order.adapter';
 import { analyticsService, type TopItem, type PaymentMethod } from '@/lib/api/services/analytics.service';
+import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
+import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +40,14 @@ interface AnalyticsOrder {
 // ─── Chart / analytics constants ───────────────────────────────────────────────
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const HOURS = ['7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22'];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function timeStrToHour(t: string | null | undefined): number | null {
+    if (!t) return null;
+    const h = parseInt(t.split(':')[0], 10);
+    return isNaN(h) ? null : h;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -152,7 +161,12 @@ function WeeklyRevenue({
                                     </p>
                                 </div>
                             )}
-                            <div className="flex items-end gap-0.5" style={{ height: 88 }}>
+                            <div className="flex items-end gap-0.5 relative" style={{ height: 88 }}>
+                                {thisVal > 0 && (
+                                    <span className="absolute -top-4 right-0 text-[8px] font-bold text-primary leading-none whitespace-nowrap">
+                                        {thisVal >= 1000 ? `${(thisVal / 1000).toFixed(1)}k` : Math.round(thisVal)}
+                                    </span>
+                                )}
                                 <div className="w-2.5 rounded-sm bg-brown-light/25" style={{ height: lastH }} />
                                 <div
                                     className="w-2.5 rounded-sm"
@@ -180,15 +194,45 @@ function WeeklyRevenue({
 
 // ─── Peak hours heatmap ───────────────────────────────────────────────────────
 
-function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: number; count: number }> }) {
+function PeakHoursHeatmap({ ordersByHour, branchId }: { ordersByHour?: Array<{ hour: number; count: number }>; branchId?: number }) {
+    const { branches: apiBranches } = useBranchesApi();
+
+    const { startHour, endHour } = useMemo(() => {
+        let earliest = 7;
+        let latest = 22;
+        const branch = apiBranches.find(b => b.id === branchId);
+        if (branch?.operating_hours) {
+            const opens: number[] = [];
+            const closes: number[] = [];
+            Object.values(branch.operating_hours).forEach((oh) => {
+                if (oh?.is_open) {
+                    const o = timeStrToHour(oh.open_time);
+                    const c = timeStrToHour(oh.close_time);
+                    if (o !== null) opens.push(o);
+                    if (c !== null) closes.push(c);
+                }
+            });
+            if (opens.length) earliest = Math.min(...opens);
+            if (closes.length) latest = Math.max(...closes);
+        }
+        return { startHour: Math.max(0, earliest), endHour: Math.min(23, latest) };
+    }, [apiBranches, branchId]);
+
+    const hours = useMemo(() => {
+        const result: string[] = [];
+        for (let h = startHour; h <= endHour; h++) result.push(String(h));
+        return result;
+    }, [startHour, endHour]);
+
     const data = useMemo(() => {
         const byHour: Record<number, number> = {};
         for (const { hour, count } of ordersByHour ?? []) {
             byHour[hour] = (byHour[hour] ?? 0) + count;
         }
-        return HOURS.map((_, i) => byHour[7 + i] ?? 0);
-    }, [ordersByHour]);
+        return hours.map((_, i) => byHour[startHour + i] ?? 0);
+    }, [ordersByHour, hours, startHour]);
     const max  = Math.max(...data, 1);
+    const openLabel = `${startHour}:00–${endHour}:00`;
 
     function cellBg(val: number) {
         const i = val / max;
@@ -201,9 +245,9 @@ function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: numbe
 
     return (
         <Card>
-            <SectionHeader title="Peak Hours Heatmap" sub="Orders by hour — darker = busier" />
+            <SectionHeader title="Peak Hours Heatmap" sub={`Orders by hour — darker = busier · ${openLabel}`} />
             <div className="flex gap-1 items-end">
-                {HOURS.map((h, i) => (
+                {hours.map((h, i) => (
                     <div key={h} className="flex-1 flex flex-col items-center gap-1">
                         <div
                             className="w-full rounded-sm flex items-center justify-center"
@@ -392,11 +436,13 @@ function TopItemsCard({ items }: { items?: TopItem[] }) {
                         <div className="flex justify-between items-center mb-1.5">
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold font-body text-neutral-gray/50 w-3">{i + 1}</span>
-                                <span className="text-xs font-semibold font-body text-text-dark">{item.name}</span>
+                                <span className="text-xs font-semibold font-body text-text-dark">
+                                    {getOrderItemLineLabel({ name: item.name, sizeLabel: item.size_label })}
+                                </span>
                                 <span className="text-[10px] font-body text-neutral-gray">×{item.units}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold font-body text-primary">₵{item.rev}</span>
+                                <span className="text-xs font-bold font-body text-primary">{formatGHS(item.rev)}</span>
                                 <div className="flex items-center gap-0.5">
                                     {item.trend > 0
                                         ? <ArrowUpIcon size={11} className="text-secondary" />
@@ -638,7 +684,7 @@ export default function ManagerAnalyticsPage() {
                     lastWeekRevenue={lastWeekRevenue}
                     todayIdx={TODAY_IDX}
                 />
-                <PeakHoursHeatmap ordersByHour={orderAnalytics?.orders_by_hour} />
+                <PeakHoursHeatmap ordersByHour={orderAnalytics?.orders_by_hour} branchId={branchId} />
             </div>
 
             {/* ══ ROW 3 — Prep time + Payment split + Fulfilment ══════════════ */}

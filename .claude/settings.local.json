@@ -41,7 +41,11 @@
       "Bash(grep '\"\"laravel/framework\"\"' composer.json)",
       "Bash(xargs cat:*)",
       "Bash(grep -n \"pending\\\\|status.*enum\\\\|ENUM\" /c/Users/iamjn/Desktop/WEBZ/cedibites_api/cedibites_api/database/migrations/*orders*)",
-      "Bash(grep -r \"resend\\\\|sms\\\\|SMS\" c:/Users/iamjn/Desktop/WEBZ/cedibites_api/cedibites_api/app/ --include=*.php -l)"
+      "Bash(grep -r \"resend\\\\|sms\\\\|SMS\" c:/Users/iamjn/Desktop/WEBZ/cedibites_api/cedibites_api/app/ --include=*.php -l)",
+      "Bash(find /c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites -path *staff* -name *analytics* -o -path *manager* -name *analytics*)",
+      "Bash(find /c/Users/iamjn/Desktop/WEBZ/CediBites/cedibites -type f \\\\\\(-name *analytics*.ts -o -name *analytics*.tsx \\\\\\))",
+      "Read(//c/Users/iamjn/Desktop/WEBZ/**)",
+      "Bash(find /c/Users/iamjn/Desktop/WEBZ/cedibites_api/cedibites_api -type f -name *.py)"
     ]
   }
 }
