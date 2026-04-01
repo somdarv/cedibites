@@ -388,7 +388,7 @@ function RevenueChart({ salesByDay }: { salesByDay?: Array<{ date: string; total
                             </div>
                             <div className="w-full rounded-sm bg-primary/85 relative flex items-center justify-center overflow-hidden" style={{ height: h, minHeight: 4, transition: 'height 0.3s ease' }}>
                                 {compactLabel && h > 18 && (
-                                    <span className="text-[24px] text-white font-bold font-body leading-none mt-1 select-none">{compactLabel}</span>
+                                    <span className="text-[14px] text-white font-bold font-body leading-none mt-1 select-none">{compactLabel}</span>
                                 )}
                             </div>
                             <span className="text-[9px] text-neutral-gray font-body">{day}</span>

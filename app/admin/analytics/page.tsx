@@ -3,7 +3,8 @@
 import { useState, useMemo, useRef } from 'react';
 import { useAnalytics, useOrderSourceAnalytics, useTopItemsAnalytics, useBottomItemsAnalytics, useCategoryRevenueAnalytics, useBranchPerformanceAnalytics, useDeliveryPickupAnalytics, usePaymentMethodAnalytics } from '@/lib/api/hooks/useAnalytics';
 import { useSearchParams } from 'next/navigation';
-import { useBranch } from '@/app/components/providers/BranchProvider';
+import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
+import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
 import { toast } from '@/lib/utils/toast';
 import { exportElementToPdf } from '@/lib/utils/exportPdf';
 import {
@@ -31,9 +32,9 @@ const BRANCH_COLORS = ['#e49925', '#6c833f', '#c8a87a'];
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-const HOURS = ['7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22'];
+const HOURS = ['7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22'];
 
-const SOURCE_COLORS = ['#e49925','#6c833f','#c8a87a','#1976d2','#e91e63','#3f51b5'];
+const SOURCE_COLORS = ['#e49925', '#6c833f', '#c8a87a', '#1976d2', '#e91e63', '#3f51b5'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -124,10 +125,23 @@ function RevenueChart({ salesByDay }: { salesByDay?: Array<{ date: string; total
                                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-text-dark" />
                                 </div>
                             )}
+                            {/* Value label above short bars */}
+                            {val > 0 && h < 20 && (
+                                <span className="text-[8px] font-bold text-primary leading-none select-none">
+                                    {val >= 1000 ? `${(val / 1000).toFixed(1)}k` : Math.round(val)}
+                                </span>
+                            )}
                             <div
-                                className={`w-full rounded-sm transition-all duration-200 ${isHovered ? 'bg-primary' : 'bg-primary/70'}`}
-                                style={{ height: h, minHeight: 4 }}
-                            />
+                                className={`w-full rounded-sm transition-all duration-200 flex items-end justify-center pb-0.5 ${isHovered ? 'bg-primary' : 'bg-primary/70'}`}
+                                style={{ height: Math.max(h, 4), minHeight: 4 }}
+                            >
+                                {/* Value label inside tall bars */}
+                                {val > 0 && h >= 20 && (
+                                    <span className="text-[8px] font-bold text-white leading-none select-none">
+                                        {val >= 1000 ? `${(val / 1000).toFixed(1)}k` : Math.round(val)}
+                                    </span>
+                                )}
+                            </div>
                             <span className="text-[9px] text-neutral-gray font-body">{day}</span>
                         </div>
                     );
@@ -147,22 +161,22 @@ function timeStrToHour(t: string | null | undefined): number | null {
 
 function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: number; count: number }> }) {
     const [selectedDay, setSelectedDay] = useState<string>('All');
-    const { branches } = useBranch();
+    const { branches: apiBranches } = useBranchesApi();
     const allDays = ['All', ...DAYS];
 
-    // Derive hour range from branch operating hours
+    // Derive hour range from branch operating_hours (real API shape)
     const { startHour, endHour } = useMemo(() => {
         let earliest = 7;
         let latest = 22;
-        if (branches.length > 0) {
+        if (apiBranches.length > 0) {
             const opens: number[] = [];
             const closes: number[] = [];
-            branches.forEach((b: any) => {
-                if (b.operatingHours) {
-                    Object.values(b.operatingHours).forEach((oh: any) => {
-                        if (oh?.isOpen) {
-                            const o = timeStrToHour(oh.openTime ?? oh.open_time);
-                            const c = timeStrToHour(oh.closeTime ?? oh.close_time);
+            apiBranches.forEach((b) => {
+                if (b.operating_hours) {
+                    Object.values(b.operating_hours).forEach((oh) => {
+                        if (oh?.is_open) {
+                            const o = timeStrToHour(oh.open_time);
+                            const c = timeStrToHour(oh.close_time);
                             if (o !== null) opens.push(o);
                             if (c !== null) closes.push(c);
                         }
@@ -172,9 +186,8 @@ function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: numbe
             if (opens.length) earliest = Math.min(...opens);
             if (closes.length) latest = Math.max(...closes);
         }
-        // clamp to reasonable bounds
         return { startHour: Math.max(0, earliest), endHour: Math.min(23, latest) };
-    }, [branches]);
+    }, [apiBranches]);
 
     const hours = useMemo(() => {
         const result: string[] = [];
@@ -309,7 +322,7 @@ function OrderSourceChart({ orderSources }: { orderSources?: Array<{ name: strin
 
 // ─── Top items ────────────────────────────────────────────────────────────────
 
-function TopItemsCard({ items, title, allowSortToggle = false }: { items?: Array<{ id?: number; name: string; units: number; rev: number; trend?: number }>; title: string; allowSortToggle?: boolean }) {
+function TopItemsCard({ items, title, allowSortToggle = false }: { items?: Array<{ id?: number; name: string; size_label?: string; units: number; rev: number; trend?: number }>; title: string; allowSortToggle?: boolean }) {
     const [sortBy, setSortBy] = useState<'revenue' | 'quantity'>('revenue');
 
     const itemList = useMemo(() => {
@@ -354,11 +367,17 @@ function TopItemsCard({ items, title, allowSortToggle = false }: { items?: Array
                                 <div className="flex justify-between items-center mb-1">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="text-[10px] font-bold font-body text-neutral-gray/50 w-4 shrink-0">{i + 1}</span>
-                                        <span className="text-xs font-semibold font-body text-text-dark truncate">{item.name}</span>
-                                        <span className="text-[10px] font-body text-neutral-gray shrink-0">×{item.units}</span>
+                                        <span className="text-xs font-semibold font-body text-text-dark truncate">
+                                            {getOrderItemLineLabel({ name: item.name, sizeLabel: item.size_label })}
+                                        </span>
                                     </div>
-                                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                                        <span className="text-xs font-bold font-body text-primary">{formatGHS(item.rev)}</span>
+                                    <div className="flex flex-col items-end shrink-0 ml-2">
+                                        <span className="text-xs font-bold font-body text-primary">
+                                            {sortBy === 'quantity' ? `×${item.units} sold` : formatGHS(item.rev)}
+                                        </span>
+                                        <span className="text-[10px] font-body text-neutral-gray">
+                                            {sortBy === 'quantity' ? formatGHS(item.rev) : `×${item.units}`}
+                                        </span>
                                         {item.trend !== undefined && (
                                             <div className="flex items-center gap-0.5">
                                                 {item.trend > 0
@@ -388,7 +407,7 @@ function TopItemsCard({ items, title, allowSortToggle = false }: { items?: Array
 
 function CategoryRevenue({ categoryRevenue }: { categoryRevenue?: Array<{ cat: string; rev: number; pct: number }> }) {
     const categories = categoryRevenue || [];
-    
+
     return (
         <Card>
             <SectionTitle title="Revenue by Category" />
@@ -423,7 +442,7 @@ function CategoryRevenue({ categoryRevenue }: { categoryRevenue?: Array<{ cat: s
 function BranchPerformanceTable({ branchPerformance }: { branchPerformance?: Array<{ name: string; rev: number; orders: number; avg: number; fulfilment: number; cancelled: number }> }) {
     const branches = branchPerformance || [];
     const maxRev = branches.length > 0 ? Math.max(...branches.map(b => b.rev)) : 1;
-    
+
     return (
         <Card>
             <SectionTitle title="Branch Performance" />
@@ -485,8 +504,8 @@ function BranchPerformanceTable({ branchPerformance }: { branchPerformance?: Arr
 
 // ─── Customer insights ────────────────────────────────────────────────────────
 
-function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: { 
-    topCustomers?: Array<{ name?: string; orders_count?: number; total_spend?: number; user?: { name?: string }; }>; 
+function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
+    topCustomers?: Array<{ name?: string; orders_count?: number; total_spend?: number; user?: { name?: string }; }>;
     deliveryPickup?: { delivery_pct: number; pickup_pct: number };
     paymentMethods?: Array<{ label: string; pct: number }>;
 }) {
@@ -617,7 +636,7 @@ function RepeatVsNewCustomers({ totalCustomers, newCustomers }: { totalCustomers
 
     return (
         <Card>
-            <SectionTitle title="Repeat vs New Customers" sub="Based on customer lifetime data" />
+            <SectionTitle title="Repeat vs New Customers" sub="New = first ever order in this period · Repeat = ordered before" />
             {total === 0 ? (
                 <div className="flex items-center justify-center h-24 text-neutral-gray text-sm">No customer data available</div>
             ) : (
@@ -697,7 +716,11 @@ function OrdersByDayOfWeek({ salesByDay }: { salesByDay?: Array<{ date: string; 
                                         {val} order{val !== 1 ? 's' : ''}
                                     </div>
                                 )}
-                                <div className="w-full rounded-sm bg-primary/70 hover:bg-primary transition-colors" style={{ height: h, minHeight: 3 }} />
+                                <div className="w-full rounded-sm bg-primary/70 hover:bg-primary transition-colors flex items-end justify-center pb-0.5" style={{ height: h, minHeight: 3 }}>
+                                    {val > 0 && h >= 18 && (
+                                        <span className="text-[7px] font-bold text-white leading-none select-none">{val}</span>
+                                    )}
+                                </div>
                                 <span className="text-[9px] text-neutral-gray font-body">{day}</span>
                             </div>
                         );
@@ -710,33 +733,18 @@ function OrdersByDayOfWeek({ salesByDay }: { salesByDay?: Array<{ date: string; 
 
 // ─── Avg Items Per Order (UI-only) ────────────────────────────────────────────
 
-function AvgItemsPerOrder() {
-    const HARDCODED = [
-        { label: '1 item', pct: 22 },
-        { label: '2 items', pct: 38 },
-        { label: '3 items', pct: 25 },
-        { label: '4+ items', pct: 15 },
-    ];
+function AvgItemsPerOrder({ avgItems }: { avgItems?: number }) {
     return (
         <Card>
             <div className="mb-4">
                 <p className="text-text-dark text-sm font-bold font-body">Avg. Items per Order</p>
-                <p className="text-[10px] font-body mt-0.5 text-warning font-semibold">UI only · Connect backend to activate</p>
+                <p className="text-[10px] font-body mt-0.5 text-neutral-gray">Items per completed order</p>
             </div>
-            <p className="text-3xl font-bold text-primary font-body mb-4">2.4</p>
-            <div className="flex flex-col gap-2">
-                {HARDCODED.map(row => (
-                    <div key={row.label}>
-                        <div className="flex justify-between mb-0.5">
-                            <span className="text-xs font-body text-text-dark">{row.label}</span>
-                            <span className="text-xs font-bold font-body text-text-dark">{row.pct}%</span>
-                        </div>
-                        <div className="h-1 bg-neutral-gray/15 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-primary/60" style={{ width: `${row.pct}%` }} />
-                        </div>
-                    </div>
-                ))}
-            </div>
+            {avgItems !== undefined ? (
+                <p className="text-3xl font-bold text-primary font-body">{avgItems.toFixed(1)}</p>
+            ) : (
+                <div className="flex items-center justify-center h-16 text-neutral-gray text-sm font-body opacity-50">No data</div>
+            )}
         </Card>
     );
 }
@@ -744,28 +752,13 @@ function AvgItemsPerOrder() {
 // ─── Discount Usage (UI-only) ─────────────────────────────────────────────────
 
 function DiscountUsage() {
-    const HARDCODED = [
-        { label: 'CEDIBITES10', used: 48, savings: 240 },
-        { label: 'WELCOME20', used: 31, savings: 310 },
-        { label: 'FREESHIP', used: 19, savings: 95 },
-    ];
     return (
         <Card>
             <div className="mb-4">
                 <p className="text-text-dark text-sm font-bold font-body">Discount Usage</p>
-                <p className="text-[10px] font-body mt-0.5 text-warning font-semibold">UI only · Connect backend to activate</p>
+                <p className="text-[10px] font-body mt-0.5 text-neutral-gray">Pending backend endpoint</p>
             </div>
-            <div className="flex flex-col gap-0">
-                {HARDCODED.map((d, i) => (
-                    <div key={d.label} className={`flex items-center justify-between py-2.5 ${i < HARDCODED.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}>
-                        <div>
-                            <p className="text-xs font-semibold font-body text-text-dark font-mono">{d.label}</p>
-                            <p className="text-[10px] font-body text-neutral-gray">{d.used} uses</p>
-                        </div>
-                        <span className="text-xs font-bold font-body text-primary">-{formatGHS(d.savings)}</span>
-                    </div>
-                ))}
-            </div>
+            <div className="flex items-center justify-center h-16 text-neutral-gray text-sm font-body opacity-50">Coming soon</div>
         </Card>
     );
 }
@@ -773,32 +766,13 @@ function DiscountUsage() {
 // ─── Cancellation Reasons (UI-only) ──────────────────────────────────────────
 
 function CancellationReasons() {
-    const HARDCODED = [
-        { label: 'Customer changed mind', pct: 40 },
-        { label: 'Long wait time', pct: 28 },
-        { label: 'Item unavailable', pct: 18 },
-        { label: 'Duplicate order', pct: 9 },
-        { label: 'Other', pct: 5 },
-    ];
     return (
         <Card>
             <div className="mb-4">
                 <p className="text-text-dark text-sm font-bold font-body">Cancellation Reasons</p>
-                <p className="text-[10px] font-body mt-0.5 text-warning font-semibold">UI only · Connect backend to activate</p>
+                <p className="text-[10px] font-body mt-0.5 text-neutral-gray">Pending backend endpoint</p>
             </div>
-            <div className="flex flex-col gap-2.5">
-                {HARDCODED.map(row => (
-                    <div key={row.label}>
-                        <div className="flex justify-between mb-0.5">
-                            <span className="text-xs font-body text-text-dark">{row.label}</span>
-                            <span className="text-xs font-bold font-body text-text-dark">{row.pct}%</span>
-                        </div>
-                        <div className="h-1 bg-neutral-gray/15 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-error/60" style={{ width: `${row.pct}%` }} />
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <div className="flex items-center justify-center h-16 text-neutral-gray text-sm font-body opacity-50">Coming soon</div>
         </Card>
     );
 }
@@ -806,19 +780,19 @@ function CancellationReasons() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const PERIODS: { key: Period; label: string }[] = [
-    { key: 'today',     label: 'Today' },
+    { key: 'today', label: 'Today' },
     { key: 'yesterday', label: 'Yesterday' },
-    { key: 'week',      label: 'This Week' },
+    { key: 'week', label: 'This Week' },
     { key: 'month', label: 'This Month' },
-    { key: '30d',   label: 'Last 30 Days' },
-    { key: '90d',   label: 'Last 90 Days' },
+    { key: '30d', label: 'Last 30 Days' },
+    { key: '90d', label: 'Last 90 Days' },
     { key: 'custom', label: 'Custom' },
 ];
 
 export default function AdminAnalyticsPage() {
     const exportRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
-    const [period, setPeriod] = useState<Period>('week');
+    const [period, setPeriod] = useState<Period>('today');
     const [isExporting, setIsExporting] = useState(false);
     const [customDateFrom, setCustomDateFrom] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [customDateTo, setCustomDateTo] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -836,7 +810,7 @@ export default function AdminAnalyticsPage() {
     }, [searchParams]);
 
     const { sales, orders, customers, isLoading } = useAnalytics(period, branchId, customRange);
-    
+
     // Additional analytics hooks
     const { data: orderSources } = useOrderSourceAnalytics(period, branchId, customRange);
     const { data: topItems } = useTopItemsAnalytics(period, branchId, 10, customRange);
@@ -934,9 +908,10 @@ export default function AdminAnalyticsPage() {
                 <KpiCard icon={CurrencyCircleDollarIcon} label="Revenue" value={isLoading ? '…' : formatGHS(sales?.total_sales ?? 0)} accent />
                 <KpiCard icon={ReceiptIcon} label="Orders" value={isLoading ? '…' : String(sales?.total_orders ?? orders?.total_orders ?? 0)} />
                 <KpiCard icon={TrendUpIcon} label="Avg. Order" value={isLoading ? '…' : formatGHS(sales?.average_order_value ?? 0)} />
-                <KpiCard icon={UsersIcon} label="New Customers" value={isLoading ? '…' : String(customers?.new_customers_30_days ?? 0)} />
+                {/* <KpiCard icon={UsersIcon} label="New Customers" value={isLoading ? '…' : String(customers?.new_customers_30_days ?? 0)} /> */}
                 <KpiCard icon={CheckCircleIcon} label="Fulfilment" value={`${fulfilmentPct}%`} />
-                <KpiCard icon={XCircleIcon} label="Cancellations" value={`${cancelledPct}%`} />
+                <KpiCard icon={XCircleIcon} label="Cancellations" value={`${cancelledPct}%`} sub={(() => { const n = orders?.orders_by_status?.['cancelled'] ?? 0; return n > 0 ? `${n} order${n !== 1 ? 's' : ''} cancelled` : undefined; })()}
+                />
                 <KpiCard
                     icon={TagIcon}
                     label="No Charge"
@@ -981,14 +956,14 @@ export default function AdminAnalyticsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <RepeatVsNewCustomers
                     totalCustomers={customers?.total_customers}
-                    newCustomers={customers?.new_customers_30_days}
+                    newCustomers={customers?.new_customers_in_period ?? customers?.new_customers_30_days}
                 />
                 <OrdersByDayOfWeek salesByDay={sales?.sales_by_day} />
             </div>
 
             {/* Avg items / discounts / cancellations */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                <AvgItemsPerOrder />
+                <AvgItemsPerOrder avgItems={sales?.avg_items_per_order} />
                 <DiscountUsage />
                 <CancellationReasons />
             </div>
