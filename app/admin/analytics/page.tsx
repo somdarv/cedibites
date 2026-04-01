@@ -4,7 +4,6 @@ import { useState, useMemo, useRef } from 'react';
 import { useAnalytics, useOrderSourceAnalytics, useTopItemsAnalytics, useBottomItemsAnalytics, useCategoryRevenueAnalytics, useBranchPerformanceAnalytics, useDeliveryPickupAnalytics, usePaymentMethodAnalytics } from '@/lib/api/hooks/useAnalytics';
 import { useSearchParams } from 'next/navigation';
 import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
-import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
 import { toast } from '@/lib/utils/toast';
 import { exportElementToPdf } from '@/lib/utils/exportPdf';
 import {
@@ -160,9 +159,7 @@ function timeStrToHour(t: string | null | undefined): number | null {
 }
 
 function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: number; count: number }> }) {
-    const [selectedDay, setSelectedDay] = useState<string>('All');
     const { branches: apiBranches } = useBranchesApi();
-    const allDays = ['All', ...DAYS];
 
     // Derive hour range from branch operating_hours (real API shape)
     const { startHour, endHour } = useMemo(() => {
@@ -202,7 +199,7 @@ function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: numbe
             return hours.map((_, i) => byHour[startHour + i] ?? 0);
         }
         return hours.map(() => 0);
-    }, [selectedDay, ordersByHour, hours, startHour]);
+    }, [ordersByHour, hours, startHour]);
 
     const max = Math.max(...data, 1);
 
@@ -227,26 +224,16 @@ function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: numbe
                     No peak hours data available
                 </div>
             ) : (
-                <>
-                    <div className="flex gap-1.5 mb-3 flex-wrap">
-                        {allDays.map(d => (
-                            <button key={d} type="button" onClick={() => setSelectedDay(d)}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold font-body transition-all cursor-pointer ${selectedDay === d ? 'bg-primary text-white' : 'bg-neutral-light text-neutral-gray hover:text-text-dark'}`}>
-                                {d}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="flex gap-1 items-end">
-                        {hours.map((h, i) => (
-                            <div key={h} className="flex-1 flex flex-col items-center gap-1">
-                                <div className="w-full rounded-sm flex items-center justify-center" style={{ height: 44, background: cellBg(data[i]), transition: 'background 0.3s ease' }}>
-                                    <span className="text-[8px] font-bold font-body" style={{ color: data[i] / max > 0.5 ? '#5c3d00' : '#9a8878' }}>{data[i]}</span>
-                                </div>
-                                <span className="text-[8px] text-neutral-gray font-body" style={{ transform: 'rotate(-45deg)', display: 'block', marginTop: 4 }}>{h}</span>
+                <div className="flex gap-1 items-end">
+                    {hours.map((h, i) => (
+                        <div key={h} className="flex-1 flex flex-col items-center gap-1">
+                            <div className="w-full rounded-sm flex items-center justify-center" style={{ height: 44, background: cellBg(data[i]), transition: 'background 0.3s ease' }}>
+                                <span className="text-[8px] font-bold font-body" style={{ color: data[i] / max > 0.5 ? '#5c3d00' : '#9a8878' }}>{data[i]}</span>
                             </div>
-                        ))}
-                    </div>
-                </>
+                            <span className="text-[8px] text-neutral-gray font-body" style={{ transform: 'rotate(-45deg)', display: 'block', marginTop: 4 }}>{h}</span>
+                        </div>
+                    ))}
+                </div>
             )}
         </Card>
     );
@@ -368,15 +355,15 @@ function TopItemsCard({ items, title, allowSortToggle = false }: { items?: Array
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="text-[10px] font-bold font-body text-neutral-gray/50 w-4 shrink-0">{i + 1}</span>
                                         <span className="text-xs font-semibold font-body text-text-dark truncate">
-                                            {getOrderItemLineLabel({ name: item.name, sizeLabel: item.size_label })}
+                                            {item.size_label || item.name}
                                         </span>
                                     </div>
-                                    <div className="flex flex-col items-end shrink-0 ml-2">
-                                        <span className="text-xs font-bold font-body text-primary">
-                                            {sortBy === 'quantity' ? `×${item.units} sold` : formatGHS(item.rev)}
-                                        </span>
+                                    <div className="flex items-center gap-2 shrink-0 ml-2">
                                         <span className="text-[10px] font-body text-neutral-gray">
                                             {sortBy === 'quantity' ? formatGHS(item.rev) : `×${item.units}`}
+                                        </span>
+                                        <span className="text-xs font-bold font-body text-primary">
+                                            {sortBy === 'quantity' ? `×${item.units} sold` : formatGHS(item.rev)}
                                         </span>
                                         {item.trend !== undefined && (
                                             <div className="flex items-center gap-0.5">

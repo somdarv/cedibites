@@ -20,7 +20,6 @@ import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
 import { mapApiOrderToAdminOrder } from '@/lib/api/adapters/order.adapter';
 import { analyticsService, type TopItem, type PaymentMethod } from '@/lib/api/services/analytics.service';
 import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
-import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -437,7 +436,7 @@ function TopItemsCard({ items }: { items?: TopItem[] }) {
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold font-body text-neutral-gray/50 w-3">{i + 1}</span>
                                 <span className="text-xs font-semibold font-body text-text-dark">
-                                    {getOrderItemLineLabel({ name: item.name, sizeLabel: item.size_label })}
+                                    {item.size_label || item.name}
                                 </span>
                                 <span className="text-[10px] font-body text-neutral-gray">×{item.units}</span>
                             </div>
