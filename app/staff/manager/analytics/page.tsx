@@ -12,6 +12,7 @@ import {
     CaretLeftIcon,
     ArrowUpIcon,
     ArrowDownIcon,
+    FileCsvIcon,
 } from '@phosphor-icons/react';
 import { STATUS_CONFIG } from '@/app/staff/orders/constants';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
@@ -19,6 +20,8 @@ import { useAnalytics } from '@/lib/api/hooks/useAnalytics';
 import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
 import { mapApiOrderToAdminOrder } from '@/lib/api/adapters/order.adapter';
 import { analyticsService, type TopItem, type PaymentMethod } from '@/lib/api/services/analytics.service';
+import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
+import { buildReportHtml, printReport, generateCsv, type ReportData, type ReportMeta, type ItemSoldRow } from '@/lib/utils/reportGenerator';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +41,14 @@ interface AnalyticsOrder {
 // ─── Chart / analytics constants ───────────────────────────────────────────────
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const HOURS = ['7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22'];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function timeStrToHour(t: string | null | undefined): number | null {
+    if (!t) return null;
+    const h = parseInt(t.split(':')[0], 10);
+    return isNaN(h) ? null : h;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -152,7 +162,12 @@ function WeeklyRevenue({
                                     </p>
                                 </div>
                             )}
-                            <div className="flex items-end gap-0.5" style={{ height: 88 }}>
+                            <div className="flex items-end gap-0.5 relative" style={{ height: 88 }}>
+                                {thisVal > 0 && (
+                                    <span className="absolute -top-4 right-0 text-[8px] font-bold text-primary leading-none whitespace-nowrap">
+                                        {thisVal >= 1000 ? `${(thisVal / 1000).toFixed(1)}k` : Math.round(thisVal)}
+                                    </span>
+                                )}
                                 <div className="w-2.5 rounded-sm bg-brown-light/25" style={{ height: lastH }} />
                                 <div
                                     className="w-2.5 rounded-sm"
@@ -180,15 +195,45 @@ function WeeklyRevenue({
 
 // ─── Peak hours heatmap ───────────────────────────────────────────────────────
 
-function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: number; count: number }> }) {
+function PeakHoursHeatmap({ ordersByHour, branchId }: { ordersByHour?: Array<{ hour: number; count: number }>; branchId?: number }) {
+    const { branches: apiBranches } = useBranchesApi();
+
+    const { startHour, endHour } = useMemo(() => {
+        let earliest = 7;
+        let latest = 22;
+        const branch = apiBranches.find(b => b.id === branchId);
+        if (branch?.operating_hours) {
+            const opens: number[] = [];
+            const closes: number[] = [];
+            Object.values(branch.operating_hours).forEach((oh) => {
+                if (oh?.is_open) {
+                    const o = timeStrToHour(oh.open_time);
+                    const c = timeStrToHour(oh.close_time);
+                    if (o !== null) opens.push(o);
+                    if (c !== null) closes.push(c);
+                }
+            });
+            if (opens.length) earliest = Math.min(...opens);
+            if (closes.length) latest = Math.max(...closes);
+        }
+        return { startHour: Math.max(0, earliest), endHour: Math.min(23, latest) };
+    }, [apiBranches, branchId]);
+
+    const hours = useMemo(() => {
+        const result: string[] = [];
+        for (let h = startHour; h <= endHour; h++) result.push(String(h));
+        return result;
+    }, [startHour, endHour]);
+
     const data = useMemo(() => {
         const byHour: Record<number, number> = {};
         for (const { hour, count } of ordersByHour ?? []) {
             byHour[hour] = (byHour[hour] ?? 0) + count;
         }
-        return HOURS.map((_, i) => byHour[7 + i] ?? 0);
-    }, [ordersByHour]);
+        return hours.map((_, i) => byHour[startHour + i] ?? 0);
+    }, [ordersByHour, hours, startHour]);
     const max  = Math.max(...data, 1);
+    const openLabel = `${startHour}:00–${endHour}:00`;
 
     function cellBg(val: number) {
         const i = val / max;
@@ -201,9 +246,9 @@ function PeakHoursHeatmap({ ordersByHour }: { ordersByHour?: Array<{ hour: numbe
 
     return (
         <Card>
-            <SectionHeader title="Peak Hours Heatmap" sub="Orders by hour — darker = busier" />
+            <SectionHeader title="Peak Hours Heatmap" sub={`Orders by hour — darker = busier · ${openLabel}`} />
             <div className="flex gap-1 items-end">
-                {HOURS.map((h, i) => (
+                {hours.map((h, i) => (
                     <div key={h} className="flex-1 flex flex-col items-center gap-1">
                         <div
                             className="w-full rounded-sm flex items-center justify-center"
@@ -392,11 +437,13 @@ function TopItemsCard({ items }: { items?: TopItem[] }) {
                         <div className="flex justify-between items-center mb-1.5">
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold font-body text-neutral-gray/50 w-3">{i + 1}</span>
-                                <span className="text-xs font-semibold font-body text-text-dark">{item.name}</span>
+                                <span className="text-xs font-semibold font-body text-text-dark">
+                                    {item.size_label || item.name}
+                                </span>
                                 <span className="text-[10px] font-body text-neutral-gray">×{item.units}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold font-body text-primary">₵{item.rev}</span>
+                                <span className="text-xs font-bold font-body text-primary">{formatGHS(item.rev)}</span>
                                 <div className="flex items-center gap-0.5">
                                     {item.trend > 0
                                         ? <ArrowUpIcon size={11} className="text-secondary" />
@@ -494,6 +541,10 @@ export default function ManagerAnalyticsPage() {
     const [period, setPeriod] = useState<Period>('today');
     const [page,   setPage  ] = useState(0);
     const PAGE_SIZE = 8;
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportFormat, setReportFormat] = useState<'pdf' | 'csv'>('pdf');
+    const [reportSections, setReportSections] = useState({ summary: true, itemsSold: true, dailyBreakdown: true, topCustomers: true });
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const { staffUser } = useStaffAuth();
     const branchId = staffUser?.branches[0]?.id ? Number(staffUser.branches[0].id) : undefined;
@@ -593,6 +644,108 @@ export default function ManagerAnalyticsPage() {
     const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE);
     const pageOrders = filteredOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
+    async function handleGenerateReport(): Promise<void> {
+        setIsGenerating(true);
+        try {
+            const range = getDateRangeForPeriod(period);
+            const PERIOD_LABELS: Record<Period, string> = { today: 'Today', week: 'This Week', month: 'This Month', custom: 'All Time' };
+            const periodLabel = PERIOD_LABELS[period];
+            const dateRange = `${range.date_from} – ${range.date_to}`;
+            const generatedAt = new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+            const [salesData, ordersData, customersData, allItemsData] = await Promise.all([
+                (reportSections.summary || reportSections.dailyBreakdown)
+                    ? analyticsService.getSalesAnalytics({ ...range, branch_id: branchId })
+                    : Promise.resolve(undefined),
+                reportSections.summary
+                    ? analyticsService.getOrderAnalytics({ ...range, branch_id: branchId })
+                    : Promise.resolve(undefined),
+                reportSections.topCustomers
+                    ? analyticsService.getCustomerAnalytics({ date_from: range.date_from, date_to: range.date_to })
+                    : Promise.resolve(undefined),
+                reportSections.itemsSold
+                    ? analyticsService.getTopItemsAnalytics({ ...range, branch_id: branchId, limit: 500 })
+                    : Promise.resolve(undefined),
+            ]);
+
+            const totalRev = allItemsData?.reduce((s, i) => s + i.rev, 0) ?? 0;
+            const itemRows: ItemSoldRow[] = (allItemsData ?? []).map(i => ({
+                name: i.size_label || i.name,
+                units: i.units,
+                revenue: i.rev,
+                pctOfTotal: totalRev > 0 ? Math.round((i.rev / totalRev) * 1000) / 10 : 0,
+                trend: i.trend,
+            }));
+
+            const meta: ReportMeta = { title: 'Sales Report', branchName, periodLabel, dateRange, generatedAt };
+
+            if (reportFormat === 'pdf') {
+                const reportData: ReportData = {
+                    meta,
+                    summary: reportSections.summary && salesData ? {
+                        totalRevenue: salesData.total_sales,
+                        totalOrders: salesData.total_orders,
+                        avgOrderValue: salesData.average_order_value,
+                        noChargeOrders: salesData.no_charge_count,
+                        noChargeAmount: salesData.no_charge_amount,
+                        cancelledOrders: ordersData?.orders_by_status?.['cancelled'] ?? 0,
+                        avgItemsPerOrder: salesData.avg_items_per_order,
+                    } : undefined,
+                    itemsSold: reportSections.itemsSold && itemRows.length ? itemRows : undefined,
+                    dailyBreakdown: reportSections.dailyBreakdown && salesData?.sales_by_day?.length
+                        ? salesData.sales_by_day.map(d => ({ date: d.date, orders: d.orders, revenue: Number(d.total) }))
+                        : undefined,
+                    topCustomers: reportSections.topCustomers && customersData?.top_customers_by_spending?.length
+                        ? customersData.top_customers_by_spending.slice(0, 10).map(c => ({
+                            name: c.user?.name ?? c.name ?? 'Unknown',
+                            phone: c.user?.phone ?? '—',
+                            orders: c.orders_count ?? 0,
+                            totalSpend: c.total_spend ?? 0,
+                        }))
+                        : undefined,
+                };
+                printReport(buildReportHtml(reportData));
+            } else {
+                if (reportSections.summary && salesData) {
+                    generateCsv(['Metric', 'Value'], [
+                        ['Total Revenue', String(salesData.total_sales)],
+                        ['Total Orders', String(salesData.total_orders)],
+                        ['Avg. Order Value', String(salesData.average_order_value)],
+                        ['No-Charge Orders', String(salesData.no_charge_count)],
+                        ['No-Charge Amount', String(salesData.no_charge_amount)],
+                        ['Cancelled Orders', String(ordersData?.orders_by_status?.['cancelled'] ?? 0)],
+                        ['Avg. Items per Order', String(salesData.avg_items_per_order ?? '—')],
+                    ], `sales-summary-${range.date_from}.csv`);
+                }
+                if (reportSections.itemsSold && itemRows.length) {
+                    generateCsv(['Item', 'Qty Sold', 'Revenue (GHS)', '% of Total', 'Trend (%)'],
+                        itemRows.map(i => [i.name, String(i.units), String(i.revenue), String(i.pctOfTotal ?? ''), String(i.trend ?? '')]),
+                        `items-sold-${range.date_from}.csv`);
+                }
+                if (reportSections.dailyBreakdown && salesData?.sales_by_day?.length) {
+                    generateCsv(['Date', 'Orders', 'Revenue (GHS)'],
+                        salesData.sales_by_day.map(d => [d.date, String(d.orders), String(d.total)]),
+                        `daily-breakdown-${range.date_from}.csv`);
+                }
+                if (reportSections.topCustomers && customersData?.top_customers_by_spending?.length) {
+                    generateCsv(['Name', 'Phone', 'Orders', 'Total Spend (GHS)'],
+                        customersData.top_customers_by_spending.slice(0, 10).map(c => [
+                            c.user?.name ?? c.name ?? 'Unknown',
+                            c.user?.phone ?? '—',
+                            String(c.orders_count ?? 0),
+                            String(c.total_spend ?? 0),
+                        ]),
+                        `top-customers-${range.date_from}.csv`);
+                }
+            }
+            setShowReportModal(false);
+        } catch (err) {
+            console.error('Failed to generate report:', err);
+        } finally {
+            setIsGenerating(false);
+        }
+    }
+
     return (
         <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">
 
@@ -605,6 +758,14 @@ export default function ManagerAnalyticsPage() {
                         {branchName} · Branch Manager
                     </p>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => setShowReportModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium font-body hover:bg-primary-hover transition-colors cursor-pointer shrink-0 self-start"
+                >
+                    <FileCsvIcon size={15} weight="bold" />
+                    Generate Report
+                </button>
             </div>
 
             {/* ══ ROW 1 — KPIs ════════════════════════════════════════════════ */}
@@ -638,7 +799,7 @@ export default function ManagerAnalyticsPage() {
                     lastWeekRevenue={lastWeekRevenue}
                     todayIdx={TODAY_IDX}
                 />
-                <PeakHoursHeatmap ordersByHour={orderAnalytics?.orders_by_hour} />
+                <PeakHoursHeatmap ordersByHour={orderAnalytics?.orders_by_hour} branchId={branchId} />
             </div>
 
             {/* ══ ROW 3 — Prep time + Payment split + Fulfilment ══════════════ */}
@@ -791,6 +952,58 @@ export default function ManagerAnalyticsPage() {
             <p className="text-neutral-gray/40 text-xs font-body text-center mt-6">
                 {branchName} branch · Data refreshes every 60 seconds · Managers only
             </p>
+
+            {/* Report generation modal */}
+            {showReportModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowReportModal(false)}>
+                    <div className="bg-neutral-card rounded-2xl border border-[#f0e8d8] w-full max-w-sm p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-text-dark text-base font-bold font-body mb-1">Generate Report</h2>
+                        <p className="text-neutral-gray text-xs font-body mb-5">
+                            {({ today: 'Today', week: 'This Week', month: 'This Month', custom: 'All Time' } as Record<Period, string>)[period]}
+                            &nbsp;·&nbsp; {branchName}
+                        </p>
+
+                        <p className="text-text-dark text-xs font-semibold font-body mb-2">Format</p>
+                        <div className="flex rounded-xl overflow-hidden border border-[#f0e8d8] mb-5">
+                            {(['pdf', 'csv'] as const).map(f => (
+                                <button key={f} type="button" onClick={() => setReportFormat(f)}
+                                    className={`flex-1 py-2 text-xs font-semibold font-body transition-colors cursor-pointer ${reportFormat === f ? 'bg-primary text-white' : 'bg-neutral-card text-neutral-gray hover:text-text-dark'}`}>
+                                    {f === 'pdf' ? 'PDF (Printable)' : 'CSV (Spreadsheet)'}
+                                </button>
+                            ))}
+                        </div>
+
+                        <p className="text-text-dark text-xs font-semibold font-body mb-2">Include sections</p>
+                        <div className="flex flex-col gap-2.5 mb-6">
+                            {([
+                                ['summary', 'Sales Summary'],
+                                ['itemsSold', 'Items Sold Detail'],
+                                ['dailyBreakdown', 'Daily Breakdown'],
+                                ['topCustomers', 'Top Customers'],
+                            ] as const).map(([key, label]) => (
+                                <label key={key} className="flex items-center gap-2.5 cursor-pointer">
+                                    <input type="checkbox" checked={reportSections[key]}
+                                        onChange={e => setReportSections(s => ({ ...s, [key]: e.target.checked }))}
+                                        className="accent-primary w-4 h-4" />
+                                    <span className="text-text-dark text-xs font-body">{label}</span>
+                                </label>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => setShowReportModal(false)}
+                                className="flex-1 py-2.5 rounded-xl border border-[#f0e8d8] text-xs font-semibold font-body text-neutral-gray hover:text-text-dark cursor-pointer transition-colors">
+                                Cancel
+                            </button>
+                            <button type="button" onClick={() => void handleGenerateReport()}
+                                disabled={isGenerating || !Object.values(reportSections).some(Boolean)}
+                                className="flex-1 py-2.5 rounded-xl bg-primary text-white text-xs font-semibold font-body hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-colors">
+                                {isGenerating ? 'Generating…' : 'Generate'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

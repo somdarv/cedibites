@@ -26,6 +26,7 @@ export interface DashboardLiveOrder {
   status: string;
   time_ago: string;
   amount: number;
+  assigned_employee?: string;
 }
 
 export interface DashboardData {

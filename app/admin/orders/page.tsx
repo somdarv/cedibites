@@ -30,6 +30,8 @@ import CancelOrderModal from '@/app/components/ui/CancelOrderModal';
 import { useCancelOrder } from '@/lib/api/hooks/useOrders';
 import { toast } from '@/lib/utils/toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
+import apiClient from '@/lib/api/client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,10 +168,27 @@ function OrderDetailPanel({
     const [showConfirm, setShowConfirm] = useState<null | 'cancel' | 'refund'>(null);
     const [noteText, setNoteText] = useState('');
     const [showNote, setShowNote] = useState(false);
+    const [showStatusPicker, setShowStatusPicker] = useState(false);
+    const [updatingStatus, setUpdatingStatus] = useState(false);
     const { cancelOrder } = useCancelOrder();
     const queryClient = useQueryClient();
 
     const subtotal = order.items.reduce((s, i) => s + i.qty * i.price, 0);
+    const isTerminal = ['completed', 'delivered', 'cancelled'].includes(order.status);
+
+    async function overrideStatus(newStatus: string): Promise<void> {
+        setUpdatingStatus(true);
+        try {
+            await apiClient.patch(`/employee/orders/${order.dbId}/status`, { status: newStatus });
+            queryClient.invalidateQueries({ queryKey: ['employee-orders'] });
+            setShowStatusPicker(false);
+            toast.success('Order status updated');
+        } catch {
+            toast.error('Failed to update status');
+        } finally {
+            setUpdatingStatus(false);
+        }
+    }
 
     return (
         <>
@@ -239,7 +258,7 @@ function OrderDetailPanel({
                         <div className="bg-neutral-light rounded-xl overflow-hidden">
                             {order.items.map((item, i) => (
                                 <div key={i} className={`flex justify-between px-3 py-2.5 ${i < order.items.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}>
-                                    <span className="text-text-dark text-xs font-body">{item.qty}× {item.name}</span>
+                                    <span className="text-text-dark text-xs font-body">{item.qty}× {getOrderItemLineLabel({ name: item.name, sizeLabel: item.sizeLabel })}</span>
                                     <span className="text-text-dark text-xs font-bold font-body">₵{item.qty * item.price}</span>
                                 </div>
                             ))}
@@ -332,16 +351,56 @@ function OrderDetailPanel({
                 {/* Admin action buttons */}
                 <div className="border-t border-[#f0e8d8] p-4 flex flex-col gap-2.5">
                     <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider">Admin Actions</p>
+
+                    {/* Status picker */}
+                    {showStatusPicker && (
+                        <div className="bg-neutral-light rounded-xl p-3 flex flex-col gap-2">
+                            <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider">Set Status</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {(ALL_STATUSES as string[]).filter(s => s !== order.status).map(s => (
+                                    <button
+                                        key={s}
+                                        type="button"
+                                        disabled={updatingStatus}
+                                        onClick={() => overrideStatus(s)}
+                                        className="flex items-center gap-1.5 px-2.5 py-2 bg-neutral-card border border-[#f0e8d8] rounded-lg text-text-dark text-xs font-medium font-body hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <span className={`h-2 w-2 rounded-full shrink-0 ${STATUS_STYLES[s]?.dot ?? 'bg-neutral-gray'}`} />
+                                        {STATUS_STYLES[s]?.label ?? s}
+                                    </button>
+                                ))}
+                            </div>
+                            <button type="button" onClick={() => setShowStatusPicker(false)} className="text-xs text-neutral-gray font-body hover:text-text-dark transition-colors text-left cursor-pointer">
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-2">
-                        <button type="button" className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-neutral-light rounded-xl text-text-dark text-xs font-medium font-body hover:bg-[#f0e8d8] transition-colors cursor-pointer">
+                        <button
+                            type="button"
+                            onClick={() => setShowStatusPicker(v => !v)}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-neutral-light rounded-xl text-text-dark text-xs font-medium font-body hover:bg-[#f0e8d8] transition-colors cursor-pointer"
+                        >
                             <ArrowsClockwiseIcon size={13} weight="bold" className="text-primary" />
                             Override Status
                         </button>
-                        <button type="button" onClick={() => setShowConfirm('cancel')} className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-error/10 rounded-xl text-error text-xs font-medium font-body hover:bg-error/20 transition-colors cursor-pointer">
-                            <XCircleIcon size={13} weight="bold" />
-                            Cancel Order
-                        </button>
-                        <button type="button" onClick={() => setShowConfirm('refund')} className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-neutral-light rounded-xl text-text-dark text-xs font-medium font-body hover:bg-[#f0e8d8] transition-colors cursor-pointer">
+                        {!isTerminal ? (
+                            <button type="button" onClick={() => setShowConfirm('cancel')} className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-error/10 rounded-xl text-error text-xs font-medium font-body hover:bg-error/20 transition-colors cursor-pointer">
+                                <XCircleIcon size={13} weight="bold" />
+                                Cancel Order
+                            </button>
+                        ) : (
+                            <div className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-neutral-light rounded-xl text-neutral-gray text-xs font-medium font-body opacity-40 cursor-not-allowed">
+                                <XCircleIcon size={13} weight="bold" />
+                                Cancel Order
+                            </div>
+                        )}
+                        <button
+                            type="button"
+                            disabled
+                            className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-neutral-light rounded-xl text-text-dark text-xs font-medium font-body opacity-40 cursor-not-allowed"
+                        >
                             <ArrowCounterClockwiseIcon size={13} weight="bold" className="text-secondary" />
                             Issue Refund
                         </button>
@@ -643,8 +702,8 @@ export default function AdminOrdersPage() {
 
             {/* Table */}
             <div className="bg-neutral-card border border-[#f0e8d8] rounded-2xl overflow-hidden mb-4">
-                <div className="hidden md:grid grid-cols-[1fr_0.9fr_0.8fr_1.2fr_0.9fr_0.9fr_1fr_1fr_0.8fr] gap-3 px-4 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
-                    {['Order #', 'Branch', 'Source', 'Customer', 'Payment Method', 'Payment Status', 'Status', 'Order / Paid', 'Time'].map(h => (
+                <div className="hidden md:grid grid-cols-[1fr_0.9fr_0.8fr_1.2fr_0.9fr_0.9fr_0.8fr_0.9fr_1fr_0.8fr] gap-3 px-4 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
+                    {['Order #', 'Branch', 'Source', 'Customer', 'Payment Method', 'Payment Status', 'Status', 'Staff', 'Order / Paid', 'Time'].map(h => (
                         <span key={h} className="text-neutral-gray text-[10px] font-bold font-body uppercase tracking-wider">{h}</span>
                     ))}
                 </div>
@@ -662,7 +721,7 @@ export default function AdminOrdersPage() {
                         <div
                             key={order.id}
                             onClick={() => setSelectedOrder(order)}
-                            className={`px-4 py-3.5 flex flex-col md:grid md:grid-cols-[1fr_0.9fr_0.8fr_1.2fr_0.9fr_0.9fr_1fr_1fr_0.8fr] gap-2 md:gap-3 md:items-center cursor-pointer hover:bg-neutral-light/60 transition-colors ${i < pageOrders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
+                            className={`px-4 py-3.5 flex flex-col md:grid md:grid-cols-[1fr_0.9fr_0.8fr_1.2fr_0.9fr_0.9fr_0.8fr_0.9fr_1fr_0.8fr] gap-2 md:gap-3 md:items-center cursor-pointer hover:bg-neutral-light/60 transition-colors ${i < pageOrders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
                         >
                             <div className="flex items-center gap-2 md:block">
                                 <span className="text-text-dark text-sm font-bold font-body">#{order.id}</span>
@@ -676,15 +735,16 @@ export default function AdminOrdersPage() {
                             </div>
                             <span className="text-neutral-gray text-[10px] font-body">{order.payment}</span>
                             <span className={`text-[10px] font-semibold font-body capitalize ${
-                                order.paymentStatus === 'paid' ? 'text-secondary' : 
-                                order.paymentStatus === 'failed' ? 'text-error' : 
-                                order.paymentStatus === 'pending' ? 'text-warning' : 
+                                order.paymentStatus === 'paid' ? 'text-secondary' :
+                                order.paymentStatus === 'failed' ? 'text-error' :
+                                order.paymentStatus === 'pending' ? 'text-warning' :
                                 order.paymentStatus === 'refunded' ? 'text-blue-600' :
                                 'text-neutral-gray'
                             }`}>
                                 {order.paymentStatus === 'no_charge' ? 'No Charge' : order.paymentStatus}
                             </span>
                             <StatusBadge status={order.status} />
+                            <span className="text-text-dark text-xs font-body truncate">{order.assignedEmployee ?? '—'}</span>
                             <div className="flex flex-col">
                                 <span className="text-text-dark text-sm font-bold font-body">{formatGHS(order.amount)}</span>
                                 <span className="text-neutral-gray text-[10px] font-body">{order.paymentStatus === 'no_charge' ? `Waived: ${formatGHS(order.amount)}` : `Paid: ${formatGHS(order.amountPaid)}`}</span>

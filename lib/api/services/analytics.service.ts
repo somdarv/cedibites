@@ -26,6 +26,7 @@ export interface SalesAnalytics {
   sales_by_type: SalesByType[];
   no_charge_count: number;
   no_charge_amount: number;
+  avg_items_per_order?: number;
 }
 
 export interface OrdersByHour {
@@ -52,6 +53,7 @@ export interface TopCustomer {
 export interface CustomerAnalytics {
   total_customers: number;
   new_customers_30_days: number;
+  new_customers_in_period: number;
   top_customers_by_orders: TopCustomer[];
   top_customers_by_spending: TopCustomer[];
 }
@@ -66,6 +68,7 @@ export interface OrderSource {
 export interface TopItem {
   id?: number;
   name: string;
+  size_label?: string;
   units: number;
   rev: number;
   trend: number;
@@ -74,6 +77,7 @@ export interface TopItem {
 export interface BottomItem {
   id?: number;
   name: string;
+  size_label?: string;
   units: number;
   rev: number;
 }
