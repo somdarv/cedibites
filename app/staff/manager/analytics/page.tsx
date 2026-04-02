@@ -26,7 +26,7 @@ import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Period = 'today' | 'week' | 'month' | '30d' | '90d' | 'custom';
+type Period = 'today' | 'yesterday' | 'week' | 'month' | '30d' | '90d' | 'custom';
 
 interface AnalyticsOrder {
     id: string;
@@ -326,10 +326,13 @@ function PrepTimeTrend({ avgPrepTime }: { avgPrepTime?: number }) {
 // ─── Payment split ────────────────────────────────────────────────────────────
 
 function PaymentSplitCard({ methods }: { methods?: PaymentMethod[] }) {
-    const mobileMoney = methods?.find(m => m.label.toLowerCase().includes('mobile'))?.pct ?? 0;
-    const cash = methods?.find(m => m.label.toLowerCase().includes('cash'))?.pct ?? 0;
+    const paymentData = methods ?? [];
+    const COLORS = ['#e49925', '#c8a87a', '#6c833f', '#1976d2', '#8b7f70'];
     const circumference = 2 * Math.PI * 30;
-    const mmDash = (mobileMoney / 100) * circumference;
+    const topPct = paymentData[0]?.pct ?? 0;
+    const topDash = (topPct / 100) * circumference;
+    const cashEntry = paymentData.find(m => m.label.toLowerCase().includes('cash'));
+    const cashPct = cashEntry?.pct ?? 0;
 
     return (
         <Card>
@@ -339,38 +342,51 @@ function PaymentSplitCard({ methods }: { methods?: PaymentMethod[] }) {
                 <div className="relative w-20 h-20 shrink-0">
                     <svg width="80" height="80" viewBox="0 0 80 80">
                         <circle cx="40" cy="40" r="30" fill="none" stroke="#e8ddd0" strokeWidth="12" />
-                        <circle cx="40" cy="40" r="30" fill="none" stroke="#e49925" strokeWidth="12"
-                            strokeDasharray={`${mmDash} ${circumference}`}
-                            strokeLinecap="round"
-                            transform="rotate(-90 40 40)"
-                            style={{ transition: 'stroke-dasharray 0.5s ease' }}
-                        />
+                        {(() => {
+                            let offset = 0;
+                            return paymentData.map((m, i) => {
+                                const dash = (m.pct / 100) * circumference;
+                                const seg = (
+                                    <circle key={m.label} cx="40" cy="40" r="30" fill="none"
+                                        stroke={COLORS[i % COLORS.length]} strokeWidth="12"
+                                        strokeDasharray={`${dash} ${circumference}`}
+                                        strokeDashoffset={-offset}
+                                        strokeLinecap="butt"
+                                        transform="rotate(-90 40 40)"
+                                        style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                                    />
+                                );
+                                offset += dash;
+                                return seg;
+                            });
+                        })()}
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-sm font-bold font-body text-primary">{Math.round(mobileMoney)}%</span>
+                        <span className="text-sm font-bold font-body text-primary">{Math.round(topPct)}%</span>
                     </div>
                 </div>
                 {/* Bars */}
                 <div className="flex flex-col gap-2.5 flex-1">
-                    {[
-                        { label: 'Mobile Money', pct: mobileMoney, color: '#e49925', textColor: 'text-primary' },
-                        { label: 'Cash',          pct: cash,        color: '#c8a87a', textColor: 'text-text-dark' },
-                    ].map(row => (
-                        <div key={row.label}>
-                            <div className="flex justify-between mb-1">
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full" style={{ background: row.color }} />
-                                    <span className="text-xs font-body text-text-dark">{row.label}</span>
+                    {paymentData.length === 0 ? (
+                        <p className="text-neutral-gray text-xs font-body">No payment data available</p>
+                    ) : (
+                        paymentData.map((row, i) => (
+                            <div key={row.label}>
+                                <div className="flex justify-between mb-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-2 h-2 rounded-full" style={{ background: COLORS[i % COLORS.length] }} />
+                                        <span className="text-xs font-body text-text-dark">{row.label}</span>
+                                    </div>
+                                    <span className="text-xs font-bold font-body text-text-dark">{Math.round(row.pct)}%</span>
                                 </div>
-                                <span className={`text-xs font-bold font-body ${row.textColor}`}>{Math.round(row.pct)}%</span>
+                                <div className="h-1 bg-neutral-gray/15 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: COLORS[i % COLORS.length], transition: 'width 0.4s ease' }} />
+                                </div>
                             </div>
-                            <div className="h-1 bg-neutral-gray/15 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: row.color, transition: 'width 0.4s ease' }} />
-                            </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                     <div className="text-[11px] text-neutral-gray font-body px-2 py-1.5 bg-neutral-gray/10 rounded-lg">
-                        Keep ~<span className="text-text-dark font-semibold">₵{Math.round(cash * 8)}</span> cash float for today
+                        Keep ~<span className="text-text-dark font-semibold">₵{Math.round(cashPct * 8)}</span> cash float for today
                     </div>
                 </div>
             </div>
@@ -623,18 +639,25 @@ function StatusDot({ status }: { status: string }) {
 
 type PeriodTab = { key: Period; label: string };
 const PERIODS: PeriodTab[] = [
-    { key: 'today',  label: 'Today'      },
-    { key: 'week',   label: 'This Week'  },
-    { key: 'month',  label: 'This Month' },
-    { key: '30d',    label: 'Last 30d'   },
-    { key: '90d',    label: 'Last 90d'   },
-    { key: 'custom', label: 'All Time'   },
+    { key: 'today',     label: 'Today'      },
+    { key: 'yesterday', label: 'Yesterday'  },
+    { key: 'week',      label: 'This Week'  },
+    { key: 'month',     label: 'This Month' },
+    { key: '30d',       label: 'Last 30d'   },
+    { key: '90d',       label: 'Last 90d'   },
+    { key: 'custom',    label: 'All Time'   },
 ];
 
 function getDateRangeForPeriod(period: Period): { date_from: string; date_to: string } {
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
     if (period === 'today') return { date_from: today, date_to: today };
+    if (period === 'yesterday') {
+        const y = new Date(now);
+        y.setDate(y.getDate() - 1);
+        const yd = y.toISOString().slice(0, 10);
+        return { date_from: yd, date_to: yd };
+    }
     if (period === 'week') {
         const ws = new Date(now);
         ws.setDate(ws.getDate() - 6);
@@ -794,7 +817,7 @@ export default function ManagerAnalyticsPage() {
         setIsGenerating(true);
         try {
             const range = getDateRangeForPeriod(period);
-            const PERIOD_LABELS: Record<Period, string> = { today: 'Today', week: 'This Week', month: 'This Month', '30d': 'Last 30 Days', '90d': 'Last 90 Days', custom: 'All Time' };
+            const PERIOD_LABELS: Record<Period, string> = { today: 'Today', yesterday: 'Yesterday', week: 'This Week', month: 'This Month', '30d': 'Last 30 Days', '90d': 'Last 90 Days', custom: 'All Time' };
             const periodLabel = PERIOD_LABELS[period];
             const dateRange = `${range.date_from} – ${range.date_to}`;
             const generatedAt = new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });

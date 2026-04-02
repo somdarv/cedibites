@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     ListIcon,
     MagnifyingGlassIcon,
@@ -11,10 +11,12 @@ import {
     CaretDownIcon,
     CaretUpIcon,
     FunnelIcon,
+    SpinnerIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
-import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
-import { formatPrice, type OrderStatus } from '@/types/order';
+import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import { mapApiOrderToOrder } from '@/lib/api/adapters/order.adapter';
+import { formatPrice, type OrderStatus, type Order } from '@/types/order';
 import { STATUS_CONFIG } from '@/lib/constants/order.constants';
 import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
 
@@ -64,7 +66,7 @@ function StatusDot({ status }: { status: string }) {
 
 // ─── Order row (expandable) ───────────────────────────────────────────────────
 
-function OrderRow({ order, isLast }: { order: ReturnType<typeof useOrderStore>['orders'][number]; isLast: boolean }) {
+function OrderRow({ order, isLast }: { order: Order; isLast: boolean }) {
     const [open, setOpen] = useState(false);
 
     return (
@@ -141,17 +143,18 @@ function OrderRow({ order, isLast }: { order: ReturnType<typeof useOrderStore>['
 
 export default function PartnerOrdersPage() {
     const { staffUser } = useStaffAuth();
-    const { orders } = useOrderStore();
-    const branchName = staffUser?.branches[0]?.name ?? '';
+    const branchId = staffUser?.branches[0]?.id ? Number(staffUser.branches[0].id) : undefined;
+
+    const { orders: apiOrders, isLoading } = useEmployeeOrders({ branch_id: branchId, per_page: 100 });
+
+    const branchOrders = useMemo(() =>
+        apiOrders.map(mapApiOrderToOrder).sort((a, b) => b.placedAt - a.placedAt),
+    [apiOrders]);
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
-
-    const branchOrders = useMemo(() =>
-        orders
-            .filter(o => o.branch.name === branchName)
-            .sort((a, b) => b.placedAt - a.placedAt),
-    [orders, branchName]);
+    const [page, setPage] = useState(0);
+    const PAGE_SIZE = 15;
 
     const filtered = useMemo(() => {
         let list = branchOrders.filter(o => matchesFilter(o.status as OrderStatus, statusFilter));
@@ -165,7 +168,21 @@ export default function PartnerOrdersPage() {
         return list;
     }, [branchOrders, statusFilter, search]);
 
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+    // Reset page when filters change
+    useEffect(() => { setPage(0); }, [statusFilter, search]);
+
     const activeCount = branchOrders.filter(o => ACTIVE_STATUSES.includes(o.status as OrderStatus)).length;
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[50vh]">
+                <SpinnerIcon size={32} className="text-primary animate-spin" />
+            </div>
+        );
+    }
 
     return (
         <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">
@@ -228,9 +245,37 @@ export default function PartnerOrdersPage() {
                             <span key={i} className="text-neutral-gray text-[10px] font-bold font-body uppercase tracking-wider">{h}</span>
                         ))}
                     </div>
-                    {filtered.map((order, i) => (
-                        <OrderRow key={order.id} order={order} isLast={i === filtered.length - 1} />
+                    {paged.map((order, i) => (
+                        <OrderRow key={order.id} order={order} isLast={i === paged.length - 1} />
                     ))}
+                </div>
+            )}
+
+            {/* Pagination */}
+            {filtered.length > PAGE_SIZE && (
+                <div className="flex items-center justify-between mt-4 px-1">
+                    <span className="text-neutral-gray text-xs font-body">
+                        Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={page === 0}
+                            onClick={() => setPage(p => p - 1)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold font-body border border-[#f0e8d8] bg-neutral-card text-neutral-gray hover:text-text-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            Previous
+                        </button>
+                        <span className="text-xs font-body text-neutral-gray">{page + 1} / {totalPages}</span>
+                        <button
+                            type="button"
+                            disabled={page >= totalPages - 1}
+                            onClick={() => setPage(p => p + 1)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold font-body border border-[#f0e8d8] bg-neutral-card text-neutral-gray hover:text-text-dark disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            Next
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
