@@ -523,7 +523,6 @@ export default function MenuSettingsPage() {
             {deletingCat && (
                 <DeleteConfirm label={deletingCat} onConfirm={() => deleteCategory(deletingCat)} onClose={() => setDeletingCat(null)} />
             )}
-            )}
         </>
     );
 }

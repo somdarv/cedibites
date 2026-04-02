@@ -794,7 +794,7 @@ export default function ManagerAnalyticsPage() {
         setIsGenerating(true);
         try {
             const range = getDateRangeForPeriod(period);
-            const PERIOD_LABELS: Record<Period, string> = { today: 'Today', week: 'This Week', month: 'This Month', custom: 'All Time' };
+            const PERIOD_LABELS: Record<Period, string> = { today: 'Today', week: 'This Week', month: 'This Month', '30d': 'Last 30 Days', '90d': 'Last 90 Days', custom: 'All Time' };
             const periodLabel = PERIOD_LABELS[period];
             const dateRange = `${range.date_from} – ${range.date_to}`;
             const generatedAt = new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
