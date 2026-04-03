@@ -3,20 +3,10 @@
 import { useState, useEffect } from 'react';
 import {
     GearSixIcon,
-    TagIcon,
-    PlusIcon,
-    PencilSimpleIcon,
-    TrashIcon,
-    XIcon,
-    CheckIcon,
-    ArrowUpIcon,
-    ArrowDownIcon,
-    WarningCircleIcon,
     FloppyDiskIcon,
     StorefrontIcon,
     ClockIcon,
     TruckIcon,
-    CreditCardIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { useBranch } from '@/lib/api/hooks/useBranches';
@@ -57,8 +47,6 @@ const DEFAULT_BRANCH: BranchSettings = {
     hours: DEFAULT_HOURS,
 };
 
-const DEFAULT_CATEGORIES = ['Basic Meals', 'Budget Bowls', 'Combos', 'Top Ups', 'Drinks'];
-
 // ─── Shared input class (light text on dark bg) ───────────────────────────────
 
 const inputCls = 'w-full bg-neutral-light border border-brown-light/20 rounded-xl px-3 py-2.5 text-sm font-body text-text-dark placeholder:text-neutral-gray/50 focus:outline-none focus:border-primary transition-colors';
@@ -93,53 +81,6 @@ function SectionHeader({ icon: Icon, color, title, sub }: { icon: React.ElementT
     );
 }
 
-// ─── Inline edit field ────────────────────────────────────────────────────────
-
-function InlineEdit({ value, placeholder, onSave, onCancel }: {
-    value: string; placeholder?: string; onSave: (v: string) => void; onCancel: () => void;
-}) {
-    const [text, setText] = useState(value);
-    return (
-        <div className="flex items-center gap-2 flex-1">
-            <input
-                type="text" value={text}
-                onChange={e => setText(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') onSave(text.trim()); if (e.key === 'Escape') onCancel(); }}
-                placeholder={placeholder} autoFocus
-                className="flex-1 bg-neutral-light border border-primary/40 rounded-lg px-3 py-1.5 text-sm font-body text-text-dark placeholder:text-neutral-gray/50 focus:outline-none focus:border-primary transition-colors"
-            />
-            <button type="button" onClick={() => { if (text.trim()) onSave(text.trim()); }}
-                className="p-1.5 rounded-lg bg-primary/15 text-primary hover:bg-primary/25 transition-colors cursor-pointer">
-                <CheckIcon size={14} weight="bold" />
-            </button>
-            <button type="button" onClick={onCancel}
-                className="p-1.5 rounded-lg text-neutral-gray hover:text-text-dark hover:bg-brown-light/10 transition-colors cursor-pointer">
-                <XIcon size={14} weight="bold" />
-            </button>
-        </div>
-    );
-}
-
-// ─── Delete confirm ───────────────────────────────────────────────────────────
-
-function DeleteConfirm({ label, onConfirm, onClose }: { label: string; onConfirm: () => void; onClose: () => void }) {
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-darker/60 backdrop-blur-sm">
-            <div className="bg-neutral-card border border-brown-light/20 rounded-3xl p-6 w-full max-w-sm shadow-xl text-center">
-                <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mx-auto mb-4">
-                    <WarningCircleIcon size={28} weight="fill" className="text-error" />
-                </div>
-                <h2 className="text-text-dark text-base font-bold font-body">Remove &ldquo;{label}&rdquo;?</h2>
-                <p className="text-neutral-gray text-sm font-body mt-1 mb-6">This cannot be undone.</p>
-                <div className="flex gap-3">
-                    <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl border border-brown-light/20 text-sm font-medium font-body text-neutral-gray hover:text-text-dark transition-colors cursor-pointer">Cancel</button>
-                    <button type="button" onClick={onConfirm} className="flex-1 py-3 rounded-xl bg-error hover:bg-error/80 text-white text-sm font-bold font-body transition-colors cursor-pointer">Remove</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // ─── Day labels ───────────────────────────────────────────────────────────────
 
 const DAY_LABELS: Record<DayKey, string> = {
@@ -159,12 +100,7 @@ export default function MenuSettingsPage() {
 
     // Local working copies
     const [branch,     setBranch]     = useState<BranchSettings>(DEFAULT_BRANCH);
-    const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
     const [dirty, setDirty] = useState(false);
-
-    const [editingCatIdx,   setEditingCatIdx]   = useState<number | null>(null);
-    const [addingCat,       setAddingCat]       = useState(false);
-    const [deletingCat,     setDeletingCat]     = useState<string | null>(null);
     
     // Update branch settings when API data loads
     useEffect(() => {
@@ -237,33 +173,6 @@ export default function MenuSettingsPage() {
             hours: { ...prev.hours, [day]: { ...prev.hours[day], [field]: value } },
         }));
         mark();
-    }
-
-    // ── Categories ───────────────────────────────────────────────────────────
-
-    function saveCategory(idx: number, value: string) {
-        if (!value) return;
-        setCategories(prev => prev.map((c, i) => i === idx ? value : c));
-        setEditingCatIdx(null); mark();
-    }
-
-    function addCategory(value: string) {
-        if (!value || categories.includes(value)) return;
-        setCategories(prev => [...prev, value]);
-        setAddingCat(false); mark();
-    }
-
-    function deleteCategory(cat: string) {
-        setCategories(prev => prev.filter(c => c !== cat));
-        setDeletingCat(null); mark();
-    }
-
-    function moveCat(idx: number, dir: -1 | 1) {
-        const next = idx + dir;
-        if (next < 0 || next >= categories.length) return;
-        const arr = [...categories];
-        [arr[idx], arr[next]] = [arr[next], arr[idx]];
-        setCategories(arr); mark();
     }
 
     // ── Commit ───────────────────────────────────────────────────────────────
@@ -435,59 +344,6 @@ export default function MenuSettingsPage() {
                     </div>
                 </section>
 
-                {/* ═══════════════════════════════════════════════════════════════
-                    SECTION 4 — CATEGORIES
-                ════════════════════════════════════════════════════════════════ */}
-                <section className="mb-10">
-                    <SectionHeader icon={TagIcon} color="bg-primary" title="Menu Categories" sub="How items are grouped on the customer menu" />
-
-                    <div className="bg-neutral-card border border-brown-light/15 rounded-2xl overflow-hidden mb-3">
-                        {categories.map((cat, i) => (
-                            <div key={cat + i} className={`flex items-center gap-3 px-4 py-3.5 ${i < categories.length - 1 ? 'border-b border-brown-light/10' : ''}`}>
-                                <div className="flex flex-col gap-0.5 shrink-0">
-                                    <button type="button" onClick={() => moveCat(i, -1)} disabled={i === 0}
-                                        className="p-0.5 text-neutral-gray/40 hover:text-neutral-gray disabled:opacity-20 transition-colors cursor-pointer disabled:cursor-not-allowed">
-                                        <ArrowUpIcon size={12} weight="bold" />
-                                    </button>
-                                    <button type="button" onClick={() => moveCat(i, 1)} disabled={i === categories.length - 1}
-                                        className="p-0.5 text-neutral-gray/40 hover:text-neutral-gray disabled:opacity-20 transition-colors cursor-pointer disabled:cursor-not-allowed">
-                                        <ArrowDownIcon size={12} weight="bold" />
-                                    </button>
-                                </div>
-                                {editingCatIdx === i ? (
-                                    <InlineEdit value={cat} placeholder="Category name" onSave={v => saveCategory(i, v)} onCancel={() => setEditingCatIdx(null)} />
-                                ) : (
-                                    <span className="flex-1 text-text-dark text-sm font-medium font-body">{cat}</span>
-                                )}
-                                {editingCatIdx !== i && (
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        <button type="button" onClick={() => setEditingCatIdx(i)}
-                                            className="p-1.5 rounded-lg text-neutral-gray hover:text-primary hover:bg-primary/10 transition-colors cursor-pointer">
-                                            <PencilSimpleIcon size={15} weight="bold" />
-                                        </button>
-                                        <button type="button" onClick={() => setDeletingCat(cat)}
-                                            className="p-1.5 rounded-lg text-neutral-gray hover:text-error hover:bg-error/10 transition-colors cursor-pointer">
-                                            <TrashIcon size={15} weight="bold" />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                        {addingCat && (
-                            <div className="flex items-center gap-3 px-4 py-3.5 border-t border-brown-light/10">
-                                <div className="w-5.5 shrink-0" />
-                                <InlineEdit value="" placeholder="New category name…" onSave={addCategory} onCancel={() => setAddingCat(false)} />
-                            </div>
-                        )}
-                    </div>
-                    {!addingCat && (
-                        <button type="button" onClick={() => setAddingCat(true)}
-                            className="flex items-center gap-2 text-sm font-medium font-body text-primary hover:text-primary-hover transition-colors cursor-pointer w-fit">
-                            <PlusIcon size={15} weight="bold" /> Add category
-                        </button>
-                    )}
-                </section>
-
                 {/* ── Sticky save bar ─────────────────────────────────────────── */}
                 {dirty && (
                     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 bg-neutral-card border border-brown-light/20 shadow-2xl rounded-2xl px-5 py-3.5">
@@ -500,11 +356,6 @@ export default function MenuSettingsPage() {
                 )}
 
             </div>
-
-            {/* ── Modals ──────────────────────────────────────────────────────── */}
-            {deletingCat && (
-                <DeleteConfirm label={deletingCat} onConfirm={() => deleteCategory(deletingCat)} onClose={() => setDeletingCat(null)} />
-            )}
         </>
     );
 }

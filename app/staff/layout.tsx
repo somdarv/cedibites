@@ -29,7 +29,6 @@ import { SignOutDialog } from '@/app/components/ui/SignOutDialog';
 
 const MANAGER_NAV_MAIN = [
     { href: '/staff/manager/dashboard', label: 'Dashboard', icon: SquaresFourIcon },
-    { href: '/staff/manager/new-order', label: 'New Order', icon: PlusCircleIcon,  permission: 'create_orders' },
     { href: '/staff/manager/orders',    label: 'Orders',    icon: ListIcon },
 ];
 
@@ -39,13 +38,12 @@ const MANAGER_NAV_TOOLS = [
     { href: '/staff/manager/staff',     label: 'Staff',      icon: UsersThreeIcon, permission: 'manage_employees' },
     { href: '/staff/manager/staff-sales', label: 'Staff Sales', icon: CurrencyCircleDollarIcon, permission: 'view_orders' },
     { href: '/staff/manager/shifts',    label: 'Shifts',     icon: ClockIcon,      permission: 'manage_shifts' },
-    { href: '/staff/manager/my-shifts', label: 'My Shifts',  icon: ReceiptIcon,    permission: 'view_my_shifts' },
     { href: '/staff/manager/settings',  label: 'Configure',  icon: GearSixIcon,    permission: 'manage_settings' },
 ];
 
 const SALES_NAV = [
     { href: '/staff/sales/dashboard',  label: 'Dashboard', icon: SquaresFourIcon },
-    { href: '/staff/sales/new-order',  label: 'New Order', icon: PlusCircleIcon,  permission: 'create_orders' },
+    { href: '/staff/sales/new-order',  label: 'New Order', icon: PlusCircleIcon,  permission: 'create_orders', roles: ['call_center'] as string[] },
     { href: '/staff/sales/orders',     label: 'Orders',    icon: ListIcon },
     { href: '/staff/sales/my-sales',   label: 'My Sales',  icon: ReceiptIcon,     permission: 'view_my_sales' },
     { href: '/staff/sales/my-shifts',  label: 'My Shifts', icon: ClockIcon,       permission: 'view_my_shifts' },
@@ -153,7 +151,7 @@ function StaffLayoutShell({ children }: { children: React.ReactNode }) {
 
     const mainNav = isManagerPortal
         ? MANAGER_NAV_MAIN.filter(i => !i.permission || can(i.permission))
-        : SALES_NAV.filter(i => !i.permission || can(i.permission));
+        : SALES_NAV.filter(i => (!i.permission || can(i.permission)) && (!('roles' in i) || !i.roles || i.roles.includes(staffUser.role)));
 
     const toolsNav = isManagerPortal
         ? MANAGER_NAV_TOOLS.filter(i => can(i.permission))
