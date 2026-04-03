@@ -64,16 +64,19 @@ function SessionCard({
   session,
   onResend,
   onPayCash,
+  onPayCard,
   onDelete,
 }: {
   session: CheckoutSession;
   onResend: (token: string, phone?: string) => Promise<void>;
   onPayCash: (token: string, totalAmount: number) => Promise<void>;
+  onPayCard: (token: string, totalAmount: number) => Promise<void>;
   onDelete: (token: string) => Promise<void>;
 }) {
   const [isActing, setIsActing] = useState(false);
   const [showChangeNumber, setShowChangeNumber] = useState(false);
   const [newPhone, setNewPhone] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const itemsSummary = session.items
     .map(i => `${i.quantity}x ${i.name}${i.option_label ? ` (${i.option_label})` : ''}`)
@@ -95,12 +98,26 @@ function SessionCard({
     }
   };
 
+  // 3-minute cooldown after re-sending MoMo prompt
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const handleResendWithCooldown = async (token: string, phone?: string) => {
+    await onResend(token, phone);
+    setResendCooldown(180); // 3 minutes
+  };
+
   const handleResendWithNewNumber = async () => {
     if (!isValidGhanaPhone(newPhone)) {
       toast.error('Enter a valid Ghana phone number');
       return;
     }
-    await handleAction(() => onResend(session.session_token, normalizeGhanaPhone(newPhone)));
+    await handleAction(() => handleResendWithCooldown(session.session_token, normalizeGhanaPhone(newPhone)));
     setShowChangeNumber(false);
     setNewPhone('');
   };
@@ -186,12 +203,19 @@ function SessionCard({
             {/* Re-send prompt */}
             {session.payment_method === 'mobile_money' && (
               <button
-                onClick={() => handleAction(() => onResend(session.session_token))}
-                className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20 transition-colors"
-                title="Re-send MoMo prompt"
+                onClick={() => handleAction(() => handleResendWithCooldown(session.session_token))}
+                disabled={resendCooldown > 0}
+                className={`flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl text-xs font-medium transition-colors ${
+                  resendCooldown > 0
+                    ? 'bg-neutral-gray/10 text-neutral-gray cursor-not-allowed'
+                    : 'bg-primary/10 text-primary hover:bg-primary/20'
+                }`}
+                title={resendCooldown > 0 ? `Wait ${Math.ceil(resendCooldown / 60)}m` : 'Re-send MoMo prompt'}
               >
                 <ArrowClockwiseIcon className="w-3.5 h-3.5" />
-                Re-send
+                {resendCooldown > 0
+                  ? `${Math.floor(resendCooldown / 60)}:${(resendCooldown % 60).toString().padStart(2, '0')}`
+                  : 'Re-send'}
               </button>
             )}
 
@@ -215,6 +239,16 @@ function SessionCard({
             >
               <CurrencyDollarIcon className="w-3.5 h-3.5" />
               Cash
+            </button>
+
+            {/* Pay with card */}
+            <button
+              onClick={() => handleAction(() => onPayCard(session.session_token, session.total_amount))}
+              className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+              title="Switch to card payment"
+            >
+              <CurrencyDollarIcon className="w-3.5 h-3.5" />
+              Card
             </button>
 
             {/* Delete */}
@@ -279,6 +313,15 @@ export default function PendingPaymentsDrawer({
     refetch();
   };
 
+  const handlePayCard = async (token: string, totalAmount: number) => {
+    // Switch payment method to card first, then confirm
+    await checkoutSessionService.posChangePayment(token, { payment_method: 'card' });
+    const result = await checkoutSessionService.confirmCard(token, totalAmount);
+    toast.success('Card payment confirmed');
+    onSessionConfirmed?.(result);
+    refetch();
+  };
+
   const handleDelete = async (token: string) => {
     await checkoutSessionService.posAbandon(token);
     toast.success('Session cancelled');
@@ -325,6 +368,7 @@ export default function PendingPaymentsDrawer({
                 session={session}
                 onResend={handleResend}
                 onPayCash={handlePayCash}
+                onPayCard={handlePayCard}
                 onDelete={handleDelete}
               />
             ))

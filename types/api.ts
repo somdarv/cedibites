@@ -241,6 +241,10 @@ export interface CheckoutSession {
   expires_at: string;
   created_at: string;
   updated_at: string;
+  // Recovery flags from show() endpoint
+  can_retry?: boolean;
+  can_change_payment?: boolean;
+  can_change_number?: boolean;
 }
 
 export interface CheckoutSessionItem {
