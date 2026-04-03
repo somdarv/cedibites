@@ -153,6 +153,8 @@ export default function POSTerminalPage() {
   const [isBranchSwitcherOpen, setIsBranchSwitcherOpen] = useState(false);
   const [optionPickerItem, setOptionPickerItem] = useState<DisplayMenuItem | null>(null);
   const [isPendingDrawerOpen, setIsPendingDrawerOpen] = useState(false);
+  const [backgroundMomoToken, setBackgroundMomoToken] = useState<string | null>(null);
+  const [backgroundConfirmedOrder, setBackgroundConfirmedOrder] = useState<Order | null>(null);
 
   // Pending checkout sessions count for badge
   const { data: pendingSessionsData } = usePosCheckoutSessions(
@@ -177,6 +179,34 @@ export default function POSTerminalPage() {
       setPromoDiscount(getPromoService().calculateDiscount(p, cartTotal));
     }).catch(() => { setActivePromo(null); setPromoDiscount(0); });
   }, [cart, session?.branchId, cartTotal]);
+
+  // Background poll for dismissed MoMo sessions — detect when payment completes
+  useEffect(() => {
+    if (!backgroundMomoToken) return;
+    const interval = setInterval(async () => {
+      try {
+        const { checkoutSessionService } = await import('@/lib/api/services/checkout-session.service');
+        const cs = await checkoutSessionService.posGetStatus(backgroundMomoToken);
+        if (cs.status === 'confirmed' && cs.order) {
+          clearInterval(interval);
+          setBackgroundMomoToken(null);
+          setBackgroundConfirmedOrder({
+            orderNumber: cs.order.order_number ?? '',
+            status: 'received',
+            paymentStatus: 'completed',
+            isPaid: true,
+            total: cs.total_amount,
+            items: cs.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.unit_price })),
+            contact: { name: cs.customer_name, phone: cs.customer_phone },
+          } as unknown as Order);
+        } else if (cs.status === 'failed' || cs.status === 'expired') {
+          clearInterval(interval);
+          setBackgroundMomoToken(null);
+        }
+      } catch { /* ignore poll errors */ }
+    }, 7000);
+    return () => clearInterval(interval);
+  }, [backgroundMomoToken]);
 
   // Branches this staff member can switch between (empty branchIds = admin = all branches)
   const switchableBranches = useMemo(() => {
@@ -760,10 +790,25 @@ export default function POSTerminalPage() {
             setCompletedOrder(confirmedOrder);
           }}
           onTimeout={() => {
+            const token = pendingMomoOrder._sessionToken;
             setPendingMomoOrder(null);
-            toast.error('Payment timed out. Please ask the customer to try again.');
+            if (token) {
+              setBackgroundMomoToken(token);
+              setIsPendingDrawerOpen(true);
+              toast.error('Payment timed out. Moved to Pending Payments — you can retry from there.');
+            } else {
+              toast.error('Payment timed out. Please ask the customer to try again.');
+            }
           }}
-          onCancel={() => setPendingMomoOrder(null)}
+          onCancel={() => {
+            const token = pendingMomoOrder._sessionToken;
+            setPendingMomoOrder(null);
+            if (token) {
+              setBackgroundMomoToken(token);
+              setIsPendingDrawerOpen(true);
+              toast.info('Payment moved to Pending Payments. You can continue taking orders.');
+            }
+          }}
         />
       )}
 
@@ -773,6 +818,14 @@ export default function POSTerminalPage() {
           order={completedOrder}
           branch={{ name: branchInfo?.name ?? 'CediBites', address: branchInfo?.address, phone: branchInfo?.phone }}
           onClose={() => setCompletedOrder(null)}
+        />
+      )}
+
+      {/* Background MoMo Payment Confirmed Overlay */}
+      {backgroundConfirmedOrder && (
+        <PaymentConfirmedOverlay
+          order={backgroundConfirmedOrder}
+          onDismiss={() => setBackgroundConfirmedOrder(null)}
         />
       )}
 
@@ -1469,8 +1522,61 @@ function MomoWaitingModal({ order, onConfirmed, onTimeout, onCancel }: MomoWaiti
               transition-all duration-150
             "
           >
-            Cancel
+            Dismiss &mdash; Track in Pending
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Payment Confirmed Overlay (background MoMo) ─────────────────────────────
+
+function PaymentConfirmedOverlay({ order, onDismiss }: { order: Order; onDismiss: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 8000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-start justify-center bg-black/50 animate-in fade-in duration-300">
+      <div className="w-full max-w-lg mt-0 bg-green-600 text-white rounded-b-3xl shadow-2xl overflow-hidden animate-in slide-in-from-top duration-500">
+        <div className="px-6 py-8 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-white/20 flex items-center justify-center mb-4">
+            <CheckCircleIcon className="w-10 h-10 text-white" weight="fill" />
+          </div>
+          <h2 className="text-2xl font-bold mb-1">Payment Confirmed!</h2>
+          <p className="text-white/80 text-sm mb-4">
+            A pending MoMo payment just completed
+          </p>
+
+          <div className="bg-white/15 rounded-2xl p-4 mb-5 text-left space-y-2">
+            {order.orderNumber && (
+              <div className="flex justify-between text-sm">
+                <span className="text-white/70">Order</span>
+                <span className="font-bold">{order.orderNumber}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-white/70">Customer</span>
+              <span className="font-medium">{order.contact?.name || 'Walk-in'}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-white/70">Amount</span>
+              <span className="font-bold">{formatGHS(order.total)}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={onDismiss}
+            className="w-full h-12 rounded-2xl font-medium bg-white text-green-700 hover:bg-white/90 active:scale-[0.98] transition-all"
+          >
+            Got it
+          </button>
+        </div>
+
+        <div className="h-1 bg-white/20">
+          <div className="h-full bg-white animate-shrink" style={{ animationDuration: '8s' }} />
         </div>
       </div>
     </div>

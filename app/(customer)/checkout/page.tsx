@@ -17,6 +17,7 @@ import { useBranch, Branch, BranchWithDistance } from '@/app/components/provider
 import { useLocation } from '@/app/components/providers/LocationProvider';
 import { useAuth } from '@/app/components/providers/AuthProvider';
 import { useCreateCheckoutSession, useCheckoutSessionStatus, useAbandonCheckoutSession, useRetryPayment, useChangePaymentMethod } from '@/lib/api/hooks/useCheckoutSession';
+import PaymentRecoveryActions from '@/app/components/order/PaymentRecoveryActions';
 import type { PaymentMethod as UnifiedPaymentMethod, FulfillmentType } from '@/types/order';
 import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
 import apiClient, { ApiError } from '@/lib/api/client';
@@ -584,15 +585,14 @@ function StepProcessing({ sessionToken, onSuccess, onFail, onAbandon }: {
 }) {
     const { session } = useCheckoutSessionStatus(sessionToken);
     const abandon = useAbandonCheckoutSession();
+    const [showRecovery, setShowRecovery] = useState(false);
 
     useEffect(() => {
         if (!session) return;
         if (session.status === 'confirmed' && session.order?.order_number) {
             onSuccess(session.order.order_number);
-        } else if (session.status === 'failed') {
-            onFail('Payment failed. Please try again.');
-        } else if (session.status === 'expired') {
-            onFail('Payment session expired. Please start a new checkout.');
+        } else if (session.status === 'failed' || session.status === 'expired') {
+            setShowRecovery(true);
         }
     }, [session, onSuccess, onFail]);
 
@@ -602,6 +602,34 @@ function StepProcessing({ sessionToken, onSuccess, onFail, onAbandon }: {
         } catch { /* ignore */ }
         onAbandon();
     };
+
+    // Show recovery UI when payment fails or expires
+    if (showRecovery && session) {
+        const isFailed = session.status === 'failed';
+        return (
+            <div className="flex flex-col items-center gap-5 py-10 text-center max-w-sm mx-auto">
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center ${isFailed ? 'bg-red-100 dark:bg-red-900/20' : 'bg-amber-100 dark:bg-amber-900/20'}`}>
+                    <WarningCircleIcon weight="fill" size={40} className={isFailed ? 'text-red-500' : 'text-amber-500'} />
+                </div>
+                <div>
+                    <h2 className="text-xl font-bold text-text-dark dark:text-text-light">
+                        {isFailed ? 'Payment Failed' : 'Session Expired'}
+                    </h2>
+                    <p className="text-sm text-neutral-gray mt-2">
+                        {isFailed
+                            ? 'Your payment could not be completed. Choose an option below to try again.'
+                            : 'Your payment session has expired. You can retry or switch to cash.'}
+                    </p>
+                </div>
+
+                <PaymentRecoveryActions
+                    session={session}
+                    onOrderCreated={onSuccess}
+                    onAbandoned={onAbandon}
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col items-center gap-6 py-12 text-center">
@@ -807,7 +835,8 @@ export default function CheckoutPage() {
             if (paymentMethod === 'mobile_money') {
                 // Redirect to Hubtel checkout if we have a URL
                 if (session.checkout_url) {
-                    clearCart();
+                    // Don't clear cart here — backend clears it when order is created.
+                    // If payment fails, the customer can retry with their cart intact.
                     window.location.href = session.checkout_url;
                     return;
                 }
