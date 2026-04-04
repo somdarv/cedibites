@@ -190,14 +190,19 @@ export default function POSTerminalPage() {
         if (cs.status === 'confirmed' && cs.order) {
           clearInterval(interval);
           setBackgroundMomoToken(null);
+          const o = cs.order;
           setBackgroundConfirmedOrder({
-            orderNumber: cs.order.order_number ?? '',
+            orderNumber: o.order_number ?? '',
             status: 'received',
             paymentStatus: 'completed',
             isPaid: true,
-            total: cs.total_amount,
-            items: cs.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.unit_price })),
-            contact: { name: cs.customer_name, phone: cs.customer_phone },
+            total: o.total_amount ?? cs.total_amount,
+            items: (o.items ?? []).map((i) => ({
+              name: i.menu_item?.name ?? i.menu_item_snapshot?.name ?? 'Item',
+              quantity: i.quantity,
+              price: i.unit_price,
+            })),
+            contact: { name: o.contact_name, phone: o.contact_phone },
           } as unknown as Order);
         } else if (cs.status === 'failed' || cs.status === 'expired') {
           clearInterval(interval);
@@ -1026,7 +1031,8 @@ function PaymentModal({ total, onClose, onPayment, isManualEntry }: PaymentModal
     } else if (selectedMethod === 'mobile_money') {
       await onPayment('mobile_money', undefined, normalizeGhanaPhone(momoNumber), manualOpts);
     } else if (selectedMethod === 'manual_momo') {
-      await onPayment('manual_momo', undefined, undefined, manualOpts);
+      const manualMomoNum = momoNumber ? normalizeGhanaPhone(momoNumber) : undefined;
+      await onPayment('manual_momo', undefined, manualMomoNum, manualOpts);
     } else if (selectedMethod === 'no_charge') {
       await onPayment('no_charge', undefined, undefined, manualOpts);
     } else {
@@ -1038,24 +1044,24 @@ function PaymentModal({ total, onClose, onPayment, isManualEntry }: PaymentModal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="w-full max-w-md bg-white rounded-3xl overflow-hidden shadow-2xl">
+      <div className={`w-full max-w-md rounded-3xl overflow-hidden shadow-2xl ${isManualEntry ? 'bg-gray-900' : 'bg-white'}`}>
         {/* Header */}
-        <div className="px-6 py-4 border-b border-neutral-gray/20 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-text-dark">
-            {isManualEntry ? 'Record Past Order' : 'Payment'}
+        <div className={`px-6 py-4 border-b flex items-center justify-between ${isManualEntry ? 'border-gray-700' : 'border-neutral-gray/20'}`}>
+          <h2 className={`text-xl font-semibold ${isManualEntry ? 'text-amber-400' : 'text-text-dark'}`}>
+            {isManualEntry ? '⏱ Record Past Order' : 'Payment'}
           </h2>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-gray hover:text-text-dark hover:bg-neutral-gray/10 transition-all"
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isManualEntry ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-neutral-gray hover:text-text-dark hover:bg-neutral-gray/10'}`}
           >
             <XIcon className="w-5 h-5" />
           </button>
         </div>
 
         {/* Total */}
-        <div className="px-6 py-6 border-b border-neutral-gray/15 text-center">
-          <p className="text-neutral-gray text-sm mb-1">Amount Due</p>
-          <p className="text-4xl font-bold text-primary">{formatGHS(total)}</p>
+        <div className={`px-6 py-6 border-b text-center ${isManualEntry ? 'border-gray-700' : 'border-neutral-gray/15'}`}>
+          <p className={`text-sm mb-1 ${isManualEntry ? 'text-gray-400' : 'text-neutral-gray'}`}>Amount Due</p>
+          <p className={`text-4xl font-bold ${isManualEntry ? 'text-amber-400' : 'text-primary'}`}>{formatGHS(total)}</p>
         </div>
 
         {/* Scrollable content */}
@@ -1064,7 +1070,7 @@ function PaymentModal({ total, onClose, onPayment, isManualEntry }: PaymentModal
           {/* Manual entry: date/time picker */}
           {isManualEntry && dateEnabled !== null && (
             <div className="space-y-2">
-              <p className="text-neutral-gray text-sm">
+              <p className={`text-sm ${isManualEntry ? 'text-gray-400' : 'text-neutral-gray'}`}>
                 {dateEnabled ? 'When was this order?' : 'What time was this order?'}
               </p>
               {dateEnabled ? (
@@ -1073,30 +1079,36 @@ function PaymentModal({ total, onClose, onPayment, isManualEntry }: PaymentModal
                   value={recordedAt}
                   max={new Date().toISOString().slice(0, 16)}
                   onChange={e => setRecordedAt(e.target.value)}
-                  className="
+                  className={`
                     w-full h-12 px-4 rounded-xl text-sm
-                    bg-neutral-light text-text-dark
-                    border border-neutral-gray/20 focus:border-primary/50
+                    border focus:border-primary/50
                     outline-none transition-colors
-                  "
+                    ${isManualEntry
+                      ? 'bg-gray-800 text-white border-gray-600'
+                      : 'bg-neutral-light text-text-dark border-neutral-gray/20'
+                    }
+                  `}
                 />
               ) : (
                 <input
                   type="time"
                   value={recordedTime}
                   onChange={e => setRecordedTime(e.target.value)}
-                  className="
+                  className={`
                     w-full h-12 px-4 rounded-xl text-sm
-                    bg-neutral-light text-text-dark
-                    border border-neutral-gray/20 focus:border-primary/50
+                    border focus:border-primary/50
                     outline-none transition-colors
-                  "
+                    ${isManualEntry
+                      ? 'bg-gray-800 text-white border-gray-600'
+                      : 'bg-neutral-light text-text-dark border-neutral-gray/20'
+                    }
+                  `}
                 />
               )}
             </div>
           )}
 
-          <p className="text-neutral-gray text-sm">Select payment method</p>
+          <p className={`text-sm ${isManualEntry ? 'text-gray-400' : 'text-neutral-gray'}`}>Select payment method</p>
 
           <div className="grid grid-cols-2 gap-3">
             {([
@@ -1118,8 +1130,12 @@ function PaymentModal({ total, onClose, onPayment, isManualEntry }: PaymentModal
                   py-4 rounded-2xl flex flex-col items-center gap-2
                   transition-all duration-150
                   ${selectedMethod === method.id
-                    ? 'bg-primary text-brown ring-2 ring-primary ring-offset-2 ring-offset-white'
-                    : 'bg-neutral-gray/10 text-text-dark hover:bg-neutral-gray/20'
+                    ? isManualEntry
+                      ? 'bg-amber-500 text-gray-900 ring-2 ring-amber-500 ring-offset-2 ring-offset-gray-900'
+                      : 'bg-primary text-brown ring-2 ring-primary ring-offset-2 ring-offset-white'
+                    : isManualEntry
+                      ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                      : 'bg-neutral-gray/10 text-text-dark hover:bg-neutral-gray/20'
                   }
                 `}
               >
@@ -1241,16 +1257,36 @@ function PaymentModal({ total, onClose, onPayment, isManualEntry }: PaymentModal
             <div className="pt-2 space-y-2">
               <p className="text-neutral-gray text-xs">Customer paid via direct MoMo transfer to branch number</p>
               <input
+                type="tel"
+                placeholder="Customer's MoMo number"
+                value={momoNumber}
+                onChange={e => setMomoNumber(e.target.value)}
+                className={`
+                  w-full h-12 px-4 rounded-xl text-sm
+                  placeholder:text-neutral-gray/60
+                  border focus:border-primary/50
+                  outline-none transition-colors
+                  ${isManualEntry
+                    ? 'bg-gray-800 text-white border-gray-600'
+                    : 'bg-neutral-light text-text-dark border-neutral-gray/20'
+                  }
+                `}
+              />
+              <input
                 type="text"
                 placeholder="MoMo transaction ID (optional)"
                 value={momoReference}
                 onChange={e => setMomoReference(e.target.value)}
-                className="
+                className={`
                   w-full h-12 px-4 rounded-xl text-sm
-                  bg-neutral-light text-text-dark placeholder:text-neutral-gray/60
-                  border border-neutral-gray/20 focus:border-primary/50
+                  placeholder:text-neutral-gray/60
+                  border focus:border-primary/50
                   outline-none transition-colors
-                "
+                  ${isManualEntry
+                    ? 'bg-gray-800 text-white border-gray-600'
+                    : 'bg-neutral-light text-text-dark border-neutral-gray/20'
+                  }
+                `}
               />
             </div>
           )}
@@ -1270,7 +1306,7 @@ function PaymentModal({ total, onClose, onPayment, isManualEntry }: PaymentModal
             disabled={
               !selectedMethod || isProcessing
               || (selectedMethod === 'mobile_money' && !momoVerified)
-              || (isManualEntry && !recordedAt)
+              || (isManualEntry && !recordedAt && !recordedTime)
             }
             className="
               w-full h-14 rounded-2xl font-semibold text-lg

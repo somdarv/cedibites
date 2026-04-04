@@ -77,9 +77,14 @@ function SessionCard({
   const [showChangeNumber, setShowChangeNumber] = useState(false);
   const [newPhone, setNewPhone] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [confirmingAction, setConfirmingAction] = useState<'cash' | 'card' | null>(null);
 
   const itemsSummary = session.items
-    .map(i => `${i.quantity}x ${i.name}${i.option_label ? ` (${i.option_label})` : ''}`)
+    .map(i => {
+      const name = i.name ?? i.menu_item_snapshot?.name ?? 'Unknown Item';
+      const optLabel = i.option_label ?? i.menu_item_option_snapshot?.option_label;
+      return `${i.quantity}x ${name}${optLabel ? ` (${optLabel})` : ''}`;
+    })
     .join(', ');
 
   const isExpired = session.status === 'expired';
@@ -108,8 +113,18 @@ function SessionCard({
   }, [resendCooldown]);
 
   const handleResendWithCooldown = async (token: string, phone?: string) => {
-    await onResend(token, phone);
-    setResendCooldown(180); // 3 minutes
+    try {
+      await onResend(token, phone);
+      setResendCooldown(300); // 5 minutes — matches MoMo USSD prompt duration
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { cooldown_remaining?: number; message?: string } } };
+      if (error?.response?.status === 429 && error?.response?.data?.cooldown_remaining) {
+        setResendCooldown(error.response.data.cooldown_remaining);
+        toast.error(error.response.data.message ?? 'Please wait before re-sending.');
+      } else {
+        throw err;
+      }
+    }
   };
 
   const handleResendWithNewNumber = async () => {
@@ -168,7 +183,9 @@ function SessionCard({
         <p className="text-xs text-error font-medium mb-2">Payment timed out</p>
       )}
       {isFailed && (
-        <p className="text-xs text-error font-medium mb-2">Payment failed</p>
+        <p className="text-xs text-error font-medium mb-2">
+          {session.failure_reason ?? 'Payment failed'}
+        </p>
       )}
 
       {/* Actions (only for pending/payment_initiated sessions) */}
@@ -232,24 +249,64 @@ function SessionCard({
             )}
 
             {/* Pay with cash */}
-            <button
-              onClick={() => handleAction(() => onPayCash(session.session_token, session.total_amount))}
-              className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
-              title="Switch to cash payment"
-            >
-              <CurrencyDollarIcon className="w-3.5 h-3.5" />
-              Cash
-            </button>
+            {confirmingAction === 'cash' ? (
+              <div className="flex-1 flex gap-1">
+                <button
+                  onClick={() => {
+                    handleAction(() => onPayCash(session.session_token, session.total_amount));
+                    setConfirmingAction(null);
+                  }}
+                  className="flex-1 flex items-center justify-center h-9 rounded-xl bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setConfirmingAction(null)}
+                  className="h-9 px-2 rounded-xl bg-neutral-gray/10 text-neutral-gray text-xs hover:bg-neutral-gray/20 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingAction('cash')}
+                className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100 transition-colors"
+                title="Switch to cash payment"
+              >
+                <CurrencyDollarIcon className="w-3.5 h-3.5" />
+                Cash
+              </button>
+            )}
 
             {/* Pay with card */}
-            <button
-              onClick={() => handleAction(() => onPayCard(session.session_token, session.total_amount))}
-              className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
-              title="Switch to card payment"
-            >
-              <CurrencyDollarIcon className="w-3.5 h-3.5" />
-              Card
-            </button>
+            {confirmingAction === 'card' ? (
+              <div className="flex-1 flex gap-1">
+                <button
+                  onClick={() => {
+                    handleAction(() => onPayCard(session.session_token, session.total_amount));
+                    setConfirmingAction(null);
+                  }}
+                  className="flex-1 flex items-center justify-center h-9 rounded-xl bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setConfirmingAction(null)}
+                  className="h-9 px-2 rounded-xl bg-neutral-gray/10 text-neutral-gray text-xs hover:bg-neutral-gray/20 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingAction('card')}
+                className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                title="Switch to card payment"
+              >
+                <CurrencyDollarIcon className="w-3.5 h-3.5" />
+                Card
+              </button>
+            )}
 
             {/* Delete */}
             <button

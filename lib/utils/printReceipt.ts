@@ -167,6 +167,10 @@ function receiptHTML(order: Order, branch: ReceiptBranch, kind: ReceiptKind): st
       <td class="label">Pay Mode:</td>
       <td>${paymentLabel[order.paymentMethod] ?? order.paymentMethod.toUpperCase()}</td>
     </tr>
+    ${order.momoNumber ? `<tr>
+      <td class="label">MoMo #:</td>
+      <td>${escapeHtml(order.momoNumber)}</td>
+    </tr>` : ''}
     <tr>
       <td class="label">Order Type:</td>
       <td>${FULFILLMENT_LABELS[order.fulfillmentType]}</td>
