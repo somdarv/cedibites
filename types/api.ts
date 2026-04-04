@@ -241,6 +241,7 @@ export interface CheckoutSession {
   expires_at: string;
   created_at: string;
   updated_at: string;
+  failure_reason?: string | null;
   // Recovery flags from show() endpoint
   can_retry?: boolean;
   can_change_payment?: boolean;
@@ -250,11 +251,20 @@ export interface CheckoutSession {
 export interface CheckoutSessionItem {
   menu_item_id: number;
   menu_item_option_id?: number | null;
-  name: string;
+  name?: string;
   option_label?: string;
   quantity: number;
   unit_price: number;
-  subtotal: number;
+  subtotal?: number;
+  /** Raw snapshot from backend — name lives here for POS sessions. */
+  menu_item_snapshot?: { id?: number; name?: string; description?: string | null } | null;
+  menu_item_option_snapshot?: {
+    id?: number;
+    option_key?: string;
+    option_label?: string;
+    display_name?: string;
+    price?: number;
+  } | null;
 }
 
 export interface OrderItem {

@@ -28,7 +28,7 @@ import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
 import { mapApiOrderToOrder } from '@/lib/api/adapters/order.adapter';
 import { formatOrderLineItemSummary } from '@/lib/utils/orderItemDisplay';
 import CancelOrderModal from '@/app/components/ui/CancelOrderModal';
-import { useRequestCancel } from '@/lib/api/hooks/useOrders';
+import { useRequestCancel, useCancelOrder } from '@/lib/api/hooks/useOrders';
 import { toast } from '@/lib/utils/toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { getEcho } from '@/lib/echo';
@@ -50,12 +50,14 @@ export default function POSOrdersPage() {
     isManualEntry,
     setIsManualEntry,
   } = usePOS();
-  const { logout } = useStaffAuth();
+  const { logout, staffUser } = useStaffAuth();
   const { branches } = useBranch();
+  const isAdmin = staffUser?.role === 'admin' || staffUser?.role === 'super_admin';
 
   const [isSignOutOpen, setIsSignOutOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const { requestCancel } = useRequestCancel();
+  const { cancelOrder } = useCancelOrder();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -191,9 +193,14 @@ export default function POSOrdersPage() {
         <CancelOrderModal
           orderNumber={cancelTarget.orderNumber}
           theme="light"
+          context="staff"
           onCancel={() => setCancelTarget(null)}
           onConfirm={async (reason) => {
-            await requestCancel({ id: Number(cancelTarget.id), reason: reason || 'Requested by POS staff' });
+            if (isAdmin) {
+              await cancelOrder({ id: Number(cancelTarget.id), reason: reason || 'Cancelled by POS admin' });
+            } else {
+              await requestCancel({ id: Number(cancelTarget.id), reason: reason || 'Requested by POS staff' });
+            }
           }}
         />
       )}
@@ -213,6 +220,7 @@ export default function POSOrdersPage() {
               order={order}
               branchName={branchInfo?.name ?? 'CediBites'}
               staffName={session.staffName}
+              isAdmin={isAdmin}
               onCancelRequested={setCancelTarget}
             />
           ))
@@ -228,10 +236,11 @@ interface OrderCardProps {
   order: Order;
   branchName: string;
   staffName: string;
+  isAdmin: boolean;
   onCancelRequested: (order: Order) => void;
 }
 
-function OrderCard({ order, branchName, staffName, onCancelRequested }: OrderCardProps) {
+function OrderCard({ order, branchName, staffName, isAdmin, onCancelRequested }: OrderCardProps) {
   const itemSummary = order.items.map((i) => formatOrderLineItemSummary(i)).join(', ');
 
   return (
@@ -267,9 +276,9 @@ function OrderCard({ order, branchName, staffName, onCancelRequested }: OrderCar
             <button
               onClick={() => onCancelRequested(order)}
               className="w-ful px-3 py-2 rounded-lg text-xs font-medium text-amber-600/70 hover:text-amber-700 hover:bg-amber-50 transition-colors border border-dashed border-amber-300/40 hover:border-amber-400"
-              title="Request Cancel"
+              title={isAdmin ? 'Cancel Order' : 'Request Cancel'}
             >
-              Request Cancel
+              {isAdmin ? 'Cancel' : 'Request Cancel'}
             </button>
           </div>
         )}

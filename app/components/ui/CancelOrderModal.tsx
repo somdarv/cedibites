@@ -12,12 +12,23 @@ const REASON_PRESETS = [
     'Payment issue',
 ];
 
+const STAFF_REASON_PRESETS = [
+    'Customer changed their mind',
+    'Customer ordered by mistake',
+    'Taking too long',
+    'Wrong items ordered',
+    'Payment issue',
+    'Duplicate order',
+];
+
 interface CancelOrderModalProps {
     orderNumber: string;
     onConfirm: (reason: string) => Promise<void>;
     onCancel: () => void;
     /** Dark theme for staff panels, light for customer/admin */
     theme?: 'dark' | 'light';
+    /** 'self' = customer cancelling their own, 'staff' = staff cancelling on behalf */
+    context?: 'self' | 'staff';
 }
 
 export default function CancelOrderModal({
@@ -25,6 +36,7 @@ export default function CancelOrderModal({
     onConfirm,
     onCancel,
     theme = 'light',
+    context = 'self',
 }: CancelOrderModalProps) {
     const [selected, setSelected] = useState<string | null>(null);
     const [custom, setCustom] = useState('');
@@ -34,6 +46,7 @@ export default function CancelOrderModal({
     const reason = selected === '__custom__' ? custom.trim() : (selected ?? '');
 
     const isDark = theme === 'dark';
+    const presets = context === 'staff' ? STAFF_REASON_PRESETS : REASON_PRESETS;
 
     const bg = isDark ? 'bg-brown border-brown-light/20' : 'bg-white border-[#f0e8d8]';
     const titleColor = isDark ? 'text-text-light' : 'text-text-dark';
@@ -106,7 +119,7 @@ export default function CancelOrderModal({
                             Select a reason
                         </p>
                         <div className="flex flex-wrap gap-2 mb-3">
-                            {REASON_PRESETS.map(r => (
+                            {presets.map(r => (
                                 <button
                                     key={r}
                                     type="button"
