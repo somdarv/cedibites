@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
-        hostname: "api.cedibites.com",
+        hostname: "app.cedibites.com",
       },
     ],
   },

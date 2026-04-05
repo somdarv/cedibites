@@ -81,6 +81,67 @@ Items still needing attention.
 
 ---
 
+## [2026-04-05] Session: Menu Item Image Display Fix (Full Pipeline)
+
+### Intent
+
+Fix menu item images not displaying on customer-facing menu pages. Images were uploading successfully to the backend (Spatie Media Library) but returning 403 Forbidden when accessed via their `/storage/` URLs. Additionally, optimize image delivery with thumbnails and Next.js image optimization.
+
+### Changes Made
+
+#### Phase 1: Image Upload Cleanup (carried from previous session)
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/utils/compressImage.ts` | Removed debug `console.log` statements | Cleanup — compression utility was finalized in prior session |
+| `lib/api/services/menu.service.ts` | Removed debug `console.log` statements | Cleanup — image upload integration complete |
+| `app/admin/menu/page.tsx` | Removed debug `console.log` statements | Cleanup — save flow rewrite complete |
+
+#### Phase 2: Image Display Fix
+
+| File | Change | Reason |
+|------|--------|--------|
+| `next.config.ts` | Removed `images: { unoptimized: true }`, added `remotePatterns` for `beta-api.cedibites.com` and `app.cedibites.com` | Enables Next.js built-in image optimization (WebP/AVIF, responsive resizing, lazy loading) for API-served images |
+| `types/api.ts` | Added `thumbnail_url` field to `MenuItemOption` and `MenuItem` interfaces | API now returns thumbnail URLs alongside full-size image URLs |
+| `app/components/providers/MenuDiscoveryProvider.tsx` | `SearchableItem` type now includes `thumbnail` field; transform maps `thumbnail_url` → `thumbnail` for items and sizes | Provider feeds thumbnail data into menu discovery/search system |
+| `app/components/ui/MenuItemCard.tsx` | Cards prefer `thumbnail` over full `image` for grid loading | 400×300 thumbnails load significantly faster than full-res images in card grids |
+
+### Decisions
+
+- **Decision**: Enable Next.js image optimization via `remotePatterns` instead of `unoptimized: true`
+  - **Rationale**: Automatic WebP/AVIF conversion, responsive `srcset`, and lazy loading — massive performance gain with no code changes needed in `<Image>` components
+- **Decision**: Cards use `thumbnail` (400×300), detail modal keeps full resolution
+  - **Rationale**: Cards are small and rendered in grids (many at once); thumbnails reduce bandwidth. Detail view is full-screen, warrants full-res.
+- **Decision**: Map `thumbnail_url` → `thumbnail` in `MenuDiscoveryProvider` transform
+  - **Rationale**: Keep frontend naming consistent (`image`/`thumbnail`) while API uses `image_url`/`thumbnail_url`
+
+### Cross-Repo Impact
+
+| File (API repo) | Change | Impact on Frontend |
+|-----------------|--------|--------------------|
+| `app/Http/Controllers/Api/MediaController.php` | **NEW** — serves media through Laravel with caching headers | Image URLs changed from `/storage/...` (403) to `/v1/media/{id}` (200) |
+| `routes/public.php` | Added `GET /v1/media/{media}/{conversion?}` | New public route for all media access |
+| `app/Http/Resources/MenuItemResource.php` | `image_url` uses `route('media.show', $media)`, added `thumbnail_url` | Frontend receives route-based URLs + thumbnails |
+| `app/Http/Resources/MenuItemOptionResource.php` | Same changes as MenuItemResource | Option images also served via new route |
+| `app/Models/MenuItemOption.php` | Added `registerMediaConversions()` with `thumbnail` (400×300) | Thumbnails generated on upload for options |
+
+### Current State
+
+- **Image upload pipeline**: Fully working — admin → client-side compress → API → Spatie Media Library
+- **Image display on customer side**: Fully working — route-based media URLs bypass Nginx `/storage/` 403
+- **Performance**: Next.js image optimization enabled, ETag/304 caching on media endpoint, thumbnail conversions for card grids
+- **Note**: Existing images need `php artisan media-library:regenerate --only-missing` to generate thumbnails
+- **Build**: Passes clean
+- **Branch**: `payment-order-bug-fixes`
+
+### Pending / Follow-up
+
+- Run `php artisan media-library:regenerate --only-missing` on production to backfill thumbnails for existing images
+- Other media types (if any) may also benefit from the route-based serving pattern
+- Monitor Next.js image optimization cache behavior in production
+
+---
+
 ## [2026-04-04] Session: syncOptions Race Condition Fix (Image Upload Root Cause)
 
 ### Intent
