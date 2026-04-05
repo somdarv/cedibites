@@ -91,20 +91,20 @@ Fix menu item images not displaying on customer-facing menu pages. Images were u
 
 #### Phase 1: Image Upload Cleanup (carried from previous session)
 
-| File | Change | Reason |
-|------|--------|--------|
-| `lib/utils/compressImage.ts` | Removed debug `console.log` statements | Cleanup — compression utility was finalized in prior session |
-| `lib/api/services/menu.service.ts` | Removed debug `console.log` statements | Cleanup — image upload integration complete |
-| `app/admin/menu/page.tsx` | Removed debug `console.log` statements | Cleanup — save flow rewrite complete |
+| File                               | Change                                 | Reason                                                       |
+| ---------------------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| `lib/utils/compressImage.ts`       | Removed debug `console.log` statements | Cleanup — compression utility was finalized in prior session |
+| `lib/api/services/menu.service.ts` | Removed debug `console.log` statements | Cleanup — image upload integration complete                  |
+| `app/admin/menu/page.tsx`          | Removed debug `console.log` statements | Cleanup — save flow rewrite complete                         |
 
 #### Phase 2: Image Display Fix
 
-| File | Change | Reason |
-|------|--------|--------|
-| `next.config.ts` | Removed `images: { unoptimized: true }`, added `remotePatterns` for `beta-api.cedibites.com` and `app.cedibites.com` | Enables Next.js built-in image optimization (WebP/AVIF, responsive resizing, lazy loading) for API-served images |
-| `types/api.ts` | Added `thumbnail_url` field to `MenuItemOption` and `MenuItem` interfaces | API now returns thumbnail URLs alongside full-size image URLs |
-| `app/components/providers/MenuDiscoveryProvider.tsx` | `SearchableItem` type now includes `thumbnail` field; transform maps `thumbnail_url` → `thumbnail` for items and sizes | Provider feeds thumbnail data into menu discovery/search system |
-| `app/components/ui/MenuItemCard.tsx` | Cards prefer `thumbnail` over full `image` for grid loading | 400×300 thumbnails load significantly faster than full-res images in card grids |
+| File                                                 | Change                                                                                                                 | Reason                                                                                                           |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `next.config.ts`                                     | Removed `images: { unoptimized: true }`, added `remotePatterns` for `beta-api.cedibites.com` and `app.cedibites.com`   | Enables Next.js built-in image optimization (WebP/AVIF, responsive resizing, lazy loading) for API-served images |
+| `types/api.ts`                                       | Added `thumbnail_url` field to `MenuItemOption` and `MenuItem` interfaces                                              | API now returns thumbnail URLs alongside full-size image URLs                                                    |
+| `app/components/providers/MenuDiscoveryProvider.tsx` | `SearchableItem` type now includes `thumbnail` field; transform maps `thumbnail_url` → `thumbnail` for items and sizes | Provider feeds thumbnail data into menu discovery/search system                                                  |
+| `app/components/ui/MenuItemCard.tsx`                 | Cards prefer `thumbnail` over full `image` for grid loading                                                            | 400×300 thumbnails load significantly faster than full-res images in card grids                                  |
 
 ### Decisions
 
@@ -117,13 +117,13 @@ Fix menu item images not displaying on customer-facing menu pages. Images were u
 
 ### Cross-Repo Impact
 
-| File (API repo) | Change | Impact on Frontend |
-|-----------------|--------|--------------------|
-| `app/Http/Controllers/Api/MediaController.php` | **NEW** — serves media through Laravel with caching headers | Image URLs changed from `/storage/...` (403) to `/v1/media/{id}` (200) |
-| `routes/public.php` | Added `GET /v1/media/{media}/{conversion?}` | New public route for all media access |
-| `app/Http/Resources/MenuItemResource.php` | `image_url` uses `route('media.show', $media)`, added `thumbnail_url` | Frontend receives route-based URLs + thumbnails |
-| `app/Http/Resources/MenuItemOptionResource.php` | Same changes as MenuItemResource | Option images also served via new route |
-| `app/Models/MenuItemOption.php` | Added `registerMediaConversions()` with `thumbnail` (400×300) | Thumbnails generated on upload for options |
+| File (API repo)                                 | Change                                                                | Impact on Frontend                                                     |
+| ----------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `app/Http/Controllers/Api/MediaController.php`  | **NEW** — serves media through Laravel with caching headers           | Image URLs changed from `/storage/...` (403) to `/v1/media/{id}` (200) |
+| `routes/public.php`                             | Added `GET /v1/media/{media}/{conversion?}`                           | New public route for all media access                                  |
+| `app/Http/Resources/MenuItemResource.php`       | `image_url` uses `route('media.show', $media)`, added `thumbnail_url` | Frontend receives route-based URLs + thumbnails                        |
+| `app/Http/Resources/MenuItemOptionResource.php` | Same changes as MenuItemResource                                      | Option images also served via new route                                |
+| `app/Models/MenuItemOption.php`                 | Added `registerMediaConversions()` with `thumbnail` (400×300)         | Thumbnails generated on upload for options                             |
 
 ### Current State
 
