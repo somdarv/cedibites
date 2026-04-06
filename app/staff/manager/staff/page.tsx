@@ -220,25 +220,44 @@ function StaffModal({ staff, onClose, onSave, branchName, branchId }: {
     };
 
     const availableRoles = roles.filter(role => {
-        if (role.name === 'employee') return false;
         const staffRole = dbRoleToStaffRole(role.name);
         return MANAGER_ASSIGNABLE_ROLES.includes(staffRole);
     });
 
+    const BACKEND_TO_FRONTEND: Record<string, keyof StaffPermissions> = {
+        view_orders:           'canViewOrders',
+        create_orders:         'canPlaceOrders',
+        update_orders:         'canAdvanceOrders',
+        delete_orders:         'canDeleteOrders',
+        view_menu:             'canViewMenu',
+        manage_menu:           'canManageMenu',
+        view_branches:         'canViewBranches',
+        manage_branches:       'canManageBranches',
+        view_customers:        'canViewCustomers',
+        manage_customers:      'canManageCustomers',
+        view_employees:        'canViewEmployees',
+        manage_employees:      'canManageStaff',
+        view_analytics:        'canViewReports',
+        view_activity_log:     'canViewActivityLog',
+        access_admin_panel:    'canAccessAdminPanel',
+        access_manager_portal: 'canAccessManagerPortal',
+        access_sales_portal:   'canAccessSalesPortal',
+        access_partner_portal: 'canAccessPartnerPortal',
+        access_pos:            'canAccessPOS',
+        access_kitchen:        'canAccessKitchen',
+        access_order_manager:  'canAccessOrderManager',
+        manage_shifts:         'canManageShifts',
+        manage_settings:       'canManageSettings',
+        view_my_shifts:        'canViewMyShifts',
+        view_my_sales:         'canViewMySales',
+    };
+
     const getPermissionMapping = () => {
         const mapping: Record<string, { key: keyof StaffPermissions; label: string; description: string }> = {};
         permissions.forEach(perm => {
-            switch (perm.name) {
-                case 'create_orders':    mapping[perm.name] = { key: 'canPlaceOrders', label: perm.display_name, description: perm.description }; break;
-                case 'update_orders':    mapping[perm.name] = { key: 'canAdvanceOrders', label: perm.display_name, description: perm.description }; break;
-                case 'access_pos':       mapping[perm.name] = { key: 'canAccessPOS', label: 'Can Access POS Terminal', description: 'Allows logging in to the POS terminal with a PIN' }; break;
-                case 'view_analytics':   mapping[perm.name] = { key: 'canViewReports', label: perm.display_name, description: perm.description }; break;
-                case 'manage_menu':      mapping[perm.name] = { key: 'canManageMenu', label: perm.display_name, description: perm.description }; break;
-                case 'manage_employees': mapping[perm.name] = { key: 'canManageStaff', label: perm.display_name, description: perm.description }; break;
-                case 'manage_shifts':    mapping[perm.name] = { key: 'canManageShifts', label: perm.display_name, description: perm.description }; break;
-                case 'manage_settings':  mapping[perm.name] = { key: 'canManageSettings', label: perm.display_name, description: perm.description }; break;
-                case 'view_my_shifts':   mapping[perm.name] = { key: 'canViewMyShifts', label: perm.display_name, description: perm.description }; break;
-                case 'view_my_sales':    mapping[perm.name] = { key: 'canViewMySales', label: perm.display_name, description: perm.description }; break;
+            const frontendKey = BACKEND_TO_FRONTEND[perm.name];
+            if (frontendKey) {
+                mapping[perm.name] = { key: frontendKey, label: perm.display_name, description: perm.description };
             }
         });
         return mapping;
@@ -385,7 +404,7 @@ function StaffModal({ staff, onClose, onSave, branchName, branchId }: {
                             <div>
                                 <label className="block text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-2">Employment Status</label>
                                 <div className="flex gap-2 flex-wrap">
-                                    {(['active', 'on_leave', 'resigned'] as EmploymentStatus[]).map(s => (
+                                    {(['active', 'on_leave', 'suspended', 'terminated'] as EmploymentStatus[]).map(s => (
                                         <button key={s} type="button"
                                             onClick={() => setForm(f => ({ ...f, employmentStatus: s }))}
                                             className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-body cursor-pointer transition-colors ${form.employmentStatus === s
@@ -521,17 +540,17 @@ function FieldInput({ label, value, onChange, placeholder, error, span }: {
 
 // ─── Filter tabs ──────────────────────────────────────────────────────────────
 
-type FilterTab = 'All' | 'Manager' | 'Sales Staff' | 'Call Center' | 'Kitchen' | 'Rider' | 'Suspended' | 'Archived';
+type FilterTab = 'All' | 'Manager' | 'Sales Staff' | 'Call Center' | 'Kitchen' | 'Rider' | 'Suspended' | 'Terminated';
 
 function matchesTab(s: StaffMember, tab: FilterTab): boolean {
-    if (tab === 'Suspended') return s.systemAccess === 'disabled' && s.status !== 'archived';
-    if (tab === 'Archived')  return s.status === 'archived';
-    if (tab === 'All')       return s.status !== 'archived';
-    if (tab === 'Manager')    return s.role === 'manager'      && s.status !== 'archived';
-    if (tab === 'Sales Staff') return s.role === 'sales_staff' && s.status !== 'archived';
-    if (tab === 'Call Center') return s.role === 'call_center' && s.status !== 'archived';
-    if (tab === 'Kitchen')    return s.role === 'kitchen'      && s.status !== 'archived';
-    if (tab === 'Rider')      return s.role === 'rider'        && s.status !== 'archived';
+    if (tab === 'Suspended')  return s.status === 'suspended';
+    if (tab === 'Terminated') return s.status === 'terminated';
+    if (tab === 'All')        return s.status !== 'terminated';
+    if (tab === 'Manager')     return s.role === 'manager'      && s.status !== 'terminated';
+    if (tab === 'Sales Staff') return s.role === 'sales_staff' && s.status !== 'terminated';
+    if (tab === 'Call Center') return s.role === 'call_center' && s.status !== 'terminated';
+    if (tab === 'Kitchen')     return s.role === 'kitchen'      && s.status !== 'terminated';
+    if (tab === 'Rider')       return s.role === 'rider'        && s.status !== 'terminated';
     return false;
 }
 
@@ -573,7 +592,7 @@ export default function ManagerStaffPage() {
     const [editStaff, setEditStaff] = useState<StaffMember | null | 'new'>(null);
     const [deleteStaff, setDeleteStaff] = useState<StaffMember | null>(null);
 
-    const TABS: FilterTab[] = ['All', 'Manager', 'Sales Staff', 'Call Center', 'Kitchen', 'Rider', 'Suspended', 'Archived'];
+    const TABS: FilterTab[] = ['All', 'Manager', 'Sales Staff', 'Call Center', 'Kitchen', 'Rider', 'Suspended', 'Terminated'];
 
     const filtered = useMemo(() => {
         let list = staff.filter(s => matchesTab(s, tab));
@@ -662,7 +681,7 @@ export default function ManagerStaffPage() {
     async function suspend(s: StaffMember) {
         try {
             await employeeService.updateEmployee(s.id, { status: 'suspended' });
-            setStaff(prev => prev.map(x => x.id === s.id ? { ...x, status: 'inactive' as StaffStatus, systemAccess: 'disabled' as SystemAccess } : x));
+            setStaff(prev => prev.map(x => x.id === s.id ? { ...x, status: 'suspended' as StaffStatus, systemAccess: 'disabled' as SystemAccess } : x));
             toast.success(`${s.name} has been suspended`);
         } catch { toast.error('Failed to suspend. Please try again.'); }
     }
@@ -677,10 +696,10 @@ export default function ManagerStaffPage() {
 
     async function archive(s: StaffMember) {
         try {
-            await employeeService.updateEmployee(s.id, { status: 'archived' });
-            setStaff(prev => prev.map(x => x.id === s.id ? { ...x, status: 'archived' as StaffStatus, systemAccess: 'disabled' as SystemAccess, employmentStatus: 'resigned' as EmploymentStatus } : x));
-            toast.success(`${s.name} has been archived`);
-        } catch { toast.error('Failed to archive. Please try again.'); }
+            await employeeService.updateEmployee(s.id, { status: 'terminated' });
+            setStaff(prev => prev.map(x => x.id === s.id ? { ...x, status: 'terminated' as StaffStatus, systemAccess: 'disabled' as SystemAccess, employmentStatus: 'terminated' as EmploymentStatus } : x));
+            toast.success(`${s.name} has been terminated`);
+        } catch { toast.error('Failed to terminate. Please try again.'); }
     }
 
     async function forceLogout(s: StaffMember) {
@@ -758,17 +777,14 @@ export default function ManagerStaffPage() {
                                     <div className="min-w-0">
                                         <p className="text-text-dark text-sm font-semibold font-body truncate">{member.name}</p>
                                         <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                                            {member.systemAccess === 'disabled' && member.status !== 'archived' && (
-                                                <span className="text-[10px] font-body bg-error/10 text-error px-2 py-0.5 rounded-full">No Access</span>
+                                            {member.status === 'suspended' && (
+                                                <span className="text-[10px] font-body bg-error/10 text-error px-2 py-0.5 rounded-full">Suspended</span>
                                             )}
-                                            {member.employmentStatus === 'on_leave' && (
+                                            {member.status === 'on_leave' && (
                                                 <span className="text-[10px] font-body bg-warning/10 text-warning px-2 py-0.5 rounded-full">On Leave</span>
                                             )}
-                                            {member.employmentStatus === 'resigned' && member.status !== 'archived' && (
-                                                <span className="text-[10px] font-body bg-error/10 text-error px-2 py-0.5 rounded-full">Resigned</span>
-                                            )}
-                                            {member.status === 'archived' && (
-                                                <span className="text-[10px] font-body bg-neutral-light text-neutral-gray px-2 py-0.5 rounded-full">Archived</span>
+                                            {member.status === 'terminated' && (
+                                                <span className="text-[10px] font-body bg-neutral-light text-neutral-gray px-2 py-0.5 rounded-full">Terminated</span>
                                             )}
                                         </div>
                                     </div>
@@ -793,19 +809,19 @@ export default function ManagerStaffPage() {
                                 <div className="flex items-center justify-end shrink-0">
                                     <ActionMenu items={(() => {
                                         const actions: ActionMenuItem[] = [];
-                                        if (member.status !== 'archived') {
+                                        if (member.status !== 'terminated') {
                                             actions.push(
                                                 { icon: PencilSimpleIcon, label: 'Edit', onClick: () => setEditStaff(member), color: 'text-primary' },
                                                 { icon: LockSimpleIcon, label: 'Reset PW', onClick: () => requirePasswordReset(member), color: 'text-neutral-gray' },
                                                 { icon: SignOutIcon, label: 'Force Logout', onClick: () => forceLogout(member), color: 'text-neutral-gray' },
                                             );
-                                            if (member.systemAccess === 'enabled') {
+                                            if (member.status !== 'suspended') {
                                                 actions.push({ icon: ArchiveIcon, label: 'Suspend', onClick: () => suspend(member), color: 'text-warning' });
                                             } else {
                                                 actions.push({ icon: ArrowCounterClockwiseIcon, label: 'Reinstate', onClick: () => reinstate(member), color: 'text-secondary' });
                                             }
                                             actions.push(
-                                                { icon: ArchiveIcon, label: 'Archive', onClick: () => archive(member), color: 'text-neutral-gray' },
+                                                { icon: ArchiveIcon, label: 'Terminate', onClick: () => archive(member), color: 'text-neutral-gray' },
                                                 { icon: TrashIcon, label: 'Delete', onClick: () => setDeleteStaff(member), color: 'text-error' },
                                             );
                                         } else {

@@ -49,4 +49,8 @@ export const customerService = {
   unsuspendCustomer: (id: number): Promise<{ data: ApiCustomer }> => {
     return apiClient.patch(`/admin/customers/${id}/unsuspend`);
   },
+
+  forceLogoutCustomer: (id: number): Promise<void> => {
+    return apiClient.post(`/admin/customers/${id}/force-logout`);
+  },
 };

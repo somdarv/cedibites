@@ -164,7 +164,8 @@ export interface KanbanColumn {
 
 // ─── User roles for permissions ──────────────────────────────────────────────
 
-export type StaffRole = 'admin' | 'super_admin' | 'branch_partner' | 'manager' | 'call_center' | 'sales_staff' | 'kitchen' | 'rider';
+// Re-exported from staff.ts — identity types belong there.
+export type { StaffRole } from '@/types/staff';
 export type UserRole = 'call_center' | 'manager' | 'super_admin' | 'branch_partner';
 
 // ─── Filter type (for service layer) ─────────────────────────────────────────
@@ -380,7 +381,6 @@ export function getPaymentLabel(method: PaymentMethod, fulfillment?: Fulfillment
     if (method === 'card') return 'Card';
     if (method === 'cash') {
         if (fulfillment === 'delivery') return 'Cash on Delivery';
-        if (fulfillment === 'pickup') return 'Cash at Pickup';
         return 'Cash';
     }
     return method;

@@ -81,6 +81,291 @@ Items still needing attention.
 
 ---
 
+## [2026-04-06] Session: Branch Settings Enforcement — Admin & Order Manager Guards
+
+### Intent
+
+Complete the branch settings enforcement story by preventing contradictory "Mark Open" actions on inactive branches in admin, and blocking non-admin staff from accessing the order manager when the selected branch is closed or inactive. These are the final enforcement pieces after checkout, cart drawer, and POS were already guarded in a prior session.
+
+### Changes Made
+
+| File                          | Change                                                                                                                                                                                                                                                                                  | Reason                                                                                                                      |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `app/admin/branches/page.tsx` | "Mark Open" button is now disabled when a branch is inactive — shows reduced opacity, `cursor-not-allowed`, and tooltip "Reactivate this branch before marking it open". "Mark Closed" still works on inactive branches that happen to be open.                                         | Prevents admins from putting an inactive branch into "open" state, which would be contradictory business logic              |
+| `app/order-manager/page.tsx`  | Added closed/inactive branch guard using `useBranch` hook and `effectiveBranchId`. Shows a full-screen unavailable message (card with warning icon, "Switch Branch" and "Sign Out" options) when branch is closed or inactive. Admin and `super_admin` roles bypass the guard entirely. | Non-admin staff shouldn't manage orders for a closed/deactivated branch; admins need unrestricted access for oversight      |
+| `app/pos/terminal/page.tsx`   | Added `staffUser` to `useStaffAuth()` destructure, computed `isAdmin` flag (`admin` or `super_admin`), and prepended `!isAdmin &&` to the existing branch guard condition. Admin/super_admin roles now bypass the closed/inactive branch guard.                                         | Admins need POS access regardless of branch status for oversight and troubleshooting — matches order manager bypass pattern |
+
+### Decisions
+
+- **Decision**: Disable "Mark Open" rather than hide it entirely on inactive branches
+  - **Rationale**: Keeping the button visible (with tooltip explanation) teaches admins the correct workflow: reactivate first, then mark open. Hiding it would leave admins wondering where the button went.
+- **Decision**: Admin/super_admin roles bypass the order manager branch guard
+  - **Rationale**: Admins need oversight access regardless of branch state — they may need to review or manage orders during closures or deactivation.
+- **Decision**: Reused the POS guard pattern (full-screen card with warning icon, switch branch, sign out) for the order manager guard
+  - **Alternatives**: Redirect to dashboard, toast notification, or modal
+  - **Rationale**: Visual consistency across staff portals — POS terminal already established this guard pattern, and staff will recognize the UX.
+- **Decision**: "Mark Closed" still works on inactive branches
+  - **Rationale**: An inactive branch that was left in "open" state should still be closeable without first reactivating it.
+
+### Cross-Repo Impact
+
+No backend changes required — branch `is_active` and `is_open` states are already served via the branch API. Enforcement is purely frontend-side UX policy.
+
+### Current State
+
+- **Branch settings enforcement** is now complete across all surfaces:
+  - **Checkout** — filters order types and payment methods based on branch settings
+  - **Cart drawer** — blocks checkout for closed/inactive branches
+  - **POS terminal** — full-screen guard for closed/inactive branches (admin bypass)
+  - **Order manager** — full-screen guard for closed/inactive branches (admin bypass)
+  - **Admin branches page** — "Mark Open" disabled for inactive branches
+- **All staff portals** use consistent guard UX (full-screen card pattern)
+- **Branch**: `menu-audit`
+
+### Pending / Follow-up
+
+- Backend validation: `CheckoutSessionController::store()` and `posStore()` still need server-side branch status checks (defense in depth)
+- Customer-facing inactive branch UX: greyed-out branches with "Temporarily Closed" badge on location picker
+- Kitchen display may also need a branch status guard (currently not guarded)
+
+---
+
+## [2026-04-06] Session: IAM Hardening — Frontend Status Alignment & Admin Tooling
+
+### Intent
+
+Align frontend staff status types, role definitions, and admin tooling with the backend IAM hardening work that resolved 22 open audit findings. The backend moved from 3 staff statuses (`active`, `inactive`, `archived`) to 4 (`active`, `on_leave`, `suspended`, `terminated`), removed password exposure, and added force-logout capabilities. Frontend needed end-to-end alignment.
+
+### Changes Made
+
+#### Type System Alignment (IAM-025, IAM-030, IAM-031, IAM-034, IAM-035)
+
+| File             | Change                                                                                                                                                                                                                 | Reason                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `types/staff.ts` | `StaffStatus` changed from `'active' \| 'inactive' \| 'archived'` to `'active' \| 'on_leave' \| 'suspended' \| 'terminated'`. `EmploymentStatus` aligned to same 4 states. Added `staffStatusLabel()` helper function. | IAM-025, IAM-034, IAM-035: Frontend statuses must mirror backend enum exactly — 4 states, not 3 |
+| `types/staff.ts` | Removed `password` field from `StaffMember` interface                                                                                                                                                                  | IAM-031: Passwords should never be modeled on the frontend                                      |
+| `types/order.ts` | `StaffRole` now re-exports from `staff.ts` instead of defining its own union                                                                                                                                           | IAM-030: Role is an identity concern that belongs in `staff.ts`, not `order.ts`                 |
+
+#### Service Layer Updates (IAM-025, IAM-026, IAM-031)
+
+| File                                   | Change                                                                                                                                                                                                           | Reason                                                                                                        |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `lib/api/services/employee.service.ts` | Status mapping passes through backend values directly instead of collapsing to 3 states. Removed `password: ''` from staff member mapping. `employmentStatus` mapped from backend response instead of hardcoded. | IAM-025, IAM-031: Direct passthrough preserves all 4 backend statuses; no more phantom password field         |
+| `lib/api/services/customer.service.ts` | Added `forceLogoutCustomer()` method                                                                                                                                                                             | IAM-026: Admin needs frontend integration to call new `POST admin/customers/{customer}/force-logout` endpoint |
+
+#### Admin Staff Page (IAM-025, IAM-034, IAM-035)
+
+| File                       | Change                                                                                                                                                                                                                                                                         | Reason                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `app/admin/staff/page.tsx` | Status filter tabs: Terminated replaces Archived. Badge colors updated for Suspended (amber) and On Leave (blue). Suspend action sets `'suspended'` status. Archive action now terminates (sets `'terminated'`). Employment status dropdown options aligned to 4-state system. | IAM-034, IAM-035: Admin UI must reflect the actual backend status states |
+
+#### Manager Staff Page (IAM-025)
+
+| File                               | Change                                                                                                                                                | Reason                                          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `app/staff/manager/staff/page.tsx` | Same status updates as admin page — tabs (Terminated instead of Archived), badges (Suspended/On Leave/Terminated), actions, employment status options | IAM-025: Parity with admin page status handling |
+
+#### Partner & Staff Partner Pages
+
+| File                                   | Change                                                | Reason                                           |
+| -------------------------------------- | ----------------------------------------------------- | ------------------------------------------------ |
+| `app/partner/staff/page.tsx`           | All `'archived'` references changed to `'terminated'` | Consistent status terminology across all portals |
+| `app/partner/dashboard/page.tsx`       | `'archived'` → `'terminated'`                         | Consistent status terminology                    |
+| `app/staff/partner/staff/page.tsx`     | `'archived'` → `'terminated'`                         | Consistent status terminology                    |
+| `app/staff/partner/dashboard/page.tsx` | `'archived'` → `'terminated'`                         | Consistent status terminology                    |
+
+### Decisions
+
+- **Decision**: Frontend status types mirror backend exactly (4 states) rather than collapsing into 3
+  - **Alternatives**: Keep 3-state frontend model and map `on_leave`/`suspended` → `inactive`
+  - **Rationale**: Different statuses have different UI treatments (badges, actions, messaging). Collapsing loses information and creates UX ambiguity.
+- **Decision**: Passwords are never modeled on the frontend — removed from `StaffMember` interface
+  - **Rationale**: Frontend never needs to read or set passwords via the staff member object. Password operations go through dedicated auth endpoints.
+- **Decision**: `StaffRole` canonical definition moved to `staff.ts` (re-exported from `order.ts`)
+  - **Rationale**: Role is an identity/IAM concern, not an order-domain concern. `order.ts` should consume, not define, role types.
+- **Decision**: `staffStatusLabel()` helper added to `types/staff.ts` for display labels
+  - **Rationale**: Centralizes status → display text mapping (e.g., `'on_leave'` → `'On Leave'`) rather than duplicating across pages
+
+### Cross-Repo Impact
+
+| File (API repo)                                         | Change                                            | Triggered By                                                          |
+| ------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------- |
+| `app/Http/Middleware/EnsureCustomerActive.php`          | **NEW** — Blocks suspended customers              | Frontend will receive 403 for suspended customer sessions             |
+| `app/Http/Controllers/Api/Admin/CustomerController.php` | `suspend()` revokes tokens, `forceLogout()` added | Frontend `forceLogoutCustomer()` calls new endpoint                   |
+| `app/Http/Resources/EmployeeAuthResource.php`           | Added `status` to login response                  | Frontend can now read employee status at login                        |
+| `app/Http/Resources/AuthUserResource.php`               | Added customer `status` field                     | Frontend auth context has customer status                             |
+| `app/Http/Controllers/Api/EmployeeAuthController.php`   | Descriptive login error messages                  | Frontend can show specific error reasons (wrong password vs inactive) |
+
+### Current State
+
+- **Staff statuses**: All portals (admin, manager, partner, staff-partner) use 4-state system: `active`, `on_leave`, `suspended`, `terminated`
+- **Type safety**: `StaffStatus`, `EmploymentStatus`, `StaffRole` all aligned with backend enums
+- **Password field**: Removed from frontend type system entirely
+- **Force-logout**: Customer service has `forceLogoutCustomer()` ready for admin UI integration
+- **No TypeScript errors** in any modified file
+- **Branch**: `menu-audit`
+
+### Pending / Follow-up
+
+- Wire `forceLogoutCustomer()` into the admin customers page UI (button + confirmation dialog)
+- Handle `CustomerSessionEvent` broadcast on the customer frontend (auto-logout on suspend)
+- Staff login page should display specific error messages from the new descriptive backend responses
+- Admin active sessions page (`GET admin/employees/sessions/active`) needs frontend UI
+
+---
+
+## [2026-04-06] Session: Permission Expansion + Legacy Employee Role Removal
+
+### Intent
+
+Expand the staff permission system from 10 visible permissions to all 24 backend permissions in both admin and manager staff pages. Remove the legacy `employee` role (a duplicate of `sales_staff`) from the frontend type system and role mappers.
+
+### Changes Made
+
+| File                                   | Change                                                                                                                                                                                                                                                      | Reason                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `types/staff.ts`                       | Expanded `StaffPermissions` interface from 10 to 25 boolean fields covering all 24 backend permissions. Added `ALL_FALSE` and `ALL_TRUE` helper constants. Rewrote `defaultPermissions()` to match exact `RoleSeeder` data per role.                        | Previously 14 permissions were invisible to the admin UI                          |
+| `lib/api/services/employee.service.ts` | Expanded `apiEmployeeToStaffMember()` mapper to map all 25 boolean permission fields. Rewrote `mapPermissionsToBackend()` as data-driven map. Removed `'employee'` from `BackendRole` type. Removed `employee: 'sales_staff'` from `mapApiRoleToStaffRole`. | Frontend mapper only handled 10 of 24 permissions; employee role no longer exists |
+| `app/admin/staff/page.tsx`             | Replaced `getPermissionMapping()` 10-case switch with data-driven `BACKEND_TO_FRONTEND` map covering all 24 permissions. Removed `if (role.name === 'employee')` filter from `availableRoles`.                                                              | Data-driven map is easier to maintain; employee role removed                      |
+| `app/staff/manager/staff/page.tsx`     | Same update as admin page: replaced 10-permission switch with data-driven `BACKEND_TO_FRONTEND` map. Removed `if (role.name === 'employee') return false;` filter from `availableRoles`.                                                                    | Parity with admin page; employee role removed                                     |
+
+### Decisions
+
+- **Decision**: Data-driven `BACKEND_TO_FRONTEND` map (`Record<string, keyof StaffPermissions>`) instead of switch/case
+  - **Rationale**: Adding a new permission only requires one line — more maintainable than a growing switch statement
+- **Decision**: Kept backward-compatibility `'employee': 'sales_staff'` entries in role mappers
+  - **Rationale**: Old database records may still reference the employee role until the backend migration runs
+- **Decision**: Permission toggles still use smart filtering (hide permissions already granted by role)
+  - **Rationale**: Only show extras that can be toggled per-user, reducing noise in the UI
+
+### Cross-Repo Impact
+
+| File (API repo)                                                                  | Change                                                                                                          | Triggered By              |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `app/Enums/Role.php`                                                             | Removed `case Employee = 'employee'`                                                                            | Employee role elimination |
+| `database/seeders/RoleSeeder.php`                                                | Removed legacy employee role sync block                                                                         | Employee role elimination |
+| `app/Http/Controllers/Api/RoleController.php`                                    | Removed `'employee' => 'Employee'` from display name map                                                        | Employee role elimination |
+| `database/migrations/2026_04_06_040105_migrate_employee_role_to_sales_staff.php` | **NEW** — Reassigns users from employee→sales_staff, cleans up role_has_permissions, deletes legacy role record | Safe data migration       |
+| `docs/agents/iam-auditor-kb.md`                                                  | Updated with IAM-021 through IAM-036 findings and permission expansion changelog                                | Audit documentation       |
+
+### Current State
+
+- All 24 backend permissions are individually toggleable in both admin (`/admin/staff`) and manager (`/staff/manager/staff`) pages
+- Legacy `employee` role removed from frontend type system, role mappers, and role filter lists
+- No TypeScript errors in any modified file
+- **Branch**: `menu-audit`
+
+### Pending / Follow-up
+
+- 16 new IAM audit findings (IAM-021 through IAM-036) documented in backend KB — 2 Critical, 3 High, 7 Medium, 4 Low — all still open
+- Backend migration `2026_04_06_040105_migrate_employee_role_to_sales_staff.php` needs to be run in production
+- Monitor for any stale `employee` role references in other areas of the codebase
+
+---
+
+## [2026-04-06] Session: Remove Cash at Pickup Payment Method + Branch Settings Audit
+
+### Intent
+
+Audit whether branch admin settings (order types, payment methods, branch active status) actually work end-to-end. Remove the "Cash at Pickup" payment method which doesn't exist in the business model.
+
+### Changes Made
+
+| File                                       | Change                                                                               | Reason                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `lib/api/adapters/order.adapter.ts`        | Removed `'Cash at Pickup'` from PaymentMethod type union and PAYMENT_METHOD_MAP      | Payment method no longer exists                 |
+| `lib/api/adapters/branch.adapter.ts`       | Removed `cashAtPickup` from DisplayBranch.payments type and mapper                   | Payment method removed                          |
+| `types/order.ts`                           | Removed pickup-specific cash label from `getPaymentLabel()`                          | Cash label no longer varies by fulfillment type |
+| `app/(customer)/checkout/page.tsx`         | Cash option now always shows "Cash on Delivery" instead of varying by order type     | No more pickup cash distinction                 |
+| `app/admin/branches/page.tsx`              | Removed cashAtPickup toggle, validation, and API payload mapping                     | Setting no longer exists                        |
+| `app/admin/orders/page.tsx`                | Removed `'Cash at Pickup'` from PaymentMethod type                                   | Type cleanup                                    |
+| `app/admin/settings/page.tsx`              | Removed `cup` toggle from global payment methods                                     | Setting no longer exists                        |
+| `app/staff/store/page.tsx`                 | Removed "Cash at Pickup" from PAYMENT_OPTIONS                                        | Option removed                                  |
+| `app/staff/new-order/steps/StepReview.tsx` | Removed pickup-specific cash option from PAYMENT_OPTIONS                             | Option removed                                  |
+| `app/staff/manager/settings/page.tsx`      | Removed cashPickup from BranchSettings type, defaults, API read/write, and toggle UI | Setting no longer exists                        |
+| `app/staff/partner/branch/page.tsx`        | Removed cashAtPickup from type definition, demo data, and payment display            | Setting no longer exists                        |
+| `app/partner/branch/page.tsx`              | Removed cashAtPickup from type definition, demo data, and payment display            | Setting no longer exists                        |
+
+### Decisions
+
+- **Decision**: Remove "Cash at Pickup" entirely rather than keeping it disabled
+  - **Rationale**: Business does not use this payment method — it was dead code adding complexity to every payments touchpoint
+- **Decision**: Cash option in checkout now always labeled "Cash on Delivery"
+  - **Rationale**: With cash_at_pickup gone, there's no need for dynamic labeling of the cash option
+
+### Audit Findings (Branch Settings)
+
+The audit revealed that admin branch settings toggles (order types, payment methods, branch active status) **save correctly to the database but have zero functional effect** on the customer or POS ordering experience:
+
+- **Order types**: Customer checkout hardcodes delivery + pickup; POS hardcodes dine_in + takeaway. Neither checks branch settings.
+- **Payment methods**: Checkout hardcodes momo + cash. No branch-level filtering.
+- **Branch active status**: No validation prevents orders at inactive branches. Customers still see inactive branches.
+- **Backend validation gap**: Order creation only validates enum values (e.g., `in:delivery,pickup`), not branch-level enablement.
+
+### Current State
+
+- "Cash at Pickup" fully removed from all 12 frontend files
+- Payment methods across all portals: Mobile Money, Cash on Delivery only
+- Branch settings audit documented — enforcement implementation is a follow-up task
+- **Branch**: `menu-audit`
+
+### Pending / Follow-up
+
+- **Backend validation**: Add branch-level checks in `CheckoutSessionController::store()` and `posStore()` for is_active, order type enablement, payment method enablement
+- **Frontend filtering**: ~~Extend BranchProvider Branch interface with orderTypes/payments, filter checkout options based on branch settings~~ ✅ Done — checkout, cart drawer, POS, order manager, and admin branches all enforce branch settings (see [2026-04-06] Branch Settings Enforcement session)
+- **Inactive branch handling**: Customer UX for inactive branches (greyed out with "Temporarily Closed" badge)
+- ~~**POS disabled states**: Show disabled order types/payment methods with "Turned off by admin" label~~ ✅ Done
+- **changePayment endpoint**: Also needs branch validation
+
+---
+
+## [2026-04-06] Session: Smart Categories Relocated to Configure Page + Helper Text
+
+### Intent
+
+Move Smart Categories from a standalone top-level tab to a section within the Configure page, grouping it logically with category management. Add descriptive helper text so admins understand what smart categories are and what each individual category does.
+
+### Changes Made
+
+| File                                                  | Change                                                                                                                                                                                                                                                                                                                                                                                                                            | Reason                                                                                                                                               |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/admin/menu/configure/SmartCategoriesSection.tsx` | **NEW** — Extracted smart categories UI into a reusable section component. Contains all card management (toggle, reorder, preview, reset, time windows, item limits). Wrapped in `bg-neutral-light/50` container with proper padding. Grid changed from 3-col to 2-col max. Added "How Smart Categories work" explainer card with 5 bullet points. Added per-card description text keyed by slug via `CATEGORY_DESCRIPTIONS` map. | Reusable section for embedding in Configure page; cards no longer touch edges; 2-col fits `max-w-5xl` container; self-documenting feature for admins |
+| `app/admin/menu/configure/page.tsx`                   | Imports and renders `SmartCategoriesSection` below the categories table, separated by a `border-t` divider. Removed "Smart Categories" from `MENU_SUB_TABS`.                                                                                                                                                                                                                                                                      | Groups smart categories logically with category management                                                                                           |
+| `app/admin/menu/page.tsx`                             | Removed "Smart Categories" entry from `MENU_SUB_TABS`                                                                                                                                                                                                                                                                                                                                                                             | Navigation consistency — tab no longer exists                                                                                                        |
+| `app/admin/menu-tags/page.tsx`                        | Removed "Smart Categories" entry from `MENU_SUB_TABS`                                                                                                                                                                                                                                                                                                                                                                             | Navigation consistency                                                                                                                               |
+| `app/admin/menu-add-ons/page.tsx`                     | Removed "Smart Categories" entry from `MENU_SUB_TABS`                                                                                                                                                                                                                                                                                                                                                                             | Navigation consistency                                                                                                                               |
+| `app/admin/menu/smart-categories/page.tsx`            | Gutted to a simple redirect to `/admin/menu/configure`                                                                                                                                                                                                                                                                                                                                                                            | Keeps route alive for existing bookmarks                                                                                                             |
+
+### Decisions
+
+- **Decision**: Slug-keyed `CATEGORY_DESCRIPTIONS` map for per-card text instead of storing descriptions in the backend
+  - **Rationale**: These are static explanations of category behavior — no dynamic data needed, simpler to maintain in the frontend
+- **Decision**: Old `/admin/menu/smart-categories` route kept as a redirect rather than deleted
+  - **Rationale**: Avoids breaking any existing bookmarks or shared links
+- **Decision**: Changed from 3-column to 2-column card grid
+  - **Rationale**: Cards now live within the narrower Configure page `max-w-5xl` container; 2-col provides better readability and spacing
+- **Decision**: Added "How Smart Categories work" explainer card
+  - **Rationale**: Admins had no explanation of what smart categories are or how the controls work — makes the feature self-documenting
+
+### Current State
+
+- **Configure page** now has two sections:
+  1. **Menu Categories** — existing category CRUD table
+  2. **Smart Categories** — separated by divider, with explainer card, stats bar, and card grid
+- **Admin menu navigation**: 4 tabs — Items, Add-ons, Tags, Configure (Smart Categories tab removed)
+- **All 4 menu sub-pages** have consistent `MENU_SUB_TABS`
+- **Old route** `/admin/menu/smart-categories` redirects to `/admin/menu/configure`
+- **Branch**: `menu-audit`
+
+### Pending / Follow-up
+
+- Drag-and-drop reorder (currently arrow-based) if UX feedback warrants it
+- Bulk enable/disable toggle for all smart categories at once
+- Consider inline editing of category display names
+- Manager menu page (`/staff/manager/menu/`) may need Smart Categories in its configure section too
+
+---
+
 ## [2026-04-06] Session: Smart Categories Admin Settings UI
 
 ### Intent
