@@ -114,6 +114,7 @@ export interface MenuItemOption {
   base_price?: number;
   is_available: boolean;
   image_url?: string | null;
+  thumbnail_url?: string | null;
   branch_prices?: MenuItemOptionBranchPrice[];
 }
 
@@ -148,11 +149,20 @@ export interface MenuItem {
   rating?: number | null;
   rating_count?: number;
   image_url?: string;
+  thumbnail_url?: string;
   options?: MenuItemOption[];
   tags?: MenuTag[];
   add_ons?: MenuAddOn[];
   created_at: string;
   updated_at: string;
+}
+
+// Smart category types (code-defined virtual categories with computed membership)
+export interface SmartCategory {
+  slug: string;
+  name: string;
+  icon: string;
+  item_ids: number[];
 }
 
 // Cart types
