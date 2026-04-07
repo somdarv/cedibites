@@ -1195,9 +1195,8 @@ function PaymentModal({ total, onClose, onPayment, isManualEntry, branchPaymentM
           <div className="grid grid-cols-2 gap-3">
             {(() => {
               // Map POS payment method IDs to branch settings DB keys
-              const posToDbKey: Record<string, string> = { cash: 'cash_on_delivery', mobile_money: 'momo', manual_momo: 'momo', card: 'card' };
+              const posToDbKey: Record<string, string> = { cash: 'cash_on_delivery', mobile_money: 'momo', manual_momo: 'momo', card: 'card', no_charge: 'no_charge' };
               const isMethodEnabled = (id: string) => {
-                if (id === 'no_charge') return true; // Admin override, always allowed
                 const dbKey = posToDbKey[id];
                 if (!dbKey || !branchPaymentMethods) return true; // No branch data = allow all
                 return branchPaymentMethods[dbKey]?.is_enabled !== false;

@@ -81,6 +81,56 @@ Items still needing attention.
 
 ---
 
+## [2026-04-07] Session: Admin Orders Page — Source Badge, Override Status Logic, SMS Cleanup & Role Seeding
+
+### Intent
+
+Polish the admin orders page: convert source badge to plain text, replace naive override status filtering with a proper status transition map, remove a non-functional Re-send SMS button, and fix a database seeding gap for the `sales_staff` role.
+
+### Changes Made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `app/admin/orders/page.tsx` | Replaced `SourceBadge` (colored pill with `rounded-full` + background colors) with plain colored text. Renamed `SOURCE_STYLES` → `SOURCE_COLORS` keeping only text color classes. | Source display was visually heavy; plain colored text matches the rest of the order detail panel |
+| `app/admin/orders/page.tsx` | Replaced naive "show all statuses except current" override logic with `ADMIN_OVERRIDE_TARGETS` status transition map. Each status now only shows valid next statuses. `cancel_requested` excluded from override options (admins cancel directly via Cancel button). Terminal statuses (`completed`, `cancelled`) show no Override button. Button conditionally rendered only when valid targets exist. | Previous logic allowed invalid status transitions (e.g., going from `completed` back to `pending`). Proper transition map enforces business rules. |
+| `app/admin/orders/page.tsx` | Removed non-functional "Re-send SMS" button and cleaned up unused `ChatTextIcon` import. | Button had no implementation — dead UI element |
+
+### Decisions
+
+- **Decision**: Source displayed as plain colored text instead of pill badge
+  - **Rationale**: Visual consistency — the source label sits in the order detail panel alongside other plain text fields. A pill badge was unnecessarily prominent.
+- **Decision**: `ADMIN_OVERRIDE_TARGETS` map instead of exclusion-based filtering
+  - **Alternatives**: Keep showing all statuses except current; use a shared transition map from types
+  - **Rationale**: Explicit allowlist of valid transitions per status is safer and more maintainable than blacklisting the current status. Prevents invalid state transitions at the UI level.
+- **Decision**: `cancel_requested` excluded from override targets
+  - **Rationale**: Admins have a dedicated Cancel button for cancellations. Showing `cancel_requested` in the override dropdown would be redundant and confusing.
+- **Decision**: Terminal statuses (`completed`, `cancelled`) show no Override button at all
+  - **Rationale**: No valid transition exists from a terminal state. Hiding the button is cleaner than showing it disabled.
+
+### Database Fix (Not a Code Change)
+
+- **Issue**: `sales_staff` role was missing from the database, causing role-related queries to fail
+- **Fix**: Ran `PermissionSeeder` and `RoleSeeder` to populate all 8 roles including `sales_staff`
+- **Root Cause**: Seeders had never been run after the role restructuring session — database was out of sync with code
+
+### Cross-Repo Impact
+
+No backend code changes needed. The database seeding fix was in `cedibites_api` but only involved running existing seeders (`PermissionSeeder`, `RoleSeeder`), not modifying code.
+
+### Current State
+
+- **Admin orders page** (`/admin/orders`): Source shown as plain colored text, override status dropdown enforces valid transitions only, no dead SMS button
+- **Override status transitions**: Each status maps to a defined set of valid next statuses; terminal statuses have no override option
+- **Database**: All 8 roles now seeded including `sales_staff`
+- **Branch**: `menu-audit`
+
+### Pending / Follow-up
+
+- Consider extracting `ADMIN_OVERRIDE_TARGETS` to a shared constants file if the same transition logic is needed elsewhere (e.g., order manager, POS)
+- Verify that the override status API endpoint also validates transitions server-side (UI enforcement alone is insufficient)
+
+---
+
 ## [2026-04-07] Session: Promo System End-to-End — Audit Fixes, Route Bug, POS Subtotal Bug & Display
 
 ### Intent
