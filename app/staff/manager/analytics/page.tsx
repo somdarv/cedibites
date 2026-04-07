@@ -973,7 +973,7 @@ export default function ManagerAnalyticsPage() {
 
             {/* ══ ROW 3 — Prep time + Payment split + Fulfilment ══════════════ */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                <PrepTimeTrend avgPrepTime={todayOrderAnalytics?.average_prep_time} />
+                <PrepTimeTrend avgPrepTime={todayOrderAnalytics?.average_prep_time ?? undefined} />
                 <PaymentSplitCard methods={paymentMethods} />
                 <FulfilmentRate ordersByStatus={todayOrderAnalytics?.orders_by_status} />
             </div>
