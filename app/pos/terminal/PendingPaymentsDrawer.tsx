@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   XIcon,
   SpinnerIcon,
@@ -405,6 +405,15 @@ export default function PendingPaymentsDrawer({
 }: PendingPaymentsDrawerProps) {
   const { data, refetch } = usePosCheckoutSessions({ branch_id: branchId, status: 'pending,payment_initiated' });
   const sessions = data?.data ?? [];
+
+  // Refetch immediately when drawer opens so data is fresh
+  const prevOpen = useRef(false);
+  useEffect(() => {
+    if (isOpen && !prevOpen.current) {
+      refetch();
+    }
+    prevOpen.current = isOpen;
+  }, [isOpen, refetch]);
 
   // Sort: payment_initiated first, then pending, then by created_at desc
   const sortedSessions = useMemo(() => {

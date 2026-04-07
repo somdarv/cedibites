@@ -310,5 +310,9 @@ export function mapApiOrderToOrder(api: any): import('@/types/order').Order {
     readyAt: api.ready_at ? new Date(api.ready_at).getTime() : undefined,
     completedAt: api.completed_at ? new Date(api.completed_at).getTime() : undefined,
     recordedAt: api.recorded_at ? new Date(api.recorded_at).getTime() : undefined,
+    cancelRequestedBy: api.cancel_requested_by_user?.name
+      ?? (api.cancel_requested_by ? `Staff #${api.cancel_requested_by}` : undefined),
+    cancelRequestReason: api.cancel_request_reason ?? undefined,
+    cancelRequestedAt: api.cancel_requested_at ? new Date(api.cancel_requested_at).getTime() : undefined,
   };
 }

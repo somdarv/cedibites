@@ -198,30 +198,22 @@ export default function OrderManagerPage() {
   const approveCancel = useCallback(async (orderId: string) => {
     try {
       await apiClient.post(`/admin/orders/${orderId}/approve-cancel`);
-      // Refresh local state
-      handleStatusUpdate(orderId, 'cancelled', { completedAt: Date.now() });
+      toast.success('Cancellation approved');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to approve cancellation';
       toast.error(message);
     }
-  }, [handleStatusUpdate]);
+  }, []);
 
   const rejectCancel = useCallback(async (order: Order) => {
     try {
       await apiClient.post(`/admin/orders/${order.id}/reject-cancel`);
-      const restoreStatus = (order.cancelPreviousStatus ?? 'received') as OrderStatus;
-      await updateOrder(order.id, {
-        status: restoreStatus,
-        cancelRequestedBy: undefined,
-        cancelRequestedAt: undefined,
-        cancelRequestReason: undefined,
-        cancelPreviousStatus: undefined,
-      });
+      toast.success('Cancel request rejected');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to reject cancellation';
       toast.error(message);
     }
-  }, [updateOrder]);
+  }, []);
 
   const handleAction = useCallback((order: Order) => {
     if (order.status === 'received') acceptOrder(order.id);
