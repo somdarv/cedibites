@@ -158,6 +158,7 @@ export default function POSTerminalPage() {
   const [isPendingDrawerOpen, setIsPendingDrawerOpen] = useState(false);
   const [backgroundMomoToken, setBackgroundMomoToken] = useState<string | null>(null);
   const [backgroundConfirmedOrder, setBackgroundConfirmedOrder] = useState<Order | null>(null);
+  const [branchClosedNotice, setBranchClosedNotice] = useState<string | null>(null);
 
   // Pending checkout sessions count for badge
   const { data: pendingSessionsData } = usePosCheckoutSessions(
@@ -308,12 +309,18 @@ export default function POSTerminalPage() {
         setCompletedOrder(order);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string; errors?: Record<string, string[]> }; status?: number } };
+      const axiosErr = err as { response?: { data?: { code?: string; message?: string; errors?: Record<string, string[]> }; status?: number } };
       const apiMsg = axiosErr?.response?.data?.message;
       const apiErrors = axiosErr?.response?.data?.errors;
+      const apiCode = axiosErr?.response?.data?.code;
       const status = axiosErr?.response?.status;
       console.error('[POS] Order creation failed:', { status, apiMsg, apiErrors, err });
-      toast.error(apiMsg || 'Failed to create order. Please try again.');
+
+      if (apiCode === 'branch_closed') {
+        setBranchClosedNotice(apiMsg || 'This branch is currently closed and cannot accept orders.');
+      } else {
+        toast.error(apiMsg || 'Failed to create order. Please try again.');
+      }
     }
   };
 
@@ -944,6 +951,27 @@ export default function POSTerminalPage() {
           onClose={() => setOptionPickerItem(null)}
           onAdd={handleOptionAdd}
         />
+      )}
+
+      {/* Branch Closed Notice Modal */}
+      {branchClosedNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setBranchClosedNotice(null)}>
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 flex flex-col items-center gap-4 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+              <ProhibitIcon weight="fill" size={32} className="text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-text-dark">Order Not Allowed</h3>
+              <p className="text-sm text-neutral-gray mt-2 leading-relaxed">{branchClosedNotice}</p>
+            </div>
+            <button
+              onClick={() => setBranchClosedNotice(null)}
+              className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 rounded-2xl transition-all active:scale-[0.98]"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
