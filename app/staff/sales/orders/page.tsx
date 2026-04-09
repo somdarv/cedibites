@@ -149,7 +149,7 @@ function OrderRow({ order, isLast, onCancel }: { order: Order; isLast: boolean; 
                             className="self-end flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-error/30 hover:bg-error/10 text-error text-xs font-semibold font-body transition-colors cursor-pointer mt-1"
                         >
                             <ProhibitIcon size={12} weight="fill" />
-                            Cancel Order
+                            Request Cancel
                         </button>
                     )}
                 </div>

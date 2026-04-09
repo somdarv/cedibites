@@ -81,6 +81,46 @@ Items still needing attention.
 
 ---
 
+## [2026-04-09] Session: Staff Portal — Cancel UX, Dashboard Drawer, Role Label
+
+### Intent
+
+Three UX refinements from live staff testing at Ashaiman branch: (1) Staff should not have a "Cancel Order" button — they can only "Request Cancel" which goes to manager/admin for approval. (2) Active orders on the staff dashboard should open an inline order detail drawer instead of redirecting to the orders page. (3) The role label in the staff sidebar should say "Sales Staff" instead of generic "Staff".
+
+### Changes Made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `app/staff/sales/orders/page.tsx` | Changed cancel button text from "Cancel Order" to "Request Cancel" | Staff cannot directly cancel — they submit cancellation requests for manager approval |
+| `app/components/ui/CancelOrderModal.tsx` | Modal title is now conditional: "Request Cancellation" when `context === 'staff'`, "Cancel Order" otherwise | Reinforce that staff are requesting, not executing, cancellation |
+| `app/staff/dashboard/SalesDashboardView.tsx` | Replaced `<Link>` wrappers on active order cards with `<button onClick>`. Added `OrderDrawer` (reused from My Sales) with `useState` for selected order ID, `mapApiOrderToOrder` for drawer-compatible Order mapping. | Eliminates unnecessary redirect — staff can view order details inline without leaving the dashboard |
+| `app/staff/layout-client.tsx` | Changed `employee` role label from `'Staff'` to `'Sales Staff'` | Better reflects the actual role designation in the CediBites system |
+
+### Decisions
+
+- **Decision**: Reuse `OrderDrawer` from My Sales instead of building a new component
+  - **Rationale**: Same dark-themed drawer with full order detail already exists and is styled for the staff portal. Dual-mapping the raw orders (AdminOrder for cards, Order for drawer) avoids restructuring existing card display logic.
+- **Decision**: Button text "Request Cancel" (not "Request Cancellation")
+  - **Rationale**: Shorter, fits the compact button layout. The modal title uses the full "Request Cancellation" phrasing for clarity.
+
+### Current State
+
+- **Staff Orders Page**: Cancel button now reads "Request Cancel". The underlying logic already correctly called `requestCancel()` (not `cancelOrder()`) for non-admin staff — this change aligns the UI label with the behavior.
+- **Staff Dashboard**: Clicking an active order opens the same `OrderDrawer` used in My Sales. No more redirect to `/staff/sales/orders?select=ID`.
+- **Sidebar**: Role displays as "Sales Staff — Ashaiman" instead of "Staff — Ashaiman".
+- **CancelOrderModal**: Title reads "Request Cancellation" in staff context, "Cancel Order" for customer/admin context.
+
+### Cross-Repo Impact
+
+None — all changes are frontend-only. The backend `requestCancel` API endpoint was already correctly wired.
+
+### Pending / Follow-up
+
+- Replicate My Shifts page design to Branch Manager portal (user mentioned this is next)
+- Consider adding "Request Cancel" capability directly in the dashboard's OrderDrawer (currently cancel is only on the orders page)
+
+---
+
 ## [2026-04-09] Session: Staff Portal — Dashboard, My Sales, My Shifts Redesign
 
 ### Intent

@@ -113,7 +113,7 @@ function roleLabel(role: StaffRole | string): string {
         branch_partner: 'Branch Partner',
         manager:        'Branch Manager',
         call_center:    'Call Center',
-        employee:       'Staff',
+        employee:       'Sales Staff',
         kitchen:        'Kitchen',
         rider:          'Rider',
     };

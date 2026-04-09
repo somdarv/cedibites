@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { CashRegisterIcon, ListIcon } from '@phosphor-icons/react';
 import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
-import { mapApiOrderToAdminOrder } from '@/lib/api/adapters/order.adapter';
+import { mapApiOrderToAdminOrder, mapApiOrderToOrder } from '@/lib/api/adapters/order.adapter';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 import { STATUS_CONFIG } from '@/app/staff/orders/constants';
+import OrderDrawer from '@/app/staff/my-sales/components/OrderDrawer';
+import type { Order } from '@/types/order';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,16 @@ export default function SalesDashboardView() {
   });
 
   const orders = useMemo(() => rawOrders.map(mapApiOrderToAdminOrder), [rawOrders]);
+
+  // Orders mapped for the detail drawer (needs Order type, not AdminOrder)
+  const drawerOrders = useMemo(() => rawOrders.map(mapApiOrderToOrder), [rawOrders]);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const selectedOrder = useMemo(
+    () => drawerOrders.find(o => o.id === selectedOrderId) ?? null,
+    [drawerOrders, selectedOrderId],
+  );
+  const handleOrderClick = useCallback((id: string) => setSelectedOrderId(id), []);
+  const handleDrawerClose = useCallback(() => setSelectedOrderId(null), []);
 
   // Staff's own orders today (for personal stats on the dashboard)
   const myOrders = useMemo(() => {
@@ -153,16 +165,17 @@ export default function SalesDashboardView() {
 
         <div className="flex flex-col gap-4">
           {orders?.filter(o => o.status !== 'completed').map(order => (
-            <Link
+            <button
               key={order.id}
-              href={`/staff/sales/orders?select=${order.id}`}
+              type="button"
+              onClick={() => handleOrderClick(order.id)}
               className="
                 bg-neutral-card dark:bg-brand-dark
                 border-brown-light/30 border rounded-2xl
                 px-4 py-3.5
                 flex items-center hover:bg-brown-light/5 justify-between gap-4
                 hover:border-brown-light/75 transition-colors
-                group
+                group text-left w-full cursor-pointer
               "
             >
               {/* Left */}
@@ -189,7 +202,7 @@ export default function SalesDashboardView() {
                   →
                 </span>
               </div>
-            </Link>
+            </button>
           )) || (
             <div className="text-center py-8 text-neutral-gray">
               <p className="text-sm font-body">No active orders at the moment</p>
@@ -198,6 +211,7 @@ export default function SalesDashboardView() {
         </div>
       </div>
 
+      <OrderDrawer order={selectedOrder} onClose={handleDrawerClose} />
     </div>
   );
 }

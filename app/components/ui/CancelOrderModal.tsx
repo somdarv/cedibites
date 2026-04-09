@@ -112,7 +112,7 @@ export default function CancelOrderModal({
                                     <ProhibitIcon size={20} weight="fill" className="text-error" />
                                 </div>
                                 <div>
-                                    <p className={`text-sm font-bold font-body ${titleColor}`}>Cancel Order</p>
+                                    <p className={`text-sm font-bold font-body ${titleColor}`}>{context === 'staff' ? 'Request Cancellation' : 'Cancel Order'}</p>
                                     <p className={`text-xs font-body ${subColor}`}>#{orderNumber}</p>
                                 </div>
                             </div>
