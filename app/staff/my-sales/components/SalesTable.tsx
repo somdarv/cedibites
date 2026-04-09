@@ -34,16 +34,16 @@ export default function SalesTable({ activeOrders, cancelledOrders, totalRevenue
     const pageOrders = allOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
     return (
-        <div className="border dark:border-brand-dark border-brand-dark/50 rounded-2xl overflow-hidden">
+        <div className="bg-neutral-card dark:bg-brand-dark border border-[#f0e8d8] dark:border-brown-light/15 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="w-full min-w-155">
                     <thead>
-                        <tr className="border-b border-brown-light/20  bg-brown dark:bg-brand-dark">
+                        <tr className="border-b border-[#f0e8d8] dark:border-brown-light/15">
                             {HEADERS.map((h, i) => (
                                 <th
                                     key={h}
                                     className={`
-                                        px-4 py-3 text-[10px] font-bold font-body text-text-light dark:text-text-light uppercase tracking-wider
+                                        px-4 py-3 text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider
                                         ${i === 0 ? 'text-center w-8' : 'text-left'}
                                         ${h === 'Branch' ? 'hidden lg:table-cell' : ''}
                                         ${h === 'Source' ? 'hidden md:table-cell' : ''}
@@ -71,7 +71,7 @@ export default function SalesTable({ activeOrders, cancelledOrders, totalRevenue
                     </tbody>
 
                     <tfoot>
-                        <tr className="border-t-2 border-brown-light/25 bg-transparent">
+                        <tr className="border-t border-[#f0e8d8] dark:border-brown-light/15">
                             <td
                                 colSpan={8}
                                 className="px-4 py-4 text-text-dark dark:text-text-light text-sm font-bold font-body text-right hidden md:table-cell"
@@ -95,7 +95,7 @@ export default function SalesTable({ activeOrders, cancelledOrders, totalRevenue
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-brand-dark/25 dark:border-brand-dark">
+                <div className="flex items-center justify-between px-4 py-3 border-t border-[#f0e8d8] dark:border-brown-light/15">
                     <p className="text-neutral-gray text-xs font-body">
                         {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, allOrders.length)} of {allOrders.length}
                     </p>

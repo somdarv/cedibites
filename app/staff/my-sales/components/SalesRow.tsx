@@ -22,9 +22,9 @@ export default function SalesRow({ order, index, isSelected, onSelect }: SalesRo
         <tr
             onClick={onSelect}
             className={`
-                border-b border-brand-dark/25 dark:border-brand-dark transition-colors cursor-pointer
+                border-b border-[#f0e8d8] dark:border-brown-light/15 last:border-0 transition-colors cursor-pointer
                 ${isCancelled ? 'opacity-50' : ''}
-                ${isSelected ? 'bg-primary/25' : 'hover:bg-brown-light/5'}
+                ${isSelected ? 'bg-primary/10' : 'hover:bg-brown-light/5 dark:hover:bg-brown-light/5'}
             `}
         >
             {/* # */}

@@ -2,11 +2,26 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { PlusCircleIcon, ListIcon } from '@phosphor-icons/react';
-import { useEmployeeOrderStats, useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import { CashRegisterIcon, ListIcon } from '@phosphor-icons/react';
+import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
 import { mapApiOrderToAdminOrder } from '@/lib/api/adapters/order.adapter';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
+import { useOrderStore } from '@/app/components/providers/OrderStoreProvider';
 import { STATUS_CONFIG } from '@/app/staff/orders/constants';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function startOfToday(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function endOfToday(): number {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
 
 // ─── Source badge ─────────────────────────────────────────────────────────────
 
@@ -34,7 +49,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function SalesDashboardView() {
   const { staffUser } = useStaffAuth();
-  const { stats } = useEmployeeOrderStats();
+  const { getOrdersByFilter } = useOrderStore();
   const { orders: rawOrders } = useEmployeeOrders({
     status: ['received', 'preparing', 'ready', 'ready_for_pickup', 'out_for_delivery'],
     per_page: 10,
@@ -42,13 +57,27 @@ export default function SalesDashboardView() {
 
   const orders = useMemo(() => rawOrders.map(mapApiOrderToAdminOrder), [rawOrders]);
 
+  // Staff's own orders today (for personal stats on the dashboard)
+  const myOrders = useMemo(() => {
+    if (!staffUser?.id) return [];
+    return getOrdersByFilter({
+      staffId: staffUser.id,
+      dateFrom: startOfToday(),
+      dateTo: endOfToday(),
+    });
+  }, [getOrdersByFilter, staffUser?.id]);
+
+  const myActiveOrders = useMemo(() => myOrders.filter(o => o.status !== 'cancelled'), [myOrders]);
+  const myReceivedCount = useMemo(() => myActiveOrders.filter(o => o.status === 'received').length, [myActiveOrders]);
+  const myPreparingCount = useMemo(() => myActiveOrders.filter(o => o.status === 'preparing').length, [myActiveOrders]);
+
   const staffName = staffUser?.name ?? 'Staff';
   const h = new Date().getHours();
   const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   const displayStats = [
-    { label: 'Received', value: String(stats?.pending_orders ?? 0), sub: 'awaiting preparation' },
-    { label: 'Preparing', value: String(stats?.preparing_orders ?? 0), sub: 'in progress' },
-    { label: 'Orders Today', value: String(stats?.today_orders ?? 0), sub: 'your branch' },
+    { label: 'Received', value: String(myReceivedCount), sub: 'awaiting preparation' },
+    { label: 'Preparing', value: String(myPreparingCount), sub: 'in progress' },
+    { label: 'My Orders Today', value: String(myActiveOrders.length), sub: 'placed by you' },
   ];
 
   return (
@@ -64,9 +93,11 @@ export default function SalesDashboardView() {
         </p>
       </div>
 
-      {/* ── Primary CTA ────────────────────────────────────────────────── */}
+      {/* ── Primary CTA — Open POS ─────────────────────────────────────── */}
       <Link
-        href="/staff/sales/new-order"
+        href="/pos/terminal"
+        target="_blank"
+        rel="noopener noreferrer"
         className="
           flex items-center justify-between
           bg-primary hover:bg-primary-hover
@@ -77,11 +108,11 @@ export default function SalesDashboardView() {
         "
       >
         <div className="flex items-center gap-3">
-          <PlusCircleIcon size={24} weight="fill" className="shrink-0" />
+          <CashRegisterIcon size={24} weight="fill" className="shrink-0" />
           <div>
-            <p className="font-semibold font-body text-base leading-none">Create New Order</p>
+            <p className="font-semibold font-body text-base leading-none">Open POS Terminal</p>
             <p className="text-brand-darker/60 text-xs font-body mt-0.5">
-              Phone, WhatsApp, Instagram, Facebook, POS & Online
+              Place walk-in, phone, or delivery orders
             </p>
           </div>
         </div>

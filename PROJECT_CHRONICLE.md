@@ -81,6 +81,99 @@ Items still needing attention.
 
 ---
 
+## [2026-04-09] Session: Staff Portal — Dashboard, My Sales, My Shifts Redesign
+
+### Intent
+
+Overhaul the Staff (Sales) portal to make the dashboard CTA route to POS instead of the call center new-order page, show staff-specific order stats instead of branch-wide stats, redesign My Sales to include a payment method revenue breakdown, redesign My Shifts to prioritize current session and today's data over lifetime stats and a full calendar, and align table styling with the analytics page design system.
+
+### Changes Made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `app/staff/dashboard/SalesDashboardView.tsx` | CTA now opens POS Terminal (`/pos/terminal`, new tab) with `CashRegisterIcon`. Stats now show staff's own orders (Received, Preparing, My Orders Today) using `useOrderStore` + `getOrdersByFilter({ staffId })` instead of `useEmployeeOrderStats()` branch-wide counts. | Sales staff should go to POS, not call center flow. Stats should reflect the individual staff member's performance. |
+| `app/staff/my-sales/MySalesView.tsx` | Replaced "Items Sold" and "Avg. Order Value" stat cards with "Cancelled" (count of cancelled orders) and "Completed" (fulfilled orders count). Added **Revenue Breakdown** section — secondary cards for Cash Collected, POS MoMo, Direct MoMo, Card Payments, No Charge — only showing payment methods with activity. | Staff need to reconcile their cash/MoMo collected at end of shift. Payment breakdown enables staff + manager alignment. |
+| `app/staff/my-shifts/MyShiftsView.tsx` | Full redesign: Active session is now a hero card with Duration/Orders/Sales sub-stats. Today's Summary replaces lifetime stats. Calendar collapsed behind a date-picker button (toggled via header). Off-shift state shown explicitly. | Calendar dominated the page with no room for actionable daily context. Priority is "Am I clocked in? How's today going?" |
+| `app/staff/my-sales/components/SalesTable.tsx` | Table container changed from `border-brand-dark/50` with dark `bg-brown` header to `bg-neutral-card border-[#f0e8d8]` with neutral header matching analytics page. Border colors unified to `border-[#f0e8d8]`. | Align with analytics page table design system for visual consistency. |
+| `app/staff/my-sales/components/SalesRow.tsx` | Row borders updated to `border-[#f0e8d8]`, selection state softened to `bg-primary/10`, added `last:border-0`. | Match analytics table row styling. |
+
+### Decisions
+
+- **Decision**: Route dashboard CTA to POS Terminal instead of new-order flow
+  - **Rationale**: The new-order flow (`/staff/sales/new-order`) is designed for call center staff taking phone/WhatsApp orders. Sales staff at a branch should use the full POS terminal. The sidebar nav already had a POS link under Displays but it wasn't the primary CTA.
+- **Decision**: Replace Items Sold / Avg Order Value with Cancelled / Completed counts
+  - **Rationale**: Items sold and average order value are less actionable for daily reconciliation. Cancelled count helps track voided orders. Completed count shows fulfilled orders. Revenue already covers the monetary summary.
+- **Decision**: Payment breakdown as secondary cards, not a chart
+  - **Rationale**: Staff need exact numbers for reconciliation ("I collected ₵150 in cash, ₵200 via MoMo"), not relative proportions. Cards with exact amounts are more scannable at a glance.
+- **Decision**: Collapse calendar behind a button, show Today's Summary as default
+  - **Rationale**: Staff open My Shifts daily to check their current status. The calendar is a secondary navigation tool for historical lookups. Prioritizing today's data reduces cognitive load.
+- **Decision**: No backend changes needed
+  - **Rationale**: All required data (paymentMethod, staffId, status) already exists on the `Order` type from the `OrderStoreProvider`. Payment breakdown is computed client-side from existing order data.
+
+### Current State
+
+- **Dashboard**: CTA opens POS in new tab. Stats show staff's own received/preparing/total orders for the day.
+- **My Sales**: 4 primary stat cards (Orders Placed, Revenue, Cancelled, Completed) + payment method revenue breakdown cards + analytics-styled order table.
+- **My Shifts**: Hero active session card → Today's summary → Collapsible calendar → Selected day sessions.
+- **Tables**: All staff order tables now use `bg-neutral-card border-[#f0e8d8]` analytics styling.
+
+### Cross-Repo Impact
+
+None — all changes are frontend-only. No new API endpoints, no type changes, no backend modifications.
+
+### Pending / Follow-up
+
+- The payment breakdown data on My Sales will also be shown in the Manager portal's Staff Sales view and shift reports (future work)
+- Consider adding a "View in POS" quick-link from My Sales order drawer for order reprinting
+- The staff orders page (`/staff/sales/orders`) still uses expandable rows instead of the analytics table — could be unified in a future pass
+
+---
+
+## [2026-04-09] Session: ApiError Code Passthrough Fix
+
+### Intent
+
+Fix the POS branch-closed modal not appearing — a toast was showing instead because the `code` field from API error responses was being stripped out by the Axios interceptor.
+
+### Root Cause
+
+The Axios response interceptor in `lib/api/client.ts` catches all error responses and throws a custom `ApiError` object. The `ApiError` class only had `status`, `message`, and `errors` fields — the `code` field from the API response (`{ code: "branch_closed", message: "..." }`) was being silently dropped during this transformation. When the POS error handler checked `err.response.data.code`, it was always `undefined`.
+
+### Changes Made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/api/client.ts` | Added `code?: string` as a 4th constructor parameter to the `ApiError` class. Updated both the 422 handler and the catch-all error handler to pass `(data as any).code` through to the `ApiError` constructor. | Preserve any `code` field from API error responses for downstream consumers |
+| `app/pos/terminal/page.tsx` | Updated `handlePaymentComplete` catch block to read `err.code` directly from the `ApiError` instance instead of `err.response.data.code` | After the interceptor transforms the response, `err.response.data` doesn't exist — must read from the `ApiError` instance directly |
+
+### Decisions
+
+- **Decision**: Add `code` as an optional field on `ApiError` rather than passing through the entire response data object
+  - **Alternatives**: Attach the raw `response.data` object to `ApiError`, or stop intercepting errors
+  - **Rationale**: Minimal change, follows existing pattern of explicitly declaring fields. Adding the full data object would be a larger refactor with wider blast radius.
+
+### Key Lesson
+
+When using Axios interceptors that transform errors into custom error classes, any additional fields from the API response must be **explicitly passed through** to the custom class — they don't survive the transformation automatically. This applies to any future API error codes added to the backend.
+
+### Cross-Repo Impact
+
+None — the API was already correctly returning `{ code: "branch_closed", message: "..." }` with a 422. This was purely a frontend data-loss bug in the error transformation layer.
+
+### Current State
+
+- **`ApiError` class**: Now carries `status`, `message`, `errors`, and `code` fields
+- **POS terminal**: Correctly reads `err.code` from `ApiError` — branch-closed modal now displays as intended
+- **Other error handlers**: Any consumer of `ApiError` can now access `err.code` if the API sends one
+- **Deployed**: `main` + `beta` (both synced)
+
+### Pending / Follow-up
+
+- Audit other error handlers across the frontend to see if any were also trying to access `err.response.data` fields that got stripped (e.g., in checkout, order-manager)
+- Consider adding a generic `data` or `meta` bag to `ApiError` for future-proofing against additional API error fields
+
+---
+
 ## [2026-04-09] Session: WebSocket Broadcast & POS Error UX for Branch Access
 
 ### Intent
