@@ -931,9 +931,9 @@ export default function POSTerminalPage() {
                 status: 'received',
                 paymentStatus: 'completed',
                 isPaid: true,
-                total: cs.total_amount,
-                items: cs.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.unit_price })),
-                contact: { name: cs.customer_name, phone: cs.customer_phone },
+                total: cs.total_amount ?? cs.order.total_amount,
+                items: (cs.items ?? []).map(i => ({ name: i.name, quantity: i.quantity, price: i.unit_price })),
+                contact: { name: cs.customer_name ?? '', phone: cs.customer_phone ?? '' },
               } as unknown as Order);
             }
           }}

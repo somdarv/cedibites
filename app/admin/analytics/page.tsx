@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAnalytics, useOrderSourceAnalytics, useTopItemsAnalytics, useBottomItemsAnalytics, useCategoryRevenueAnalytics, useBranchPerformanceAnalytics, useDeliveryPickupAnalytics, usePaymentMethodAnalytics } from '@/lib/api/hooks/useAnalytics';
 import { useSearchParams } from 'next/navigation';
 import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
@@ -160,6 +161,135 @@ function RevenueChart({ salesByDay }: { salesByDay?: Array<{ date: string; total
                     })}
                 </div>
             )}
+        </Card>
+    );
+}
+
+// ─── Weekly revenue comparison ────────────────────────────────────────────────
+
+function mapSalesByDayToWeekBars(salesByDay?: Array<{ date: string; total: number }>): number[] {
+    const bars = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
+    if (!salesByDay?.length) return bars;
+    for (const d of salesByDay) {
+        const date = new Date(d.date);
+        const dow = date.getDay();
+        const idx = (dow + 6) % 7;
+        bars[idx] = (bars[idx] ?? 0) + Number(d.total);
+    }
+    return bars;
+}
+
+function WeeklyRevenueComparison({
+    weekRevenue,
+    lastWeekRevenue,
+    todayIdx,
+}: {
+    weekRevenue: number[];
+    lastWeekRevenue: number[];
+    todayIdx: number;
+}) {
+    const [hovered, setHovered] = useState<number | null>(null);
+    const max = Math.max(...weekRevenue, ...lastWeekRevenue, 1);
+
+    return (
+        <Card>
+            <SectionTitle title="Revenue vs Last Week" sub="Daily comparison — hover for details" />
+            <div className="flex items-end gap-1.5 h-24">
+                {DAYS.map((day, i) => {
+                    const thisVal = weekRevenue[i] ?? 0;
+                    const lastVal = lastWeekRevenue[i] ?? 0;
+                    const thisH  = Math.round((thisVal / max) * 88);
+                    const lastH  = Math.round((lastVal / max) * 88);
+                    const isToday = i === todayIdx;
+                    const diff   = lastVal > 0 ? Math.round(((thisVal - lastVal) / lastVal) * 100) : 0;
+                    return (
+                        <div
+                            key={day}
+                            className="flex-1 flex flex-col items-center gap-1 relative"
+                            onMouseEnter={() => setHovered(i)}
+                            onMouseLeave={() => setHovered(null)}
+                        >
+                            {hovered === i && (
+                                <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 bg-neutral-card border border-brown-light/20 rounded-xl px-3 py-2 z-10 whitespace-nowrap text-[11px] text-text-dark shadow-lg">
+                                    <p className="font-bold mb-1">{day}</p>
+                                    <p>This: <span className="text-primary font-semibold">₵{(weekRevenue[i] ?? 0).toLocaleString()}</span></p>
+                                    <p>Last: <span className="text-neutral-gray">₵{(lastWeekRevenue[i] ?? 0).toLocaleString()}</span></p>
+                                    <p className={`font-semibold ${diff >= 0 ? 'text-secondary' : 'text-error'}`}>
+                                        {diff >= 0 ? '↑' : '↓'} {Math.abs(diff)}%
+                                    </p>
+                                </div>
+                            )}
+                            <div className="flex items-end gap-0.5 relative" style={{ height: 88 }}>
+                                {thisVal > 0 && (
+                                    <span className="absolute -top-4 right-0 text-[8px] font-bold text-primary leading-none whitespace-nowrap">
+                                        {thisVal >= 1000 ? `${(thisVal / 1000).toFixed(1)}k` : Math.round(thisVal)}
+                                    </span>
+                                )}
+                                <div className="w-4 rounded-sm bg-brown-light/25" style={{ height: lastH }} />
+                                <div
+                                    className="w-4 rounded-sm"
+                                    style={{ height: thisH, background: isToday ? '#e49925' : '#c8a87a' }}
+                                />
+                            </div>
+                            <span className={`text-[9px] font-body ${isToday ? 'text-primary font-bold' : 'text-neutral-gray'}`}>{day}</span>
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="flex gap-4 mt-3">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-sm bg-primary" />
+                    <span className="text-[11px] text-neutral-gray font-body">This week</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-sm bg-brown-light/25" />
+                    <span className="text-[11px] text-neutral-gray font-body">Last week</span>
+                </div>
+            </div>
+        </Card>
+    );
+}
+
+// ─── Avg prep time ────────────────────────────────────────────────────────────
+
+function PrepTimeTrend({ avgPrepTime }: { avgPrepTime?: number }) {
+    const TARGET = 12;
+    const MAX    = 20;
+    const currentPrepTime = avgPrepTime ?? 0;
+    const hasPrepData = avgPrepTime !== undefined && avgPrepTime > 0;
+    
+    return (
+        <Card>
+            <SectionTitle title="Avg. Prep Time Today" sub={`Target: ${TARGET} mins`} />
+            <div className="flex items-end gap-4" style={{ height: 80 }}>
+                <div className="flex-1 flex flex-col items-center gap-1">
+                    <span
+                        className="text-[10px] font-bold font-body"
+                        style={{ color: currentPrepTime > TARGET ? '#d32f2f' : '#6c833f' }}
+                    >
+                        {Math.round(currentPrepTime)}m
+                    </span>
+                    <div
+                        className="w-full rounded-sm"
+                        style={{
+                            height: Math.round((Math.min(currentPrepTime, MAX) / MAX) * 72),
+                            background: currentPrepTime > TARGET ? '#d32f2f' : '#6c833f',
+                            transition: 'height 0.3s ease',
+                        }}
+                    />
+                    <span className="text-[9px] font-body text-primary font-bold">Current</span>
+                </div>
+            </div>
+            <div className="mt-3 px-3 py-2 bg-neutral-gray/10 rounded-xl flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-warning shrink-0" />
+                <p className="text-[11px] text-neutral-gray font-body">
+                    {hasPrepData ? (
+                        <>Current avg: <span className="text-text-dark font-semibold">{Math.round(avgPrepTime)} mins</span></>
+                    ) : (
+                        <>No prep-time data yet for today.</>
+                    )}
+                </p>
+            </div>
         </Card>
     );
 }
@@ -948,6 +1078,28 @@ export default function AdminAnalyticsPage() {
     const { data: deliveryPickup } = useDeliveryPickupAnalytics(period, branchId, customRange);
     const { data: paymentMethods } = usePaymentMethodAnalytics(period, branchId, customRange);
 
+    // Weekly revenue comparison data
+    const { sales: weekSales } = useAnalytics('week', branchId);
+    const lastWeekRange = useMemo(() => {
+        const now = new Date();
+        const end = new Date(now);
+        end.setDate(end.getDate() - 7);
+        const start = new Date(end);
+        start.setDate(start.getDate() - 6);
+        return { date_from: start.toISOString().slice(0, 10), date_to: end.toISOString().slice(0, 10) };
+    }, []);
+    const { data: lastWeekSales } = useQuery({
+        queryKey: ['analytics', 'sales', 'last-week', branchId],
+        queryFn: () => analyticsService.getSalesAnalytics({ ...lastWeekRange, branch_id: branchId }),
+        staleTime: 2 * 60 * 1000,
+    });
+    const weekRevenue = useMemo(() => mapSalesByDayToWeekBars(weekSales?.sales_by_day), [weekSales?.sales_by_day]);
+    const lastWeekRevenue = useMemo(() => mapSalesByDayToWeekBars(lastWeekSales?.sales_by_day), [lastWeekSales?.sales_by_day]);
+    const TODAY_IDX = (new Date().getDay() + 6) % 7;
+
+    // Today's analytics for prep time
+    const { orders: todayOrderAnalytics } = useAnalytics('today', branchId);
+
     const fulfilmentPct = useMemo(() => {
         if (!orders?.orders_by_status || !orders?.total_orders) return 0;
         const completed = (orders.orders_by_status['completed'] ?? 0) + (orders.orders_by_status['delivered'] ?? 0);
@@ -1155,6 +1307,12 @@ export default function AdminAnalyticsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-3 mb-3">
                 <RevenueChart salesByDay={sales?.sales_by_day} />
                 <PeakHoursHeatmap ordersByHour={orders?.orders_by_hour} />
+            </div>
+
+            {/* Revenue comparison + Prep time */}
+            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-3 mb-3">
+                <WeeklyRevenueComparison weekRevenue={weekRevenue} lastWeekRevenue={lastWeekRevenue} todayIdx={TODAY_IDX} />
+                <PrepTimeTrend avgPrepTime={todayOrderAnalytics?.average_prep_time ?? undefined} />
             </div>
 
             {/* Source + category */}

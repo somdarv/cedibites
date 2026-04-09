@@ -5,39 +5,17 @@ import { useQuery } from '@tanstack/react-query';
 import {
     CalendarIcon,
     CurrencyCircleDollarIcon,
-    ReceiptIcon,
     TrendUpIcon,
-    XCircleIcon,
-    CaretRightIcon,
-    CaretLeftIcon,
     ArrowUpIcon,
     ArrowDownIcon,
     FileCsvIcon,
 } from '@phosphor-icons/react';
-import { STATUS_CONFIG } from '@/app/staff/orders/constants';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { useAnalytics } from '@/lib/api/hooks/useAnalytics';
-import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
-import { mapApiOrderToAdminOrder } from '@/lib/api/adapters/order.adapter';
 import { analyticsService, type TopItem, type PaymentMethod } from '@/lib/api/services/analytics.service';
 import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
 import { buildReportHtml, printReport, generateCsv, type ReportData, type ReportMeta, type ItemSoldRow } from '@/lib/utils/reportGenerator';
 import { getOrderItemLineLabel } from '@/lib/utils/orderItemDisplay';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type Period = 'today' | 'yesterday' | 'week' | 'month' | '30d' | '90d' | 'custom';
-
-interface AnalyticsOrder {
-    id: string;
-    customer: string;
-    source: string;
-    status: string;
-    items: number;
-    total: number;
-    placedAt: Date;
-    staffName: string;
-}
 
 // ─── Chart / analytics constants ───────────────────────────────────────────────
 
@@ -169,9 +147,9 @@ function WeeklyRevenue({
                                         {thisVal >= 1000 ? `${(thisVal / 1000).toFixed(1)}k` : Math.round(thisVal)}
                                     </span>
                                 )}
-                                <div className="w-2.5 rounded-sm bg-brown-light/25" style={{ height: lastH }} />
+                                <div className="w-4 rounded-sm bg-brown-light/25" style={{ height: lastH }} />
                                 <div
-                                    className="w-2.5 rounded-sm"
+                                    className="w-4 rounded-sm"
                                     style={{ height: thisH, background: isToday ? '#e49925' : '#c8a87a' }}
                                 />
                             </div>
@@ -614,7 +592,7 @@ function ProductSummaryCard({ items }: { items?: TopItem[] }) {
 
 function OutOfStockCard() {
     return (
-        <Card className="flex-1 min-w-[220px]">
+        <Card className="flex-1 min-w-55">
             <SectionHeader title="Out-of-Stock Alerts" sub="Live stock alert feed" />
             <div className="text-center py-8 text-neutral-gray text-sm font-body">
                 No out-of-stock analytics endpoint yet.
@@ -623,65 +601,7 @@ function OutOfStockCard() {
     );
 }
 
-// ─── Status dot (for orders table) ───────────────────────────────────────────
-
-function StatusDot({ status }: { status: string }) {
-    const config = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.received;
-    return (
-        <span className="inline-flex items-center gap-1.5 text-xs font-body font-medium text-text-dark">
-            <span className={`h-2 w-2 rounded-full shrink-0 ${config.dot}`} />
-            {config.label}
-        </span>
-    );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
-type PeriodTab = { key: Period; label: string };
-const PERIODS: PeriodTab[] = [
-    { key: 'today',     label: 'Today'      },
-    { key: 'yesterday', label: 'Yesterday'  },
-    { key: 'week',      label: 'This Week'  },
-    { key: 'month',     label: 'This Month' },
-    { key: '30d',       label: 'Last 30d'   },
-    { key: '90d',       label: 'Last 90d'   },
-    { key: 'custom',    label: 'All Time'   },
-];
-
-function getDateRangeForPeriod(period: Period): { date_from: string; date_to: string } {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    if (period === 'today') return { date_from: today, date_to: today };
-    if (period === 'yesterday') {
-        const y = new Date(now);
-        y.setDate(y.getDate() - 1);
-        const yd = y.toISOString().slice(0, 10);
-        return { date_from: yd, date_to: yd };
-    }
-    if (period === 'week') {
-        const ws = new Date(now);
-        ws.setDate(ws.getDate() - 6);
-        return { date_from: ws.toISOString().slice(0, 10), date_to: today };
-    }
-    if (period === 'month') {
-        const ms = new Date(now.getFullYear(), now.getMonth(), 1);
-        return { date_from: ms.toISOString().slice(0, 10), date_to: today };
-    }
-    if (period === '30d') {
-        const d30 = new Date(now);
-        d30.setDate(d30.getDate() - 30);
-        return { date_from: d30.toISOString().slice(0, 10), date_to: today };
-    }
-    if (period === '90d') {
-        const d90 = new Date(now);
-        d90.setDate(d90.getDate() - 90);
-        return { date_from: d90.toISOString().slice(0, 10), date_to: today };
-    }
-    // custom / all time
-    const d90 = new Date(now);
-    d90.setDate(d90.getDate() - 90);
-    return { date_from: d90.toISOString().slice(0, 10), date_to: today };
-}
 
 function mapSalesByDayToWeekBars(salesByDay?: Array<{ date: string; total: number }>): number[] {
     const bars = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
@@ -696,9 +616,6 @@ function mapSalesByDayToWeekBars(salesByDay?: Array<{ date: string; total: numbe
 }
 
 export default function ManagerAnalyticsPage() {
-    const [period, setPeriod] = useState<Period>('today');
-    const [page,   setPage  ] = useState(0);
-    const PAGE_SIZE = 8;
     const [showReportModal, setShowReportModal] = useState(false);
     const [reportFormat, setReportFormat] = useState<'pdf' | 'csv'>('pdf');
     const [reportSections, setReportSections] = useState({ summary: true, itemsSold: true, dailyBreakdown: true, topCustomers: true });
@@ -776,66 +693,13 @@ export default function ManagerAnalyticsPage() {
         ? Math.round((((todayOrderAnalytics.total_orders - (todayOrderAnalytics.orders_by_status?.cancelled ?? 0)) / todayOrderAnalytics.total_orders) * 100))
         : 0;
 
-    const orderRange = useMemo(() => getDateRangeForPeriod(period), [period]);
-
-    // Canonical analytics for the Order Log period (same source of truth as top KPIs)
-    const { data: periodSales } = useQuery({
-        queryKey: ['analytics', 'sales', period, branchId, orderRange.date_from, orderRange.date_to],
-        queryFn: () => analyticsService.getSalesAnalytics({ ...orderRange, branch_id: branchId }),
-        staleTime: 2 * 60 * 1000,
-    });
-    const { data: periodOrders } = useQuery({
-        queryKey: ['analytics', 'orders', period, branchId, orderRange.date_from, orderRange.date_to],
-        queryFn: () => analyticsService.getOrderAnalytics({ ...orderRange, branch_id: branchId }),
-        staleTime: 2 * 60 * 1000,
-    });
-
-    const { orders: rawOrders, isLoading: ordersLoading } = useEmployeeOrders({
-        branch_id: branchId,
-        date_from: orderRange.date_from,
-        date_to: orderRange.date_to,
-        per_page: 100,
-    });
-
-    const apiOrders = useMemo(() => rawOrders.map(mapApiOrderToAdminOrder), [rawOrders]);
-
-    const filteredOrders = useMemo(() => {
-        return apiOrders.map((o) => ({
-            id: o.id,
-            customer: o.customer,
-            source: o.source,
-            status: o.status,
-            items: o.items?.length ?? 0,
-            total: o.amount,
-            placedAt: new Date(o.createdAt),
-            staffName: '—',
-        }));
-    }, [apiOrders]);
-
-    const cancelledOrders = useMemo(() => filteredOrders.filter(o => o.status === 'cancelled'), [filteredOrders]);
-    // Use canonical analytics for summary stats (same definition as top KPIs)
-    const totalRevenue    = periodSales?.total_sales ?? 0;
-    const activeOrderCount = periodOrders ? (periodOrders.total_orders - (periodOrders.orders_by_status?.cancelled ?? 0)) : filteredOrders.filter(o => o.status !== 'cancelled').length;
-    const avgOrderValue   = periodSales?.average_order_value ?? 0;
-    const cancelRate      = periodOrders?.total_orders ? Math.round(((periodOrders.orders_by_status?.cancelled ?? 0) / periodOrders.total_orders) * 100) : 0;
-
-    const sourceBreakdown = useMemo(() => {
-        const active = filteredOrders.filter(o => o.status !== 'cancelled');
-        const map: Record<string, number> = {};
-        active.forEach(o => { map[o.source] = (map[o.source] ?? 0) + 1; });
-        return Object.entries(map).sort((a, b) => b[1] - a[1]);
-    }, [filteredOrders]);
-
-    const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE);
-    const pageOrders = filteredOrders.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
     async function handleGenerateReport(): Promise<void> {
         setIsGenerating(true);
         try {
-            const range = getDateRangeForPeriod(period);
-            const PERIOD_LABELS: Record<Period, string> = { today: 'Today', yesterday: 'Yesterday', week: 'This Week', month: 'This Month', '30d': 'Last 30 Days', '90d': 'Last 90 Days', custom: 'All Time' };
-            const periodLabel = PERIOD_LABELS[period];
-            const dateRange = `${range.date_from} – ${range.date_to}`;
+            const today = new Date().toISOString().slice(0, 10);
+            const range = { date_from: today, date_to: today };
+            const periodLabel = 'Today';
+            const dateRange = today;
             const generatedAt = new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
             const [salesData, ordersData, customersData, allItemsData] = await Promise.all([
@@ -978,7 +842,7 @@ export default function ManagerAnalyticsPage() {
             </div>
 
             {/* ══ ROW 2 — Weekly revenue + heatmap ════════════════════════════ */}
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-3 mb-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <WeeklyRevenue
                     weekRevenue={weekRevenue}
                     lastWeekRevenue={lastWeekRevenue}
@@ -1005,140 +869,6 @@ export default function ManagerAnalyticsPage() {
                 <ProductSummaryCard items={allProductItems} />
             </div>
 
-            {/* ── Divider ─────────────────────────────────────────────────────── */}
-            <div className="border-t border-brown-light/15 mb-6" />
-            <h2 className="text-text-dark text-base font-bold font-body mb-4 flex items-center gap-2">
-                <ReceiptIcon size={16} weight="fill" className="text-primary" />
-                Order Log
-            </h2>
-
-            {/* ── Period tabs ─────────────────────────────────────────────────── */}
-            <div className="flex gap-2 mb-5 bg-neutral-card border border-brown-light/15 rounded-2xl p-1.5 w-fit">
-                {PERIODS.map(p => (
-                    <button
-                        key={p.key}
-                        type="button"
-                        onClick={() => { setPeriod(p.key); setPage(0); }}
-                        className={`
-                            px-4 py-2 rounded-xl text-sm font-medium font-body transition-all duration-150 cursor-pointer
-                            ${period === p.key
-                                ? 'bg-primary text-brand-darker shadow-sm'
-                                : 'text-neutral-gray hover:text-text-dark'
-                            }
-                        `}
-                    >
-                        {p.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* ── Summary stats for selected period ───────────────────────────── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                {[
-                    { icon: CurrencyCircleDollarIcon, label: 'Revenue',     value: formatGHS(totalRevenue),  sub: 'Excl. cancelled'    },
-                    { icon: ReceiptIcon,              label: 'Orders',      value: String(activeOrderCount), sub: `${cancelledOrders.length} cancelled` },
-                    { icon: TrendUpIcon,              label: 'Avg. Value',  value: formatGHS(avgOrderValue), sub: 'Per order'          },
-                    { icon: XCircleIcon,              label: 'Cancel Rate', value: `${cancelRate}%`, sub: 'Of total orders' },
-                ].map(({ icon: Icon, label, value, sub }) => (
-                    <div key={label} className="bg-neutral-card border border-brown-light/15 rounded-2xl px-4 py-4 flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                            <Icon size={14} weight="fill" className="text-neutral-gray shrink-0" />
-                            <span className="text-neutral-gray text-sm font-bold font-body">{label}</span>
-                        </div>
-                        <p className="text-3xl font-bold font-body leading-none text-text-dark">{value}</p>
-                        {sub && <p className="text-neutral-gray text-xs font-body">{sub}</p>}
-                    </div>
-                ))}
-            </div>
-
-            {/* ── Source chips ─────────────────────────────────────────────────── */}
-            {sourceBreakdown.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-5">
-                    {sourceBreakdown.map(([source, count]) => (
-                        <span
-                            key={source}
-                            className="flex items-center gap-1.5 bg-neutral-card border border-brown-light/15 rounded-full px-3 py-1.5 text-xs font-body font-medium text-text-dark"
-                        >
-                            {source}
-                            <span className="bg-primary/20 text-primary font-bold rounded-full px-1.5 py-0.5 text-[10px]">{count}</span>
-                        </span>
-                    ))}
-                </div>
-            )}
-
-            {/* ── Orders table ────────────────────────────────────────────────── */}
-            <div className="bg-neutral-card border border-brown-light/15 rounded-2xl overflow-hidden mb-4">
-                <div className="hidden md:grid grid-cols-[1fr_100px_90px_80px_90px_110px] gap-4 px-4 py-3 border-b border-brown-light/15">
-                    {['Customer','Source','Status','Items','Total','Date'].map(h => (
-                        <span key={h} className="text-neutral-gray text-xs font-bold font-body uppercase tracking-wider">{h}</span>
-                    ))}
-                </div>
-
-                {ordersLoading ? (
-                    <div className="px-4 py-12 text-center">
-                        <p className="text-neutral-gray text-sm font-body">Loading orders…</p>
-                    </div>
-                ) : pageOrders.length === 0 ? (
-                    <div className="px-4 py-12 text-center">
-                        <p className="text-neutral-gray text-sm font-body">No orders for this period.</p>
-                    </div>
-                ) : (
-                    pageOrders.map((order, i) => (
-                        <div
-                            key={order.id}
-                            className={`
-                                px-4 py-3.5 flex flex-col md:grid md:grid-cols-[1fr_100px_90px_80px_90px_110px] gap-2 md:gap-4 md:items-center
-                                ${i < pageOrders.length - 1 ? 'border-b border-brown-light/10' : ''}
-                            `}
-                        >
-                            <div className="min-w-0">
-                                <p className="text-text-dark text-sm font-semibold font-body truncate">{order.customer}</p>
-                                <p className="text-neutral-gray text-xs font-body">#{order.id} · {order.staffName}</p>
-                            </div>
-                            <span className="text-[10px] font-medium font-body text-text-dark border border-brown-light/20 px-2 py-0.5 rounded-full w-fit">
-                                {order.source}
-                            </span>
-                            <StatusDot status={order.status} />
-                            <span className="text-text-dark text-sm font-body">{order.items}</span>
-                            <span className={`text-sm font-bold font-body ${order.status === 'cancelled' ? 'text-neutral-gray line-through' : 'text-text-dark'}`}>
-                                {formatGHS(order.total)}
-                            </span>
-                            <div>
-                                <p className="text-text-dark text-xs font-body">{formatDate(order.placedAt)}</p>
-                                <p className="text-neutral-gray text-[10px] font-body">{formatTime(order.placedAt)}</p>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-
-            {/* ── Pagination ──────────────────────────────────────────────────── */}
-            {totalPages > 1 && (
-                <div className="flex items-center justify-between">
-                    <button
-                        type="button"
-                        onClick={() => setPage(p => Math.max(0, p - 1))}
-                        disabled={page === 0}
-                        className="flex items-center gap-2 text-sm font-body font-medium text-neutral-gray disabled:opacity-40 hover:text-text-dark transition-colors disabled:cursor-not-allowed cursor-pointer"
-                    >
-                        <CaretLeftIcon size={14} weight="bold" />
-                        Previous
-                    </button>
-                    <span className="text-neutral-gray text-xs font-body">
-                        Page {page + 1} of {totalPages} · {filteredOrders.length} orders
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                        disabled={page >= totalPages - 1}
-                        className="flex items-center gap-2 text-sm font-body font-medium text-neutral-gray disabled:opacity-40 hover:text-text-dark transition-colors disabled:cursor-not-allowed cursor-pointer"
-                    >
-                        Next
-                        <CaretRightIcon size={14} weight="bold" />
-                    </button>
-                </div>
-            )}
-
             <p className="text-neutral-gray/40 text-xs font-body text-center mt-6">
                 {branchName} branch · Data refreshes every 60 seconds · Managers only
             </p>
@@ -1149,8 +879,7 @@ export default function ManagerAnalyticsPage() {
                     <div className="bg-neutral-card rounded-2xl border border-[#f0e8d8] w-full max-w-sm p-6 shadow-xl" onClick={e => e.stopPropagation()}>
                         <h2 className="text-text-dark text-base font-bold font-body mb-1">Generate Report</h2>
                         <p className="text-neutral-gray text-xs font-body mb-5">
-                            {({ today: 'Today', week: 'This Week', month: 'This Month', custom: 'All Time' } as Record<Period, string>)[period]}
-                            &nbsp;·&nbsp; {branchName}
+                            Today &nbsp;·&nbsp; {branchName}
                         </p>
 
                         <p className="text-text-dark text-xs font-semibold font-body mb-2">Format</p>

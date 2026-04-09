@@ -24,7 +24,7 @@ import {
     DownloadSimpleIcon,
 } from '@phosphor-icons/react';
 import CancelOrderModal from '@/app/components/ui/CancelOrderModal';
-import { useCancelOrder } from '@/lib/api/hooks/useOrders';
+import { useRequestCancel } from '@/lib/api/hooks/useOrders';
 import { toast } from '@/lib/utils/toast';
 import { useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/lib/api/client';
@@ -76,6 +76,12 @@ function getDateRange(preset: string, custom?: { date_from: string; date_to: str
     if (preset === 'This Week') return { date_from: weekStart.toISOString().slice(0, 10), date_to: today };
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     if (preset === 'This Month') return { date_from: monthStart.toISOString().slice(0, 10), date_to: today };
+    const lastWeekEnd = new Date(now); lastWeekEnd.setDate(lastWeekEnd.getDate() - lastWeekEnd.getDay() - 1);
+    const lastWeekStart = new Date(lastWeekEnd); lastWeekStart.setDate(lastWeekStart.getDate() - 6);
+    if (preset === 'Last Week') return { date_from: lastWeekStart.toISOString().slice(0, 10), date_to: lastWeekEnd.toISOString().slice(0, 10) };
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    if (preset === 'Last Month') return { date_from: lastMonthStart.toISOString().slice(0, 10), date_to: lastMonthEnd.toISOString().slice(0, 10) };
     if (preset === 'Custom' && custom?.date_from && custom?.date_to) {
         const { date_from: from, date_to: to } = custom;
         return from <= to ? { date_from: from, date_to: to } : { date_from: to, date_to: from };
@@ -121,7 +127,7 @@ function OrderDetailPanel({ order, onClose }: { order: AdminOrder; onClose: () =
     const [showConfirm, setShowConfirm] = useState<null | 'cancel'>(null);
     const [showStatusPicker, setShowStatusPicker] = useState(false);
     const [updatingStatus, setUpdatingStatus] = useState(false);
-    const { cancelOrder } = useCancelOrder();
+    const { requestCancel } = useRequestCancel();
     const queryClient = useQueryClient();
 
     const subtotal = order.items.reduce((s, i) => s + i.qty * i.price, 0);
@@ -251,7 +257,7 @@ function OrderDetailPanel({ order, onClose }: { order: AdminOrder; onClose: () =
                         <div className="bg-neutral-light rounded-xl p-3 flex flex-col gap-2">
                             <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider">Update Status</p>
                             <div className="grid grid-cols-2 gap-1.5">
-                                {(ALL_STATUSES as string[]).filter(s => s !== order.status).map(s => (
+                                {(['received', 'preparing', 'ready', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'completed'] as string[]).filter(s => s !== order.status).map(s => (
                                     <button key={s} type="button" disabled={updatingStatus} onClick={() => overrideStatus(s)}
                                         className="flex items-center gap-1.5 px-2.5 py-2 bg-neutral-card border border-[#f0e8d8] rounded-lg text-text-dark text-xs font-medium font-body hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                                         <span className={`h-2 w-2 rounded-full shrink-0 ${STATUS_STYLES[s]?.dot ?? 'bg-neutral-gray'}`} />{STATUS_STYLES[s]?.label ?? s}
@@ -266,12 +272,7 @@ function OrderDetailPanel({ order, onClose }: { order: AdminOrder; onClose: () =
                             <p className="text-xs font-bold text-orange-700 font-body">Cancel Requested</p>
                             {order.cancelRequestedBy && <p className="text-xs text-orange-600 font-body">By: {order.cancelRequestedBy}</p>}
                             {order.cancelRequestReason && <p className="text-xs text-text-dark font-body">&ldquo;{order.cancelRequestReason}&rdquo;</p>}
-                            <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={async () => { try { await apiClient.post(`/admin/orders/${order.dbId}/approve-cancel`); queryClient.invalidateQueries({ queryKey: ['employee-orders'] }); toast.success('Cancellation approved'); onClose(); } catch { toast.error('Failed'); } }}
-                                    className="flex-1 px-3 py-2 rounded-xl bg-error text-white text-xs font-medium font-body hover:bg-error/90 transition-colors cursor-pointer">Approve Cancel</button>
-                                <button type="button" onClick={async () => { try { await apiClient.post(`/admin/orders/${order.dbId}/reject-cancel`); queryClient.invalidateQueries({ queryKey: ['employee-orders'] }); toast.success('Rejected'); onClose(); } catch { toast.error('Failed'); } }}
-                                    className="flex-1 px-3 py-2 rounded-xl bg-neutral-light text-text-dark text-xs font-medium font-body hover:bg-[#f0e8d8] transition-colors cursor-pointer">Reject</button>
-                            </div>
+                            <p className="text-xs text-neutral-gray font-body italic">Waiting for admin approval</p>
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-2">
@@ -279,21 +280,21 @@ function OrderDetailPanel({ order, onClose }: { order: AdminOrder; onClose: () =
                             className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-neutral-light rounded-xl text-text-dark text-xs font-medium font-body hover:bg-[#f0e8d8] transition-colors cursor-pointer">
                             <ClockIcon size={13} weight="bold" className="text-primary" />Update Status
                         </button>
-                        {!isTerminal ? (
+                        {!isTerminal && order.status !== 'cancel_requested' ? (
                             <button type="button" onClick={() => setShowConfirm('cancel')} className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-error/10 rounded-xl text-error text-xs font-medium font-body hover:bg-error/20 transition-colors cursor-pointer">
-                                <XCircleIcon size={13} weight="bold" />Cancel Order
+                                <XCircleIcon size={13} weight="bold" />Request Cancel
                             </button>
                         ) : (
                             <div className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-neutral-light rounded-xl text-neutral-gray text-xs font-medium font-body opacity-40 cursor-not-allowed">
-                                <XCircleIcon size={13} weight="bold" />Cancel Order
+                                <XCircleIcon size={13} weight="bold" />Request Cancel
                             </div>
                         )}
                     </div>
                 </div>
             </aside>
             {showConfirm === 'cancel' && (
-                <CancelOrderModal orderNumber={order.id} theme="light" onCancel={() => setShowConfirm(null)}
-                    onConfirm={async (reason) => { await cancelOrder({ id: order.dbId, reason }); queryClient.invalidateQueries({ queryKey: ['employee-orders'] }); toast.success('Order cancelled'); }} />
+                <CancelOrderModal orderNumber={order.id} theme="light" context="staff" onCancel={() => setShowConfirm(null)}
+                    onConfirm={async (reason) => { await requestCancel({ id: order.dbId, reason }); queryClient.invalidateQueries({ queryKey: ['employee-orders'] }); toast.success('Cancellation requested'); }} />
             )}
         </>
     );
@@ -403,7 +404,7 @@ export default function ManagerOrdersPage() {
                     </button>
                 </div>
                 <div className="flex gap-2 flex-wrap mb-3">
-                    {['Today', 'Yesterday', 'This Week', 'This Month', 'Custom'].map(p => (
+                    {['Today', 'Yesterday', 'This Week', 'Last Week', 'This Month', 'Last Month', 'Custom'].map(p => (
                         <button key={p} type="button" onClick={() => { setDatePreset(p); setPage(0); }}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium font-body transition-all cursor-pointer ${datePreset === p ? 'bg-primary text-white' : 'bg-neutral-light text-neutral-gray hover:text-text-dark'}`}>{p}</button>
                     ))}

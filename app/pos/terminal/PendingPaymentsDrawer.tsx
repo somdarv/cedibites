@@ -403,8 +403,26 @@ export default function PendingPaymentsDrawer({
   onClose,
   onSessionConfirmed,
 }: PendingPaymentsDrawerProps) {
-  const { data, refetch } = usePosCheckoutSessions({ branch_id: branchId, status: 'pending,payment_initiated' });
+  const { data, refetch } = usePosCheckoutSessions({ branch_id: branchId, status: 'pending,payment_initiated,failed' });
   const sessions = data?.data ?? [];
+
+  // Track previous session states to detect transitions to "failed" (e.g. MoMo declined)
+  const prevSessionStates = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    for (const session of sessions) {
+      const prev = prevSessionStates.current.get(session.session_token);
+      if (prev && prev !== 'failed' && session.status === 'failed') {
+        const reason = session.failure_reason ?? 'Payment was declined or failed';
+        toast.error(`${session.customer_name || 'Walk-in'}: ${reason}`);
+      }
+    }
+    // Update the map
+    const newMap = new Map<string, string>();
+    for (const session of sessions) {
+      newMap.set(session.session_token, session.status);
+    }
+    prevSessionStates.current = newMap;
+  }, [sessions]);
 
   // Refetch immediately when drawer opens so data is fresh
   const prevOpen = useRef(false);
@@ -441,6 +459,8 @@ export default function PendingPaymentsDrawer({
   };
 
   const handlePayCash = async (token: string, totalAmount: number) => {
+    // Switch payment method to cash first (needed when session was originally MoMo/card)
+    await checkoutSessionService.posChangePayment(token, { payment_method: 'cash' });
     const result = await checkoutSessionService.confirmCash(token, totalAmount);
     toast.success('Cash payment confirmed');
     onSessionConfirmed?.(result);
