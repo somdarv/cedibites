@@ -31,7 +31,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
-    public errors?: Record<string, string[]>
+    public errors?: Record<string, string[]>,
+    public code?: string
   ) {
     super(message);
     this.name = 'ApiError';
@@ -169,14 +170,17 @@ apiClient.interceptors.response.use(
       throw new ApiError(
         status,
         data.message || 'Validation failed',
-        data.errors
+        data.errors,
+        (data as any).code
       );
     }
 
     // Handle other errors
     throw new ApiError(
       status,
-      data?.message || 'An error occurred. Please try again.'
+      data?.message || 'An error occurred. Please try again.',
+      undefined,
+      (data as any).code
     );
   }
 );

@@ -309,17 +309,13 @@ export default function POSTerminalPage() {
         setCompletedOrder(order);
       }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { code?: string; message?: string; errors?: Record<string, string[]> }; status?: number } };
-      const apiMsg = axiosErr?.response?.data?.message;
-      const apiErrors = axiosErr?.response?.data?.errors;
-      const apiCode = axiosErr?.response?.data?.code;
-      const status = axiosErr?.response?.status;
-      console.error('[POS] Order creation failed:', { status, apiMsg, apiErrors, err });
+      const apiErr = err as { status?: number; message?: string; errors?: Record<string, string[]>; code?: string };
+      console.error('[POS] Order creation failed:', { status: apiErr.status, message: apiErr.message, errors: apiErr.errors, err });
 
-      if (apiCode === 'branch_closed') {
-        setBranchClosedNotice(apiMsg || 'This branch is currently closed and cannot accept orders.');
+      if (apiErr.code === 'branch_closed') {
+        setBranchClosedNotice(apiErr.message || 'This branch is currently closed and cannot accept orders.');
       } else {
-        toast.error(apiMsg || 'Failed to create order. Please try again.');
+        toast.error(apiErr.message || 'Failed to create order. Please try again.');
       }
     }
   };

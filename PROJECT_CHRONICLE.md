@@ -2,7 +2,7 @@
 
 > **Purpose**: Living record of all changes, decisions, and current state of the CediBites Next.js frontend. Maintained by the Project Chronicle agent. Read this before starting work on any area.
 
-> **Current Branch**: `menu-audit` (off `main`)
+> **Current Branch**: `main` / `beta` (synced)
 
 ---
 
@@ -81,6 +81,52 @@ Items still needing attention.
 
 ---
 
+## [2026-04-09] Session: WebSocket Broadcast & POS Error UX for Branch Access
+
+### Intent
+
+Make branch extended access toggles propagate in real-time to all connected POS/KDS/Order Manager clients via WebSocket broadcast (eliminating the 10-minute staleTime wait), and improve the POS error UX when an order is rejected because the branch is closed.
+
+### Changes Made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `app/components/providers/BranchProvider.tsx` | Added `useQueryClient` import from TanStack Query and `getEcho` from echo. Added `useEffect` that listens for `.branch.access.updated` events on the staff's current branch channel (`orders.branch.{id}`). On event, invalidates `['branches']` query cache for instant re-fetch. Uses `channel.stopListening()` on cleanup (not `channel.leave()`). | Real-time branch data refresh when admin toggles extended access — no more waiting for 10-minute staleTime |
+| `app/pos/terminal/page.tsx` | Added `branchClosedNotice` state variable. Updated `handlePaymentComplete` catch block to detect `code === 'branch_closed'` from API response. Shows a modal with amber `ProhibitIcon`, "Order Not Allowed" title, API message, and "Got it" dismiss button. Non-branch-closed errors still show as toasts. | Clear, actionable feedback when POS order is rejected due to branch being closed |
+
+### Decisions
+
+- **Decision**: Use `stopListening()` instead of `leave()` on channel cleanup
+    - **Alternatives**: Use `channel.leave()` which fully disconnects from the channel
+    - **Rationale**: `useOrderChannel` (in Kitchen/Order Manager) may also be listening on the same `orders.branch.{id}` channel. Calling `leave()` would disconnect both listeners. `stopListening('.branch.access.updated')` only removes this specific listener.
+- **Decision**: Modal over toast for branch-closed errors
+    - **Alternatives**: Toast notification, inline error banner
+    - **Rationale**: Branch closure is a deliberate access control decision that requires user acknowledgment, not a transient notification. A modal ensures the staff member reads the message and understands the next step (ask an admin).
+- **Decision**: Amber/warning color scheme for the modal instead of red/error
+    - **Rationale**: "Access not enabled" is informational/warning — it's not a system error or failure. Amber conveys "action required" rather than "something went wrong".
+
+### Cross-Repo Impact
+
+| File (API repo) | Change | Impact |
+|------|--------|--------|
+| `app/Events/BranchAccessUpdatedEvent.php` | **NEW** — Broadcasts `.branch.access.updated` on `orders.branch.{id}` | Frontend `BranchProvider` listens for this event to invalidate branch cache |
+| `app/Http/Controllers/Api/BranchController.php` | Toggle methods dispatch `BranchAccessUpdatedEvent` | Triggers the WebSocket event that frontend consumes |
+| `app/Http/Controllers/Api/CheckoutSessionController.php` | `posStore()` returns `code: 'branch_closed'` on 422 | Frontend POS detects this code to show modal instead of generic toast |
+
+### Current State
+
+- **BranchProvider**: Listens for `.branch.access.updated` WebSocket events — branch data refreshes instantly when admin toggles access
+- **POS terminal**: Shows amber modal with actionable message when order is rejected due to branch closure. Other errors still show as toasts.
+- **10-minute staleTime**: Still in place as a fallback, but WebSocket event provides the instant update path
+- **Deployed**: Committed on `manager-staff-fixes`, merged to `main` and `beta`
+
+### Pending / Follow-up
+
+- Monitor WebSocket event reception in production POS/KDS/OM to confirm real-time updates work
+- Consider adding the same `.branch.access.updated` listener in Kitchen and Order Manager layouts for instant UI updates (currently they rely on the BranchProvider invalidation which covers them)
+
+---
+
 ## [2026-04-09] Session: Branch Extended Access — After-Hours Staff System Access
 
 ### Intent
@@ -130,9 +176,9 @@ Add admin-controlled "Extended Access" toggles per branch so staff can continue 
 
 ### Pending / Follow-up
 
-- Consider broadcasting a WebSocket event when extended access is toggled so POS/KDS/OM update in real-time without waiting for next branch query refetch
+- ~~Consider broadcasting a WebSocket event when extended access is toggled so POS/KDS/OM update in real-time without waiting for next branch query refetch~~ — **DONE** in [2026-04-09] WebSocket Broadcast & POS Error UX session
 - Consider adding an auto-disable mechanism (e.g., extended access expires after X hours) to prevent accidental overnight access
-- Frontend branch data refetches on 10-minute staleTime — staff may need to refresh browser after admin enables extended access (or wait up to 10 minutes)
+- ~~Frontend branch data refetches on 10-minute staleTime — staff may need to refresh browser after admin enables extended access (or wait up to 10 minutes)~~ — **RESOLVED** by WebSocket listener in BranchProvider
 
 ---
 
