@@ -81,6 +81,47 @@ Items still needing attention.
 
 ---
 
+## [2026-04-09] Session: Unified Analytics Data Freshness Across Admin Pages
+
+### Intent
+
+Eliminate stale-data discrepancies between Admin Dashboard, Analytics, and Branches pages — all three display today's revenue/order counts but used different cache durations, causing confusing mismatched numbers.
+
+### Root Cause
+
+With only 1 branch active, the branch card showed stale cached data (₵409/6 orders) while the dashboard showed current data (₵751/10 orders). The backend calculations (via `AnalyticsQueryBuilder`) were identical — the discrepancy was purely frontend cache staleness. Each hook family had a different `staleTime`: Dashboard (1min), Analytics hooks (2min), Branch hooks (10min).
+
+### Changes Made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/api/hooks/useBranches.ts` | Reduced `staleTime` from 10 minutes to 1 minute for both `useBranches` and `useBranch` hooks | Branch cards on the Branches page showed stale revenue/order counts vs other admin pages |
+| `lib/api/hooks/useAnalytics.ts` | Reduced `staleTime` from 2 minutes to 1 minute for all 10 analytics hooks (sales, orders, customers, order-sources, top-items, bottom-items, category-revenue, branch-performance, delivery-pickup, payment-methods) | Analytics page data lagged behind dashboard by up to 1 minute, creating confusing discrepancies |
+
+### Decisions
+
+- **Decision**: Standardize all analytics-related hooks to 1-minute `staleTime`
+  - **Alternatives**: Keep different cadences per page importance; use WebSocket push for real-time; use shorter intervals like 30s
+  - **Rationale**: 1 minute matches the Dashboard's existing refresh cadence — proven acceptable for UX and API load. Uniform staleness eliminates cross-page inconsistency for volatile "today" metrics without adding complexity.
+
+### Current State
+
+- **Admin Dashboard**: 1-minute refresh (unchanged)
+- **Analytics Page**: 1-minute refresh (was 2 minutes)
+- **Branches Page**: 1-minute refresh (was 10 minutes)
+- All three pages now show consistent data for today's revenue and order counts. No backend changes needed — the canonical query definitions in `AnalyticsQueryBuilder` were already consistent.
+
+### Cross-Repo Impact
+
+None — purely frontend cache configuration. Backend analytics queries were already correct and consistent.
+
+### Pending / Follow-up
+
+- Monitor API load after reducing branch `staleTime` from 10min to 1min — if branch list queries become expensive with many branches, consider WebSocket invalidation instead
+- The 10-minute staleTime on branches was originally set because branch data (name, location, hours) changes infrequently — but the `BranchResource` now includes volatile analytics fields (today's revenue/orders), justifying the shorter cache
+
+---
+
 ## [2026-04-09] Session: Manager Dashboard & Shifts Bug Fixes
 
 ### Intent

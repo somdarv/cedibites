@@ -25,7 +25,7 @@ export const useBranches = () => {
   } = useQuery({
     queryKey: ['branches'],
     queryFn: branchService.getBranches,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 60 * 1000, // 1 minute — includes volatile today stats
   });
 
   return {
@@ -45,7 +45,7 @@ export const useBranch = (id: number) => {
     queryKey: ['branch', id],
     queryFn: () => branchService.getBranch(id),
     enabled: !!id,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 60 * 1000, // 1 minute — includes volatile today stats
   });
 
   return {
@@ -65,7 +65,7 @@ export const useBranchTopItems = (branchId: number | null, params?: { date?: str
     queryKey: ['branch-top-items', branchId, params],
     queryFn: () => branchService.getBranchTopItems(branchId!, params),
     enabled: !!branchId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000,
   });
   return { topItems: data || [], isLoading, error, refetch };
 };
@@ -80,7 +80,7 @@ export const useBranchRevenueChart = (branchId: number | null, params?: { period
     queryKey: ['branch-revenue-chart', branchId, params],
     queryFn: () => branchService.getBranchRevenueChart(branchId!, params),
     enabled: !!branchId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000,
   });
   return { chartData: data || [], isLoading, error, refetch };
 };
@@ -95,7 +95,7 @@ export const useBranchStaffSales = (branchId: number | null, date: string) => {
     queryKey: ['branch-staff-sales', branchId, date],
     queryFn: () => branchService.getBranchStaffSales(branchId!, date),
     enabled: !!branchId && !!date,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
   return { staffSales: data || [], isLoading, error, refetch };
 };

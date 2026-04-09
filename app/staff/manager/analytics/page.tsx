@@ -640,7 +640,7 @@ export default function ManagerAnalyticsPage() {
     const { data: lastWeekSales } = useQuery({
         queryKey: ['analytics', 'sales', 'last-week', branchId],
         queryFn: () => analyticsService.getSalesAnalytics({ ...lastWeekRange, branch_id: branchId }),
-        staleTime: 2 * 60 * 1000,
+        staleTime: 60 * 1000,
     });
 
     const { data: topItems } = useQuery({
@@ -651,7 +651,7 @@ export default function ManagerAnalyticsPage() {
             branch_id: branchId,
             limit: 5
         }),
-        staleTime: 2 * 60 * 1000,
+        staleTime: 60 * 1000,
     });
 
     const { data: allProductItems } = useQuery({
@@ -662,7 +662,7 @@ export default function ManagerAnalyticsPage() {
             branch_id: branchId,
             limit: 500
         }),
-        staleTime: 2 * 60 * 1000,
+        staleTime: 60 * 1000,
     });
 
     const { data: paymentMethods } = useQuery({
@@ -672,7 +672,7 @@ export default function ManagerAnalyticsPage() {
             date_to: new Date().toISOString().slice(0, 10),
             branch_id: branchId,
         }),
-        staleTime: 2 * 60 * 1000,
+        staleTime: 60 * 1000,
     });
 
     const weekRevenue = useMemo(() => mapSalesByDayToWeekBars(weekSales?.sales_by_day), [weekSales?.sales_by_day]);
