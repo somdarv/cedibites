@@ -101,7 +101,7 @@ export default function NewOrderFlow() {
     const router = useRouter();
     const { dashboard } = useStaffRoutes();
     const { branches } = useBranch();
-    const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems();
+    const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems({ is_available: true });
     const {
         source, branchId, cart, orderType, customer, payment,
         isSubmitting, orderCode, staffUser,

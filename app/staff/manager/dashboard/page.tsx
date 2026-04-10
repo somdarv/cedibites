@@ -455,7 +455,7 @@ export default function ManagerDashboardPage() {
                                 >
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="text-neutral-gray/50 text-xs font-bold font-body w-4 shrink-0">{i + 1}</span>
-                                        <p className="text-text-dark text-sm font-medium font-body truncate">{item.name}</p>
+                                        <p className="text-text-dark text-sm font-medium font-body truncate">{getOrderItemLineLabel({ name: item.name, sizeLabel: item.size_label })}</p>
                                     </div>
                                     <p className="text-text-dark text-xs font-bold font-body sm:text-right">{item.units} sold</p>
                                     <p className="text-primary text-xs font-bold font-body sm:text-right">{formatGHS(item.rev)}</p>

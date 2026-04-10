@@ -54,6 +54,44 @@ body {
   overflow-x: hidden;
   overflow-y: auto !important;
 
+  /* Global slim scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(55, 43, 30, 0.35) transparent;
+}
+
+/* Slim scrollbar for WebKit (Chrome, Safari, Edge) */
+body::-webkit-scrollbar {
+  width: 6px;
+}
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+body::-webkit-scrollbar-thumb {
+  background-color: rgba(55, 43, 30, 0.35);
+  border-radius: 9999px;
+}
+body::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(55, 43, 30, 0.55);
+}
+
+/* Apply slim scrollbar to all scrollable elements */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(55, 43, 30, 0.25) transparent;
+}
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(55, 43, 30, 0.25);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(55, 43, 30, 0.45);
 }
 
 

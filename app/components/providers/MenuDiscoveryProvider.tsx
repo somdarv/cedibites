@@ -95,9 +95,9 @@ export function MenuDiscoveryProvider({ children }: MenuDiscoveryProviderProps) 
 
     const branchIdNum = selectedBranch ? parseInt(selectedBranch.id) : undefined;
 
-    // Fetch menu data filtered by the selected branch
+    // Fetch menu data filtered by the selected branch (only available items for customers)
     const { items: apiItems, isLoading: isLoadingMenu, error, refetch } = useMenu(
-        branchIdNum ? { branch_id: branchIdNum } : undefined
+        branchIdNum ? { branch_id: branchIdNum, is_available: true } : undefined
     );
 
     // Fetch smart categories (computed virtual categories) for the branch

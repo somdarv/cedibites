@@ -16,7 +16,7 @@ import {
   type CancellationReasonsAnalytics,
 } from '../services/analytics.service';
 
-export type AnalyticsPeriod = 'today' | 'yesterday' | 'week' | 'month' | '30d' | '90d' | 'custom';
+export type AnalyticsPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | '30d' | '90d' | 'lifetime' | 'custom';
 
 interface CustomRange {
   date_from?: string;
@@ -55,6 +55,14 @@ export function getDateRange(period: AnalyticsPeriod, customRange?: CustomRange)
       const d90 = new Date(now);
       d90.setDate(d90.getDate() - 90);
       return { date_from: d90.toISOString().slice(0, 10), date_to: today };
+    }
+    case 'last_month': {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { date_from: lastMonth.toISOString().slice(0, 10), date_to: lastMonthEnd.toISOString().slice(0, 10) };
+    }
+    case 'lifetime': {
+      return { date_from: '2024-01-01', date_to: today };
     }
     case 'custom': {
       return {

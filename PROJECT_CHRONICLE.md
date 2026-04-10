@@ -81,6 +81,65 @@ Items still needing attention.
 
 ---
 
+## [2026-04-10] Session: Multi-Issue Fix – Analytics, Menu Toggle, Branch Status, Scrollbar, Shifts
+
+### Intent
+
+Address 11+ production bugs/features reported from live testing across Admin Analytics, Manager Dashboard, Manager Analytics, Manager Shifts, Manager Staff Sales, Admin Menu (toggle), Admin Customers, Manager Config, and UI scrollbar styling.
+
+### Changes Made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `lib/api/hooks/useAnalytics.ts` | Added `'last_month'` and `'lifetime'` to `AnalyticsPeriod` type and `getDateRange()` switch (last_month = 1st–last of prev month, lifetime = 2024-01-01 to today) | Admin analytics lacked Last Month and Lifetime period options |
+| `app/admin/analytics/page.tsx` | Extended `Period` type and `PERIODS` array with Last Month + Lifetime. Changed top customers from "Top 10" to "Top 5" (title, `.slice(0,5)`, border logic `i < 4`) | Requested reduction and new period filters |
+| `app/staff/manager/dashboard/page.tsx` | Top items display changed from `item.name` to `getOrderItemLineLabel({ name: item.name, sizeLabel: item.size_label })` | Manager dashboard showed long condensed DB names instead of short receipt/display names |
+| `app/staff/manager/analytics/page.tsx` | **Major rewrite**: Added `ManagerPeriod` type (7 options: today/yesterday/week/last_week/month/last_month/custom), `MANAGER_PERIODS` array, `getManagerDateRange()`, custom date picker with validation (limited to current + last month), previous-period comparison for trends. New variables: `periodRevenue`, `periodOrderCount`, `avgOrderValuePeriod`, `fulfilmentRate`. Added period selector pill bar to JSX, custom date picker UI, dynamic KPI labels. Report generator now uses selected period range. | Manager analytics was hardcoded to "today" only — needed full date range filtering |
+| `app/components/providers/MenuDiscoveryProvider.tsx` | Added `is_available: true` to `useMenu()` call | Toggled-off menu items still appeared on customer site |
+| `app/pos/terminal/page.tsx` | Added `{ is_available: true }` to `useMenuItems()` call | Toggled-off items still appeared on POS terminal |
+| `app/staff/new-order/steps/StepMenu.tsx` | Added `{ is_available: true }` to `useMenuItems()` call | Staff new order showed unavailable items |
+| `app/staff/new-order/NewOrderFlow.tsx` | Added `{ is_available: true }` to `useMenuItems()` call | Staff new order flow showed unavailable items |
+| `app/staff/store/page.tsx` | Added `{ is_available: true }` to `useMenuItems()` call | Staff store showed unavailable items |
+| `app/staff/manager/settings/page.tsx` | Added `isEffectivelyOpen` computed from `is_active` AND current time vs today's operating hours. New `statusLabel` and `statusSub` with 3 states: open, closed (manual override), closed (outside hours). JSX updated to use computed status. | Branch status showed "Open" even when outside operating hours |
+| `app/globals.css` | Added global slim scrollbar styling: `scrollbar-width: thin` for Firefox, `::-webkit-scrollbar` (6px body, 5px children) with semi-transparent brown thumb matching design system. Applied to `body` and `*` selector. | Bold classic white scrollbar looked out of place — needed slim blended scrollbar |
+
+### Decisions
+
+- **Decision**: Menu `is_available` filter applied on 5 ordering surfaces (customer, POS, staff new-order ×2, staff store), NOT on admin/promos pages
+  - **Rationale**: Admin needs to see all items to manage them. Ordering surfaces should only show available items.
+- **Decision**: Manager analytics limited to current + last month for custom date ranges
+  - **Rationale**: Prevents excessive data queries. Managers don't need deep historical access — that's admin territory.
+- **Decision**: Branch status uses client-side time comparison against operating hours
+  - **Rationale**: Operating hours are already loaded from the API. Real-time check avoids an extra API call. The toggle still controls `is_active` (manual override).
+- **Decision**: Global scrollbar via `*` selector instead of applying classes to each scrollable element
+  - **Rationale**: Ensures consistency everywhere without hunting down every overflow container. Individual elements can still use `.no-scrollbar` to opt out.
+
+### Current State
+
+- **Admin Analytics**: 9 period options (Today through Lifetime), top 5 customers with resolved names
+- **Manager Analytics**: 7 period options with custom date picker, trend comparison vs previous period, report generation uses selected period
+- **Manager Dashboard**: Top items show receipt-friendly display names
+- **Menu Toggle**: Disabled items correctly hidden from all ordering surfaces (customer, POS, staff new-order, staff store)
+- **Manager Config**: Branch status reflects both manual toggle AND operating hours
+- **Scrollbar**: Slim, semi-transparent brown scrollbar globally across all portals
+- **Admin Customers**: Highest spend sort handles NULL correctly via COALESCE (backend fix)
+- **Manager Shifts**: All staff shifts visible to managers (not just their own sessions — backend fix)
+
+### Cross-Repo Impact
+
+| File (Backend repo) | Change | Impact |
+|------|--------|--------|
+| `app/Services/Analytics/AnalyticsService.php` | `getCustomerMetrics()` eager-loads `user` + latest order, maps to arrays with resolved names | Admin analytics top customers now show names + order counts |
+| `app/Http/Controllers/Api/CustomerController.php` | Sort by spend uses `COALESCE(total_spend, 0) DESC` | NULL spend values no longer break sort order |
+| `app/Http/Controllers/Api/ShiftController.php` | `index()`, `getByDate()`, `getByStaff()` all allow Manager role to see shifts within their branch(es) | Manager shifts page shows all branch staff, not just own sessions |
+
+### Pending / Follow-up
+
+- Monitor analytics query performance with "Lifetime" period — may need server-side caching for large date ranges
+- Consider adding a periodic `setInterval` to re-evaluate `isEffectivelyOpen` on the settings page (currently computed once on render)
+
+---
+
 ## [2026-04-09] Session: Unified Analytics Data Freshness Across Admin Pages
 
 ### Intent

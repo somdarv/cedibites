@@ -255,7 +255,7 @@ function StepMenu({
     onNext: () => void;
     onBack: () => void;
 }) {
-    const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems();
+    const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems({ is_available: true });
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('all');
     const searchRef = useRef<HTMLInputElement>(null);

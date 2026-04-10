@@ -149,6 +149,31 @@ export default function MenuSettingsPage() {
 
     function mark() { setDirty(true); }
 
+    // ── Effective open status (accounts for operating hours) ─────────────────
+    const isEffectivelyOpen = (() => {
+        if (!branch.isOpen) return false; // manual override: closed
+        const now = new Date();
+        const dayIdx = now.getDay(); // 0=Sun
+        const dayMap: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const todayKey = dayMap[dayIdx];
+        const todayHours = branch.hours[todayKey];
+        if (todayHours.closed) return false; // scheduled closed today
+        const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        return hhmm >= todayHours.open && hhmm < todayHours.close;
+    })();
+
+    const statusLabel = !branch.isOpen
+        ? 'Branch is Closed (Manual Override)'
+        : !isEffectivelyOpen
+            ? 'Branch is Closed (Outside Operating Hours)'
+            : 'Branch is Open';
+
+    const statusSub = !branch.isOpen
+        ? 'All new orders are blocked until you re-open'
+        : !isEffectivelyOpen
+            ? 'Orders will resume when operating hours begin'
+            : 'Customers can place orders right now';
+
     // ── Branch settings ──────────────────────────────────────────────────────
 
     function setBranchField<K extends keyof BranchSettings>(key: K, value: BranchSettings[K]) {
@@ -250,13 +275,13 @@ export default function MenuSettingsPage() {
                 <section className="mb-10">
                     <SectionHeader icon={StorefrontIcon} color="bg-secondary" title="Branch Status" sub="Instantly open or close the branch for all order types" />
 
-                    <div className={`rounded-2xl border p-5 flex items-center justify-between gap-4 transition-colors ${branch.isOpen ? 'bg-secondary/8 border-secondary/25' : 'bg-error/8 border-error/25'}`}>
+                    <div className={`rounded-2xl border p-5 flex items-center justify-between gap-4 transition-colors ${isEffectivelyOpen ? 'bg-secondary/8 border-secondary/25' : 'bg-error/8 border-error/25'}`}>
                         <div>
-                            <p className={`text-base font-bold font-body ${branch.isOpen ? 'text-secondary' : 'text-error'}`}>
-                                {branch.isOpen ? 'Branch is Open' : 'Branch is Closed'}
+                            <p className={`text-base font-bold font-body ${isEffectivelyOpen ? 'text-secondary' : 'text-error'}`}>
+                                {statusLabel}
                             </p>
                             <p className="text-neutral-gray text-xs font-body mt-0.5">
-                                {branch.isOpen ? 'Customers can place orders right now' : 'All new orders are blocked until you re-open'}
+                                {statusSub}
                             </p>
                         </div>
                         <Toggle checked={branch.isOpen} onChange={() => setBranchField('isOpen', !branch.isOpen)} />

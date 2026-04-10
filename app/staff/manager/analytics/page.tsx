@@ -625,9 +625,133 @@ export default function ManagerAnalyticsPage() {
     const branchId = staffUser?.branches[0]?.id ? Number(staffUser.branches[0].id) : undefined;
     const branchName = staffUser?.branches[0]?.name ?? '—';
 
-    const { sales: todaySales, orders: todayOrderAnalytics } = useAnalytics('today', branchId);
+    // ── Period selection (limited to current + last month) ────────────────────
+    type ManagerPeriod = 'today' | 'yesterday' | 'week' | 'last_week' | 'month' | 'last_month' | 'custom';
+
+    const MANAGER_PERIODS: { key: ManagerPeriod; label: string }[] = [
+        { key: 'today', label: 'Today' },
+        { key: 'yesterday', label: 'Yesterday' },
+        { key: 'week', label: 'This Week' },
+        { key: 'last_week', label: 'Last Week' },
+        { key: 'month', label: 'This Month' },
+        { key: 'last_month', label: 'Last Month' },
+        { key: 'custom', label: 'Custom' },
+    ];
+
+    const [period, setPeriod] = useState<ManagerPeriod>('today');
+    const [customFrom, setCustomFrom] = useState('');
+    const [customTo, setCustomTo] = useState('');
+    const [customError, setCustomError] = useState('');
+
+    // Determine the earliest date managers can view (1st of last month)
+    const managerMinDate = useMemo(() => {
+        const now = new Date();
+        const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return first.toISOString().slice(0, 10);
+    }, []);
+    const managerMaxDate = new Date().toISOString().slice(0, 10);
+
+    function getManagerDateRange(p: ManagerPeriod): { date_from: string; date_to: string } {
+        const now = new Date();
+        const today = now.toISOString().slice(0, 10);
+        switch (p) {
+            case 'today': return { date_from: today, date_to: today };
+            case 'yesterday': {
+                const y = new Date(now); y.setDate(y.getDate() - 1);
+                const ys = y.toISOString().slice(0, 10);
+                return { date_from: ys, date_to: ys };
+            }
+            case 'week': {
+                const ws = new Date(now); ws.setDate(ws.getDate() - ((ws.getDay() + 6) % 7));
+                return { date_from: ws.toISOString().slice(0, 10), date_to: today };
+            }
+            case 'last_week': {
+                const end = new Date(now); end.setDate(end.getDate() - ((end.getDay() + 6) % 7) - 1);
+                const start = new Date(end); start.setDate(start.getDate() - 6);
+                return { date_from: start.toISOString().slice(0, 10), date_to: end.toISOString().slice(0, 10) };
+            }
+            case 'month': {
+                return { date_from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10), date_to: today };
+            }
+            case 'last_month': {
+                const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const last = new Date(now.getFullYear(), now.getMonth(), 0);
+                return { date_from: first.toISOString().slice(0, 10), date_to: last.toISOString().slice(0, 10) };
+            }
+            case 'custom': {
+                if (customFrom && customTo) return { date_from: customFrom, date_to: customTo };
+                return { date_from: today, date_to: today };
+            }
+            default: return { date_from: today, date_to: today };
+        }
+    }
+
+    function handleCustomApply(): void {
+        if (!customFrom || !customTo) { setCustomError('Please select both start and end dates.'); return; }
+        if (customFrom > customTo) { setCustomError('Start date must be before end date.'); return; }
+        if (customFrom < managerMinDate) { setCustomError(`You can only view data from ${new Date(managerMinDate).toLocaleDateString('en-GH', { day: 'numeric', month: 'short', year: 'numeric' })} onwards.`); return; }
+        if (customTo > managerMaxDate) { setCustomError('End date cannot be in the future.'); return; }
+        setCustomError('');
+        setPeriod('custom');
+    }
+
+    const range = getManagerDateRange(period);
+
+    // Period label
+    const periodLabel = period === 'custom'
+        ? `${new Date(range.date_from).toLocaleDateString('en-GH', { day: 'numeric', month: 'short' })} – ${new Date(range.date_to).toLocaleDateString('en-GH', { day: 'numeric', month: 'short' })}`
+        : MANAGER_PERIODS.find(p => p.key === period)?.label ?? 'Today';
+
+    // ── Data fetching driven by selected period ──────────────────────────────
+    const { data: periodSales } = useQuery({
+        queryKey: ['manager-analytics', 'sales', period, branchId, range.date_from, range.date_to],
+        queryFn: () => analyticsService.getSalesAnalytics({ ...range, branch_id: branchId }),
+        staleTime: 60 * 1000,
+    });
+
+    const { data: periodOrders } = useQuery({
+        queryKey: ['manager-analytics', 'orders', period, branchId, range.date_from, range.date_to],
+        queryFn: () => analyticsService.getOrderAnalytics({ ...range, branch_id: branchId }),
+        staleTime: 60 * 1000,
+    });
+
+    // Previous period for trend comparison
+    const prevRange = useMemo(() => {
+        const days = Math.max(1, Math.ceil((new Date(range.date_to).getTime() - new Date(range.date_from).getTime()) / 86400000) + 1);
+        const prevEnd = new Date(range.date_from);
+        prevEnd.setDate(prevEnd.getDate() - 1);
+        const prevStart = new Date(prevEnd);
+        prevStart.setDate(prevStart.getDate() - days + 1);
+        return { date_from: prevStart.toISOString().slice(0, 10), date_to: prevEnd.toISOString().slice(0, 10) };
+    }, [range.date_from, range.date_to]);
+
+    const { data: prevSales } = useQuery({
+        queryKey: ['manager-analytics', 'sales', 'prev', branchId, prevRange.date_from, prevRange.date_to],
+        queryFn: () => analyticsService.getSalesAnalytics({ ...prevRange, branch_id: branchId }),
+        staleTime: 60 * 1000,
+    });
+
     const { sales: weekSales, orders: orderAnalytics } = useAnalytics('week', branchId);
 
+    const { data: topItems } = useQuery({
+        queryKey: ['manager-analytics', 'top-items', period, branchId, range.date_from, range.date_to],
+        queryFn: () => analyticsService.getTopItemsAnalytics({ ...range, branch_id: branchId, limit: 5 }),
+        staleTime: 60 * 1000,
+    });
+
+    const { data: allProductItems } = useQuery({
+        queryKey: ['manager-analytics', 'all-items', period, branchId, range.date_from, range.date_to],
+        queryFn: () => analyticsService.getTopItemsAnalytics({ ...range, branch_id: branchId, limit: 500 }),
+        staleTime: 60 * 1000,
+    });
+
+    const { data: paymentMethods } = useQuery({
+        queryKey: ['manager-analytics', 'payment-methods', period, branchId, range.date_from, range.date_to],
+        queryFn: () => analyticsService.getPaymentMethodAnalytics({ ...range, branch_id: branchId }),
+        staleTime: 60 * 1000,
+    });
+
+    const weekRevenue = useMemo(() => mapSalesByDayToWeekBars(weekSales?.sales_by_day), [weekSales?.sales_by_day]);
     const lastWeekRange = useMemo(() => {
         const now = new Date();
         const end = new Date(now);
@@ -643,63 +767,31 @@ export default function ManagerAnalyticsPage() {
         staleTime: 60 * 1000,
     });
 
-    const { data: topItems } = useQuery({
-        queryKey: ['analytics', 'top-items', 'today', branchId],
-        queryFn: () => analyticsService.getTopItemsAnalytics({
-            date_from: new Date().toISOString().slice(0, 10),
-            date_to: new Date().toISOString().slice(0, 10),
-            branch_id: branchId,
-            limit: 5
-        }),
-        staleTime: 60 * 1000,
-    });
-
-    const { data: allProductItems } = useQuery({
-        queryKey: ['analytics', 'all-items', 'today', branchId],
-        queryFn: () => analyticsService.getTopItemsAnalytics({
-            date_from: new Date().toISOString().slice(0, 10),
-            date_to: new Date().toISOString().slice(0, 10),
-            branch_id: branchId,
-            limit: 500
-        }),
-        staleTime: 60 * 1000,
-    });
-
-    const { data: paymentMethods } = useQuery({
-        queryKey: ['analytics', 'payment-methods', 'today', branchId],
-        queryFn: () => analyticsService.getPaymentMethodAnalytics({
-            date_from: new Date().toISOString().slice(0, 10),
-            date_to: new Date().toISOString().slice(0, 10),
-            branch_id: branchId,
-        }),
-        staleTime: 60 * 1000,
-    });
-
-    const weekRevenue = useMemo(() => mapSalesByDayToWeekBars(weekSales?.sales_by_day), [weekSales?.sales_by_day]);
     const lastWeekRevenue = useMemo(() => mapSalesByDayToWeekBars(lastWeekSales?.sales_by_day), [lastWeekSales?.sales_by_day]);
     const TODAY_IDX = (new Date().getDay() + 6) % 7;
-    const todayRevenue  = weekRevenue[TODAY_IDX] ?? todaySales?.total_sales ?? 0;
-    const lastSatRev    = lastWeekRevenue[TODAY_IDX] ?? 0;
-    const revTrend      = lastSatRev > 0 ? Math.round(((todayRevenue - lastSatRev) / lastSatRev) * 100) : 0;
-    const todayOrders = todayOrderAnalytics?.total_orders ?? todaySales?.total_orders ?? 0;
-    const lastSatOrders = lastWeekSales?.sales_by_day?.find(d => ((new Date(d.date).getDay() + 6) % 7) === TODAY_IDX)?.orders ?? 0;
-    const ordersTrend = lastSatOrders > 0 ? Math.round(((todayOrders - lastSatOrders) / lastSatOrders) * 100) : 0;
-    const avgOrderValueToday = todaySales?.average_order_value ?? 0;
-    const lastWeekAvgOrderValue = lastWeekSales?.average_order_value ?? 0;
-    const avgOrderValueTrend = lastWeekAvgOrderValue > 0
-        ? Math.round(((avgOrderValueToday - lastWeekAvgOrderValue) / lastWeekAvgOrderValue) * 100)
+
+    // KPI values from selected period
+    const periodRevenue = periodSales?.total_sales ?? 0;
+    const prevRevenue = prevSales?.total_sales ?? 0;
+    const revTrend = prevRevenue > 0 ? Math.round(((periodRevenue - prevRevenue) / prevRevenue) * 100) : 0;
+    const periodOrderCount = periodOrders?.total_orders ?? periodSales?.total_orders ?? 0;
+    const prevOrderCount = prevSales?.total_orders ?? 0;
+    const ordersTrend = prevOrderCount > 0 ? Math.round(((periodOrderCount - prevOrderCount) / prevOrderCount) * 100) : 0;
+    const avgOrderValuePeriod = periodSales?.average_order_value ?? 0;
+    const avgOrderValuePrev = prevSales?.average_order_value ?? 0;
+    const avgOrderValueTrend = avgOrderValuePrev > 0
+        ? Math.round(((avgOrderValuePeriod - avgOrderValuePrev) / avgOrderValuePrev) * 100)
         : 0;
-    const fulfilmentRate = todayOrderAnalytics?.total_orders
-        ? Math.round((((todayOrderAnalytics.total_orders - (todayOrderAnalytics.orders_by_status?.cancelled ?? 0)) / todayOrderAnalytics.total_orders) * 100))
+    const fulfilmentRate = periodOrders?.total_orders
+        ? Math.round((((periodOrders.total_orders - (periodOrders.orders_by_status?.cancelled ?? 0)) / periodOrders.total_orders) * 100))
         : 0;
 
     async function handleGenerateReport(): Promise<void> {
         setIsGenerating(true);
         try {
-            const today = new Date().toISOString().slice(0, 10);
-            const range = { date_from: today, date_to: today };
-            const periodLabel = 'Today';
-            const dateRange = today;
+            const dateRange = range.date_from === range.date_to
+                ? range.date_from
+                : `${range.date_from} – ${range.date_to}`;
             const generatedAt = new Date().toLocaleString('en-GH', { timeZone: 'Africa/Accra', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
             const [salesData, ordersData, customersData, allItemsData] = await Promise.all([
@@ -799,7 +891,7 @@ export default function ManagerAnalyticsPage() {
         <div className="px-4 md:px-8 py-6 max-w-5xl mx-auto">
 
             {/* ── Header ──────────────────────────────────────────────────────── */}
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <div>
                     <h1 className="text-text-dark text-xl font-bold font-body">Analytics</h1>
                     <p className="text-neutral-gray text-sm font-body mt-0.5 flex items-center gap-1.5">
@@ -817,26 +909,97 @@ export default function ManagerAnalyticsPage() {
                 </button>
             </div>
 
+            {/* ── Period selector ──────────────────────────────────────────────── */}
+            <div className="mb-6">
+                <div className="flex flex-wrap gap-1.5 bg-neutral-light rounded-xl p-1">
+                    {MANAGER_PERIODS.map(p => (
+                        <button
+                            key={p.key}
+                            type="button"
+                            onClick={() => { if (p.key !== 'custom') setPeriod(p.key); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium font-body transition-all cursor-pointer ${
+                                period === p.key
+                                    ? 'bg-neutral-card text-text-dark shadow-sm'
+                                    : 'text-neutral-gray hover:text-text-dark'
+                            }`}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+                {/* Custom date range picker */}
+                {(period === 'custom' || MANAGER_PERIODS.find(p => p.key === 'custom')) && (
+                    <div className={`mt-3 ${period === 'custom' ? '' : 'hidden'}`}>
+                        <div className="flex flex-wrap items-end gap-3">
+                            <div>
+                                <label className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider block mb-1">From</label>
+                                <input
+                                    type="date"
+                                    value={customFrom}
+                                    min={managerMinDate}
+                                    max={managerMaxDate}
+                                    onChange={e => { setCustomFrom(e.target.value); setCustomError(''); }}
+                                    className="bg-neutral-card border border-[#f0e8d8] rounded-lg px-3 py-2 text-xs font-body text-text-dark cursor-pointer"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider block mb-1">To</label>
+                                <input
+                                    type="date"
+                                    value={customTo}
+                                    min={customFrom || managerMinDate}
+                                    max={managerMaxDate}
+                                    onChange={e => { setCustomTo(e.target.value); setCustomError(''); }}
+                                    className="bg-neutral-card border border-[#f0e8d8] rounded-lg px-3 py-2 text-xs font-body text-text-dark cursor-pointer"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleCustomApply}
+                                disabled={!customFrom || !customTo}
+                                className="px-4 py-2 bg-primary text-white rounded-lg text-xs font-medium font-body hover:bg-primary-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Apply
+                            </button>
+                        </div>
+                        {customError && <p className="text-error text-xs font-body mt-1.5">{customError}</p>}
+                        <p className="text-neutral-gray text-[10px] font-body mt-1.5">
+                            You can view analytics for the current month and last month only.
+                        </p>
+                    </div>
+                )}
+                {period !== 'custom' && (
+                    <p className="text-neutral-gray text-xs font-body mt-2 flex items-center gap-1.5">
+                        Showing: <span className="text-text-dark font-semibold">{periodLabel}</span>
+                        <span className="text-neutral-gray/50">·</span>
+                        {range.date_from === range.date_to
+                            ? new Date(range.date_from).toLocaleDateString('en-GH', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : `${new Date(range.date_from).toLocaleDateString('en-GH', { day: 'numeric', month: 'short' })} – ${new Date(range.date_to).toLocaleDateString('en-GH', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                        }
+                    </p>
+                )}
+            </div>
+
             {/* ══ ROW 1 — KPIs ════════════════════════════════════════════════ */}
             <div className="flex flex-wrap gap-3 mb-4">
                 <KpiCard
-                    label="Revenue Today"
-                    value={formatGHS(todayRevenue)}
+                    label={`Revenue · ${periodLabel}`}
+                    value={formatGHS(periodRevenue)}
                     trend={revTrend}
-                    trendLabel="vs same day last week"
+                    trendLabel="vs previous period"
                     accent
                 />
                 <KpiCard
-                    label="Orders Today"
-                    value={String(todayOrders)}
+                    label={`Orders · ${periodLabel}`}
+                    value={String(periodOrderCount)}
                     trend={ordersTrend}
-                    trendLabel="vs same day last week"
+                    trendLabel="vs previous period"
                 />
                 <KpiCard
                     label="Avg. Order Value"
-                    value={formatGHS(avgOrderValueToday)}
+                    value={formatGHS(avgOrderValuePeriod)}
                     trend={avgOrderValueTrend}
-                    trendLabel="vs last week avg"
+                    trendLabel="vs previous period"
                 />
                 <KpiCard label="Fulfilment Rate" value={`${fulfilmentRate}%`} />
             </div>
@@ -848,14 +1011,14 @@ export default function ManagerAnalyticsPage() {
                     lastWeekRevenue={lastWeekRevenue}
                     todayIdx={TODAY_IDX}
                 />
-                <PeakHoursHeatmap ordersByHour={orderAnalytics?.orders_by_hour} branchId={branchId} />
+                <PeakHoursHeatmap ordersByHour={periodOrders?.orders_by_hour ?? orderAnalytics?.orders_by_hour} branchId={branchId} />
             </div>
 
             {/* ══ ROW 3 — Prep time + Payment split + Fulfilment ══════════════ */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                <PrepTimeTrend avgPrepTime={todayOrderAnalytics?.average_prep_time ?? undefined} />
+                <PrepTimeTrend avgPrepTime={periodOrders?.average_prep_time ?? undefined} />
                 <PaymentSplitCard methods={paymentMethods} />
-                <FulfilmentRate ordersByStatus={todayOrderAnalytics?.orders_by_status} />
+                <FulfilmentRate ordersByStatus={periodOrders?.orders_by_status} />
             </div>
 
             {/* ══ ROW 4 — Top items + OOS ══════════════════════════════════════ */}
@@ -879,7 +1042,7 @@ export default function ManagerAnalyticsPage() {
                     <div className="bg-neutral-card rounded-2xl border border-[#f0e8d8] w-full max-w-sm p-6 shadow-xl" onClick={e => e.stopPropagation()}>
                         <h2 className="text-text-dark text-base font-bold font-body mb-1">Generate Report</h2>
                         <p className="text-neutral-gray text-xs font-body mb-5">
-                            Today &nbsp;·&nbsp; {branchName}
+                            {periodLabel} &nbsp;·&nbsp; {branchName}
                         </p>
 
                         <p className="text-text-dark text-xs font-semibold font-body mb-2">Format</p>

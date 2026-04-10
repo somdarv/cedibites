@@ -142,7 +142,7 @@ export default function POSTerminalPage() {
   const { staffUser, logout } = useStaffAuth();
   const { branches } = useBranch();
   const isAdmin = staffUser?.role === 'admin' || staffUser?.role === 'tech_admin';
-  const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems();
+  const { items: menuItems, categories: menuCategories, isLoading: menuLoading } = useMenuItems({ is_available: true });
 
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');

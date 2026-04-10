@@ -29,7 +29,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Period = 'today' | 'yesterday' | 'week' | 'month' | '30d' | '90d' | 'custom';
+type Period = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | '30d' | '90d' | 'lifetime' | 'custom';
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 
@@ -652,21 +652,21 @@ function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Top 10 customers */}
+            {/* Top 5 customers */}
             <Card>
-                <SectionTitle title="Top 10 Customers by Orders" />
+                <SectionTitle title="Top 5 Customers by Orders" />
                 {!topCustomers || topCustomers.length === 0 ? (
                     <div className="flex items-center justify-center h-32 text-neutral-gray text-sm">
                         No customer data available
                     </div>
                 ) : (
                     <div className="flex flex-col gap-0">
-                        {topCustomers.slice(0, 10).map((c, i) => {
+                        {topCustomers.slice(0, 5).map((c, i) => {
                             const name = (c as { user?: { name?: string }; name?: string }).user?.name ?? (c as { name?: string }).name ?? '—';
                             const orders = (c as { orders_count?: number }).orders_count ?? 0;
                             const spend = (c as { total_spend?: number }).total_spend ?? 0;
                             return (
-                                <div key={name + i} className={`flex items-center gap-3 py-2.5 ${i < 9 ? 'border-b border-[#f0e8d8]' : ''}`}>
+                                <div key={name + i} className={`flex items-center gap-3 py-2.5 ${i < 4 ? 'border-b border-[#f0e8d8]' : ''}`}>
                                     <span className="text-neutral-gray/50 text-[10px] font-bold font-body w-4 shrink-0">{i + 1}</span>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-text-dark text-xs font-semibold font-body truncate">{name}</p>
@@ -1086,8 +1086,10 @@ const PERIODS: { key: Period; label: string }[] = [
     { key: 'yesterday', label: 'Yesterday' },
     { key: 'week', label: 'This Week' },
     { key: 'month', label: 'This Month' },
+    { key: 'last_month', label: 'Last Month' },
     { key: '30d', label: 'Last 30 Days' },
     { key: '90d', label: 'Last 90 Days' },
+    { key: 'lifetime', label: 'Lifetime' },
     { key: 'custom', label: 'Custom' },
 ];
 
