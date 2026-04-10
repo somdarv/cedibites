@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAnalytics, useOrderSourceAnalytics, useTopItemsAnalytics, useBottomItemsAnalytics, useCategoryRevenueAnalytics, useBranchPerformanceAnalytics, useDeliveryPickupAnalytics, usePaymentMethodAnalytics } from '@/lib/api/hooks/useAnalytics';
+import { useAnalytics, useOrderSourceAnalytics, useTopItemsAnalytics, useBottomItemsAnalytics, useCategoryRevenueAnalytics, useBranchPerformanceAnalytics, useDeliveryPickupAnalytics, usePaymentMethodAnalytics, useDiscountUsageAnalytics, useCancellationReasonsAnalytics } from '@/lib/api/hooks/useAnalytics';
 import { useSearchParams } from 'next/navigation';
 import { useBranchesApi } from '@/lib/api/hooks/useBranchesApi';
 import { toast } from '@/lib/utils/toast';
@@ -194,7 +194,7 @@ function WeeklyRevenueComparison({
     return (
         <Card>
             <SectionTitle title="Revenue vs Last Week" sub="Daily comparison — hover for details" />
-            <div className="flex items-end gap-1.5 h-24">
+            <div className="fle bg-red-200x items-end gap-1.5 h-24">
                 {DAYS.map((day, i) => {
                     const thisVal = weekRevenue[i] ?? 0;
                     const lastVal = lastWeekRevenue[i] ?? 0;
@@ -205,9 +205,9 @@ function WeeklyRevenueComparison({
                     return (
                         <div
                             key={day}
-                            className="flex-1 flex flex-col items-center gap-1 relative"
+                            className="flex-1  flex flex-col items-center gap-1 relative"
                             onMouseEnter={() => setHovered(i)}
-                            onMouseLeave={() => setHovered(null)}
+                            onMouseLeave={() => setHovered(null)} 
                         >
                             {hovered === i && (
                                 <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 bg-neutral-card border border-brown-light/20 rounded-xl px-3 py-2 z-10 whitespace-nowrap text-[11px] text-text-dark shadow-lg">
@@ -219,18 +219,20 @@ function WeeklyRevenueComparison({
                                     </p>
                                 </div>
                             )}
-                            <div className="flex items-end gap-0.5 relative" style={{ height: 88 }}>
+
+                            <div className="flex items-end gap-0.5 relative" style={{ height: 22 }}>
                                 {thisVal > 0 && (
                                     <span className="absolute -top-4 right-0 text-[8px] font-bold text-primary leading-none whitespace-nowrap">
                                         {thisVal >= 1000 ? `${(thisVal / 1000).toFixed(1)}k` : Math.round(thisVal)}
                                     </span>
                                 )}
-                                <div className="w-4 rounded-sm bg-brown-light/25" style={{ height: lastH }} />
+                                <div className="w-12 rounded-sm bg-red-600/25" style={{ height: lastH }} />
                                 <div
-                                    className="w-4 rounded-sm"
+                                    className="w-24 rounded-sm"
                                     style={{ height: thisH, background: isToday ? '#e49925' : '#c8a87a' }}
                                 />
                             </div>
+
                             <span className={`text-[9px] font-body ${isToday ? 'text-primary font-bold' : 'text-neutral-gray'}`}>{day}</span>
                         </div>
                     );
@@ -880,30 +882,77 @@ function AvgItemsPerOrder({ avgItems }: { avgItems?: number }) {
     );
 }
 
-// ─── Discount Usage (UI-only) ─────────────────────────────────────────────────
+// ─── Discount Usage ───────────────────────────────────────────────────────────
 
-function DiscountUsage() {
+function DiscountUsage({ data }: { data?: import('@/lib/api/services/analytics.service').DiscountUsageAnalytics }) {
     return (
         <Card>
             <div className="mb-4">
                 <p className="text-text-dark text-sm font-bold font-body">Discount Usage</p>
-                <p className="text-[10px] font-body mt-0.5 text-neutral-gray">Pending backend endpoint</p>
+                <p className="text-[10px] font-body mt-0.5 text-neutral-gray">Orders with discounts applied</p>
             </div>
-            <div className="flex items-center justify-center h-16 text-neutral-gray text-sm font-body opacity-50">Coming soon</div>
+            {data ? (
+                <div className="space-y-3">
+                    <div className="flex items-baseline justify-between">
+                        <p className="text-3xl font-bold text-primary font-body">{data.discount_rate}%</p>
+                        <p className="text-xs text-neutral-gray font-body">{data.discounted_orders} / {data.total_orders} orders</p>
+                    </div>
+                    <div className="flex justify-between text-xs font-body">
+                        <span className="text-neutral-gray">Total given</span>
+                        <span className="text-text-dark font-medium">GH₵{data.total_discount_given.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-body">
+                        <span className="text-neutral-gray">Avg per order</span>
+                        <span className="text-text-dark font-medium">GH₵{data.avg_discount_per_order.toLocaleString()}</span>
+                    </div>
+                    {data.promos.length > 0 && (
+                        <div className="pt-2 border-t border-[#f0e8d8]">
+                            <p className="text-[10px] text-neutral-gray font-body mb-1.5">Top promos</p>
+                            {data.promos.slice(0, 3).map(p => (
+                                <div key={p.promo_id} className="flex justify-between text-xs font-body py-0.5">
+                                    <span className="text-text-dark truncate mr-2">{p.promo_name}</span>
+                                    <span className="text-neutral-gray whitespace-nowrap">{p.usage_count}× · GH₵{p.total_discount.toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="flex items-center justify-center h-16 text-neutral-gray text-sm font-body opacity-50">No data</div>
+            )}
         </Card>
     );
 }
 
-// ─── Cancellation Reasons (UI-only) ──────────────────────────────────────────
+// ─── Cancellation Reasons ────────────────────────────────────────────────────
 
-function CancellationReasons() {
+function CancellationReasons({ data }: { data?: import('@/lib/api/services/analytics.service').CancellationReasonsAnalytics }) {
     return (
         <Card>
             <div className="mb-4">
                 <p className="text-text-dark text-sm font-bold font-body">Cancellation Reasons</p>
-                <p className="text-[10px] font-body mt-0.5 text-neutral-gray">Pending backend endpoint</p>
+                <p className="text-[10px] font-body mt-0.5 text-neutral-gray">Why orders were cancelled</p>
             </div>
-            <div className="flex items-center justify-center h-16 text-neutral-gray text-sm font-body opacity-50">Coming soon</div>
+            {data && data.total_cancelled > 0 ? (
+                <div className="space-y-2">
+                    <p className="text-xs text-neutral-gray font-body">{data.total_cancelled} cancelled order{data.total_cancelled !== 1 ? 's' : ''}</p>
+                    {data.reasons.map(r => (
+                        <div key={r.reason} className="space-y-1">
+                            <div className="flex justify-between text-xs font-body">
+                                <span className="text-text-dark">{r.reason}</span>
+                                <span className="text-neutral-gray">{r.count} ({r.pct}%)</span>
+                            </div>
+                            <div className="w-full bg-[#f0e8d8] rounded-full h-1.5">
+                                <div className="bg-primary rounded-full h-1.5" style={{ width: `${r.pct}%` }} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="flex items-center justify-center h-16 text-neutral-gray text-sm font-body opacity-50">
+                    {data ? 'No cancellations' : 'No data'}
+                </div>
+            )}
         </Card>
     );
 }
@@ -1077,6 +1126,8 @@ export default function AdminAnalyticsPage() {
     const { data: branchPerformance } = useBranchPerformanceAnalytics(period, branchId, customRange);
     const { data: deliveryPickup } = useDeliveryPickupAnalytics(period, branchId, customRange);
     const { data: paymentMethods } = usePaymentMethodAnalytics(period, branchId, customRange);
+    const { data: discountUsage } = useDiscountUsageAnalytics(period, branchId, customRange);
+    const { data: cancellationReasons } = useCancellationReasonsAnalytics(period, branchId, customRange);
 
     // Weekly revenue comparison data
     const { sales: weekSales } = useAnalytics('week', branchId);
@@ -1358,8 +1409,8 @@ export default function AdminAnalyticsPage() {
             {/* Avg items / discounts / cancellations */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
                 <AvgItemsPerOrder avgItems={sales?.avg_items_per_order} />
-                <DiscountUsage />
-                <CancellationReasons />
+                <DiscountUsage data={discountUsage} />
+                <CancellationReasons data={cancellationReasons} />
             </div>
 
             {/* Report generation modal */}

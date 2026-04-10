@@ -114,6 +114,34 @@ export interface PaymentMethod {
   pct: number;
 }
 
+export interface PromoMetric {
+  promo_id: number;
+  promo_name: string;
+  usage_count: number;
+  total_discount: number;
+  revenue_generated: number;
+}
+
+export interface DiscountUsageAnalytics {
+  total_orders: number;
+  discounted_orders: number;
+  discount_rate: number;
+  total_discount_given: number;
+  avg_discount_per_order: number;
+  promos: PromoMetric[];
+}
+
+export interface CancellationReason {
+  reason: string;
+  count: number;
+  pct: number;
+}
+
+export interface CancellationReasonsAnalytics {
+  total_cancelled: number;
+  reasons: CancellationReason[];
+}
+
 function extractData<T>(response: unknown): T {
   const r = response as { data?: T };
   return (r?.data ?? response) as T;
@@ -158,5 +186,13 @@ export const analyticsService = {
 
   getPaymentMethodAnalytics: (filters?: AnalyticsFilters): Promise<PaymentMethod[]> => {
     return apiClient.get('/admin/analytics/payment-methods', { params: filters }).then(extractData) as Promise<PaymentMethod[]>;
+  },
+
+  getDiscountUsageAnalytics: (filters?: AnalyticsFilters): Promise<DiscountUsageAnalytics> => {
+    return apiClient.get('/admin/analytics/discount-usage', { params: filters }).then(extractData) as Promise<DiscountUsageAnalytics>;
+  },
+
+  getCancellationReasonsAnalytics: (filters?: AnalyticsFilters): Promise<CancellationReasonsAnalytics> => {
+    return apiClient.get('/admin/analytics/cancellation-reasons', { params: filters }).then(extractData) as Promise<CancellationReasonsAnalytics>;
   },
 };

@@ -12,6 +12,8 @@ import {
   type BranchPerformance,
   type DeliveryPickupAnalytics,
   type PaymentMethod,
+  type DiscountUsageAnalytics,
+  type CancellationReasonsAnalytics,
 } from '../services/analytics.service';
 
 export type AnalyticsPeriod = 'today' | 'yesterday' | 'week' | 'month' | '30d' | '90d' | 'custom';
@@ -182,6 +184,30 @@ export const usePaymentMethodAnalytics = (period: AnalyticsPeriod = 'week', bran
   return useQuery({
     queryKey: ['analytics', 'payment-methods', period, branchId, range.date_from, range.date_to],
     queryFn: () => analyticsService.getPaymentMethodAnalytics(filters),
+    staleTime: 60 * 1000,
+  });
+};
+
+export const useDiscountUsageAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number, customRange?: CustomRange) => {
+  const range = getDateRange(period, customRange);
+  const filters: AnalyticsFilters = { ...range };
+  if (branchId) filters.branch_id = branchId;
+
+  return useQuery({
+    queryKey: ['analytics', 'discount-usage', period, branchId, range.date_from, range.date_to],
+    queryFn: () => analyticsService.getDiscountUsageAnalytics(filters),
+    staleTime: 60 * 1000,
+  });
+};
+
+export const useCancellationReasonsAnalytics = (period: AnalyticsPeriod = 'week', branchId?: number, customRange?: CustomRange) => {
+  const range = getDateRange(period, customRange);
+  const filters: AnalyticsFilters = { ...range };
+  if (branchId) filters.branch_id = branchId;
+
+  return useQuery({
+    queryKey: ['analytics', 'cancellation-reasons', period, branchId, range.date_from, range.date_to],
+    queryFn: () => analyticsService.getCancellationReasonsAnalytics(filters),
     staleTime: 60 * 1000,
   });
 };
