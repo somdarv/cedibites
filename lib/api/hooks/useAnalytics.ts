@@ -16,7 +16,7 @@ import {
   type CancellationReasonsAnalytics,
 } from '../services/analytics.service';
 
-export type AnalyticsPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | '30d' | '90d' | 'lifetime' | 'custom';
+export type AnalyticsPeriod = 'today' | 'yesterday' | 'week' | 'last_week' | 'month' | 'last_month' | '30d' | '90d' | 'lifetime' | 'custom';
 
 interface CustomRange {
   date_from?: string;
@@ -41,6 +41,13 @@ export function getDateRange(period: AnalyticsPeriod, customRange?: CustomRange)
       const daysSinceMonday = (weekStart.getDay() + 6) % 7;
       weekStart.setDate(weekStart.getDate() - daysSinceMonday);
       return { date_from: weekStart.toISOString().slice(0, 10), date_to: today };
+    }
+    case 'last_week': {
+      const end = new Date(now);
+      end.setDate(end.getDate() - ((end.getDay() + 6) % 7) - 1);
+      const start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      return { date_from: start.toISOString().slice(0, 10), date_to: end.toISOString().slice(0, 10) };
     }
     case 'month': {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

@@ -29,7 +29,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Period = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | '30d' | '90d' | 'lifetime' | 'custom';
+type Period = 'today' | 'yesterday' | 'week' | 'last_week' | 'month' | 'last_month' | '30d' | '90d' | 'lifetime' | 'custom';
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 
@@ -194,7 +194,7 @@ function WeeklyRevenueComparison({
     return (
         <Card>
             <SectionTitle title="Revenue vs Last Week" sub="Daily comparison — hover for details" />
-            <div className="fle bg-red-200x items-end gap-1.5 h-24">
+            <div className="flex items-end gap-1.5 h-24">
                 {DAYS.map((day, i) => {
                     const thisVal = weekRevenue[i] ?? 0;
                     const lastVal = lastWeekRevenue[i] ?? 0;
@@ -205,7 +205,7 @@ function WeeklyRevenueComparison({
                     return (
                         <div
                             key={day}
-                            className="flex-1  flex flex-col items-center gap-1 relative"
+                            className="flex-1 flex flex-col items-center gap-1 relative"
                             onMouseEnter={() => setHovered(i)}
                             onMouseLeave={() => setHovered(null)} 
                         >
@@ -220,16 +220,16 @@ function WeeklyRevenueComparison({
                                 </div>
                             )}
 
-                            <div className="flex items-end gap-0.5 relative" style={{ height: 22 }}>
+                            <div className="flex items-end gap-0.5 relative" style={{ height: 88 }}>
                                 {thisVal > 0 && (
-                                    <span className="absolute -top-4 right-0 text-[8px] font-bold text-primary leading-none whitespace-nowrap">
+                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[8px] font-bold text-primary leading-none whitespace-nowrap">
                                         {thisVal >= 1000 ? `${(thisVal / 1000).toFixed(1)}k` : Math.round(thisVal)}
                                     </span>
                                 )}
-                                <div className="w-12 rounded-sm bg-red-600/25" style={{ height: lastH }} />
+                                <div className="w-3 rounded-sm bg-brown-light/25" style={{ height: Math.max(lastH, 3) }} />
                                 <div
-                                    className="w-24 rounded-sm"
-                                    style={{ height: thisH, background: isToday ? '#e49925' : '#c8a87a' }}
+                                    className="w-5 rounded-sm"
+                                    style={{ height: Math.max(thisH, 3), background: isToday ? '#e49925' : '#c8a87a' }}
                                 />
                             </div>
 
@@ -639,13 +639,16 @@ function BranchPerformanceTable({ branchPerformance }: { branchPerformance?: Arr
 
 function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
     topCustomers?: Array<{ name?: string; orders_count?: number; total_spend?: number; user?: { name?: string }; }>;
-    deliveryPickup?: { delivery_pct: number; pickup_pct: number };
+    deliveryPickup?: { delivery_pct: number; pickup_pct: number; types?: Array<{ type: string; label: string; pct: number; revenue: number }> };
     paymentMethods?: Array<{ label: string; pct: number }>;
 }) {
-    const deliveryPct = deliveryPickup?.delivery_pct ?? 0;
-    const pickupPct = deliveryPickup?.pickup_pct ?? 0;
+    const ORDER_TYPE_COLORS = ['#e49925', '#6c833f', '#c8a87a', '#1976d2', '#8b7f70'];
+    const types = deliveryPickup?.types ?? [
+        { type: 'delivery', label: 'Delivery', pct: deliveryPickup?.delivery_pct ?? 0, revenue: 0 },
+        { type: 'pickup', label: 'Pickup', pct: deliveryPickup?.pickup_pct ?? 0, revenue: 0 },
+    ];
     const circumference = 2 * Math.PI * 28;
-    const delDash = (deliveryPct / 100) * circumference;
+    let dashOffset = 0;
 
     const paymentData = paymentMethods || [];
     const paymentColors = ['#e49925', '#c8a87a', '#8b7f70'];
@@ -654,7 +657,7 @@ function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Top 5 customers */}
             <Card>
-                <SectionTitle title="Top 5 Customers by Orders" />
+                <SectionTitle title="Top 5 Customers by Fulfilled Orders" />
                 {!topCustomers || topCustomers.length === 0 ? (
                     <div className="flex items-center justify-center h-32 text-neutral-gray text-sm">
                         No customer data available
@@ -683,40 +686,44 @@ function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
             <div className="flex flex-col gap-3">
                 {/* Delivery vs pickup */}
                 <Card>
-                    <SectionTitle title="Delivery vs Pickup Split" />
-                    {deliveryPct === 0 && pickupPct === 0 ? (
+                    <SectionTitle title="Order Type Split" />
+                    {types.every(t => t.pct === 0) ? (
                         <div className="flex items-center justify-center h-20 text-neutral-gray text-sm">
-                            No delivery/pickup data available
+                            No order type data available
                         </div>
                     ) : (
                         <div className="flex items-center gap-5">
                             <div className="relative w-20 h-20 shrink-0">
                                 <svg width="80" height="80" viewBox="0 0 80 80">
                                     <circle cx="40" cy="40" r="28" fill="none" stroke="#f0e8d8" strokeWidth="12" />
-                                    <circle cx="40" cy="40" r="28" fill="none" stroke="#e49925" strokeWidth="12"
-                                        strokeDasharray={`${delDash} ${circumference}`}
-                                        strokeLinecap="round" transform="rotate(-90 40 40)" />
-                                    <circle cx="40" cy="40" r="28" fill="none" stroke="#6c833f" strokeWidth="12"
-                                        strokeDasharray={`${(pickupPct / 100) * circumference} ${circumference}`}
-                                        strokeDashoffset={-delDash}
-                                        strokeLinecap="round" transform="rotate(-90 40 40)" />
+                                    {types.map((t, i) => {
+                                        const dash = (t.pct / 100) * circumference;
+                                        const seg = (
+                                            <circle key={t.type} cx="40" cy="40" r="28" fill="none" stroke={ORDER_TYPE_COLORS[i] || '#ccc'} strokeWidth="12"
+                                                strokeDasharray={`${dash} ${circumference}`}
+                                                strokeDashoffset={-dashOffset}
+                                                strokeLinecap="round" transform="rotate(-90 40 40)" />
+                                        );
+                                        dashOffset += dash;
+                                        return seg;
+                                    })}
                                 </svg>
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-xs font-bold font-body text-primary">{deliveryPct}%</span>
+                                    <span className="text-xs font-bold font-body text-primary">{types[0]?.pct ?? 0}%</span>
                                 </div>
                             </div>
                             <div className="flex flex-col gap-2 flex-1">
-                                {[{ label: 'Delivery', pct: deliveryPct, color: '#e49925' }, { label: 'Pickup', pct: pickupPct, color: '#6c833f' }].map(row => (
-                                    <div key={row.label}>
+                                {types.map((row, i) => (
+                                    <div key={row.type}>
                                         <div className="flex justify-between mb-1">
                                             <div className="flex items-center gap-1.5">
-                                                <div className="w-2 h-2 rounded-full" style={{ background: row.color }} />
+                                                <div className="w-2 h-2 rounded-full" style={{ background: ORDER_TYPE_COLORS[i] || '#ccc' }} />
                                                 <span className="text-xs font-body text-text-dark">{row.label}</span>
                                             </div>
                                             <span className="text-xs font-bold font-body text-text-dark">{row.pct}%</span>
                                         </div>
                                         <div className="h-1 bg-neutral-gray/15 rounded-full overflow-hidden">
-                                            <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: row.color, transition: 'width 0.4s ease' }} />
+                                            <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: ORDER_TYPE_COLORS[i] || '#ccc', transition: 'width 0.4s ease' }} />
                                         </div>
                                     </div>
                                 ))}
@@ -851,7 +858,7 @@ function OrdersByDayOfWeek({ salesByDay }: { salesByDay?: Array<{ date: string; 
                                 )}
                                 <div className="w-full rounded-sm bg-primary/70 hover:bg-primary transition-colors flex items-end justify-center pb-0.5" style={{ height: h, minHeight: 3 }}>
                                     {val > 0 && h >= 18 && (
-                                        <span className="text-[7px] font-bold text-white leading-none select-none">{val}</span>
+                                    <span className="text-[9px] font-bold text-white leading-none select-none">{val}</span>
                                     )}
                                 </div>
                                 <span className="text-[9px] text-neutral-gray font-body">{day}</span>
@@ -866,15 +873,31 @@ function OrdersByDayOfWeek({ salesByDay }: { salesByDay?: Array<{ date: string; 
 
 // ─── Avg Items Per Order (UI-only) ────────────────────────────────────────────
 
-function AvgItemsPerOrder({ avgItems }: { avgItems?: number }) {
+function AvgItemsPerOrder({ avgItems, singleItemPct, multiItemOrders, maxItemsInOrder }: { avgItems?: number; singleItemPct?: number; multiItemOrders?: number; maxItemsInOrder?: number }) {
     return (
         <Card>
-            <div className="mb-4">
+            <div className="mb-3">
                 <p className="text-text-dark text-sm font-bold font-body">Avg. Items per Order</p>
                 <p className="text-[10px] font-body mt-0.5 text-neutral-gray">Items per completed order</p>
             </div>
             {avgItems !== undefined ? (
-                <p className="text-3xl font-bold text-primary font-body">{avgItems.toFixed(1)}</p>
+                <div className="space-y-3">
+                    <p className="text-3xl font-bold text-primary font-body">{avgItems.toFixed(1)}</p>
+                    <div className="space-y-2 pt-2 border-t border-[#f0e8d8]">
+                        <div className="flex justify-between text-xs font-body">
+                            <span className="text-neutral-gray">Single-item orders</span>
+                            <span className="text-text-dark font-medium">{singleItemPct ?? 0}%</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-body">
+                            <span className="text-neutral-gray">Multi-item orders</span>
+                            <span className="text-text-dark font-medium">{multiItemOrders ?? 0}</span>
+                        </div>
+                        <div className="flex justify-between text-xs font-body">
+                            <span className="text-neutral-gray">Max items in one order</span>
+                            <span className="text-text-dark font-medium">{maxItemsInOrder ?? 0}</span>
+                        </div>
+                    </div>
+                </div>
             ) : (
                 <div className="flex items-center justify-center h-16 text-neutral-gray text-sm font-body opacity-50">No data</div>
             )}
@@ -1085,6 +1108,7 @@ const PERIODS: { key: Period; label: string }[] = [
     { key: 'today', label: 'Today' },
     { key: 'yesterday', label: 'Yesterday' },
     { key: 'week', label: 'This Week' },
+    { key: 'last_week', label: 'Last Week' },
     { key: 'month', label: 'This Month' },
     { key: 'last_month', label: 'Last Month' },
     { key: '30d', label: 'Last 30 Days' },
@@ -1410,7 +1434,7 @@ export default function AdminAnalyticsPage() {
 
             {/* Avg items / discounts / cancellations */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                <AvgItemsPerOrder avgItems={sales?.avg_items_per_order} />
+                <AvgItemsPerOrder avgItems={sales?.avg_items_per_order} singleItemPct={sales?.single_item_orders_pct} multiItemOrders={sales?.multi_item_orders} maxItemsInOrder={sales?.max_items_in_order} />
                 <DiscountUsage data={discountUsage} />
                 <CancellationReasons data={cancellationReasons} />
             </div>

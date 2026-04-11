@@ -286,6 +286,14 @@ export default function MenuSettingsPage() {
                         </div>
                         <Toggle checked={branch.isOpen} onChange={() => setBranchField('isOpen', !branch.isOpen)} />
                     </div>
+                    <div className="mt-3 rounded-xl bg-neutral-light border border-brown-light/10 px-4 py-3">
+                        <p className="text-xs font-semibold font-body text-text-dark mb-1">How does branch status work?</p>
+                        <ul className="text-[11px] font-body text-neutral-gray space-y-1 list-disc pl-4">
+                            <li><strong className="text-text-dark">Toggle ON</strong> &mdash; Branch is enabled. The system checks the operating hours below to determine if the branch is actually accepting orders right now.</li>
+                            <li><strong className="text-text-dark">Toggle OFF</strong> &mdash; Branch is closed immediately, regardless of operating hours. No orders can be placed until you toggle it back on.</li>
+                            <li><strong className="text-text-dark">Status badge</strong> &mdash; Shows &ldquo;Open&rdquo; only when the toggle is ON <em>and</em> the current time falls within today&rsquo;s operating hours. Otherwise it shows &ldquo;Closed&rdquo; with the reason (manual override or outside hours).</li>
+                        </ul>
+                    </div>
                 </section>
 
                 {/* ═══════════════════════════════════════════════════════════════

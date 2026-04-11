@@ -30,6 +30,9 @@ export interface SalesAnalytics {
   no_charge_count: number;
   no_charge_amount: number;
   avg_items_per_order: number;
+  single_item_orders_pct: number;
+  multi_item_orders: number;
+  max_items_in_order: number;
 }
 
 export interface OrdersByHour {
@@ -102,11 +105,19 @@ export interface BranchPerformance {
   cancelled: number;
 }
 
+export interface OrderTypeSplit {
+  type: string;
+  label: string;
+  pct: number;
+  revenue: number;
+}
+
 export interface DeliveryPickupAnalytics {
   delivery_pct: number;
   pickup_pct: number;
   delivery_revenue: number;
   pickup_revenue: number;
+  types?: OrderTypeSplit[];
 }
 
 export interface PaymentMethod {

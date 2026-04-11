@@ -369,13 +369,16 @@ function CategoryRevenue({ categoryRevenue }: { categoryRevenue?: Array<{ cat: s
 
 function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
     topCustomers?: Array<{ name?: string; orders_count?: number; total_spend?: number; user?: { name?: string }; }>;
-    deliveryPickup?: { delivery_pct: number; pickup_pct: number };
+    deliveryPickup?: { delivery_pct: number; pickup_pct: number; types?: Array<{ type: string; label: string; pct: number; revenue: number }> };
     paymentMethods?: Array<{ label: string; pct: number }>;
 }) {
-    const deliveryPct = deliveryPickup?.delivery_pct ?? 0;
-    const pickupPct   = deliveryPickup?.pickup_pct ?? 0;
+    const ORDER_TYPE_COLORS = ['#e49925', '#6c833f', '#c8a87a', '#1976d2', '#8b7f70'];
+    const types = deliveryPickup?.types ?? [
+        { type: 'delivery', label: 'Delivery', pct: deliveryPickup?.delivery_pct ?? 0, revenue: 0 },
+        { type: 'pickup', label: 'Pickup', pct: deliveryPickup?.pickup_pct ?? 0, revenue: 0 },
+    ];
     const circumference = 2 * Math.PI * 28;
-    const delDash = (deliveryPct / 100) * circumference;
+    let dashOffset = 0;
 
     const paymentData = paymentMethods || [];
     const paymentColors = ['#e49925', '#c8a87a', '#6c833f', '#1976d2', '#8b7f70'];
@@ -384,7 +387,7 @@ function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Top 10 customers */}
             <Card>
-                <SectionTitle title="Top 10 Customers by Orders" />
+                <SectionTitle title="Top 10 Customers by Fulfilled Orders" />
                 {!topCustomers || topCustomers.length === 0 ? (
                     <div className="flex items-center justify-center h-32 text-neutral-gray text-sm">No customer data available</div>
                 ) : (
@@ -411,38 +414,42 @@ function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
             <div className="flex flex-col gap-3">
                 {/* Delivery vs pickup */}
                 <Card>
-                    <SectionTitle title="Delivery vs Pickup Split" />
-                    {deliveryPct === 0 && pickupPct === 0 ? (
-                        <div className="flex items-center justify-center h-20 text-neutral-gray text-sm">No delivery/pickup data available</div>
+                    <SectionTitle title="Order Type Split" />
+                    {types.every(t => t.pct === 0) ? (
+                        <div className="flex items-center justify-center h-20 text-neutral-gray text-sm">No order type data available</div>
                     ) : (
                         <div className="flex items-center gap-5">
                             <div className="relative w-20 h-20 shrink-0">
                                 <svg width="80" height="80" viewBox="0 0 80 80">
                                     <circle cx="40" cy="40" r="28" fill="none" stroke="#f0e8d8" strokeWidth="12" />
-                                    <circle cx="40" cy="40" r="28" fill="none" stroke="#e49925" strokeWidth="12"
-                                        strokeDasharray={`${delDash} ${circumference}`}
-                                        strokeLinecap="round" transform="rotate(-90 40 40)" />
-                                    <circle cx="40" cy="40" r="28" fill="none" stroke="#6c833f" strokeWidth="12"
-                                        strokeDasharray={`${(pickupPct / 100) * circumference} ${circumference}`}
-                                        strokeDashoffset={-delDash}
-                                        strokeLinecap="round" transform="rotate(-90 40 40)" />
+                                    {types.map((t, i) => {
+                                        const dash = (t.pct / 100) * circumference;
+                                        const seg = (
+                                            <circle key={t.type} cx="40" cy="40" r="28" fill="none" stroke={ORDER_TYPE_COLORS[i] || '#ccc'} strokeWidth="12"
+                                                strokeDasharray={`${dash} ${circumference}`}
+                                                strokeDashoffset={-dashOffset}
+                                                strokeLinecap="round" transform="rotate(-90 40 40)" />
+                                        );
+                                        dashOffset += dash;
+                                        return seg;
+                                    })}
                                 </svg>
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-xs font-bold font-body text-primary">{deliveryPct}%</span>
+                                    <span className="text-xs font-bold font-body text-primary">{types[0]?.pct ?? 0}%</span>
                                 </div>
                             </div>
                             <div className="flex flex-col gap-2 flex-1">
-                                {[{ label: 'Delivery', pct: deliveryPct, color: '#e49925' }, { label: 'Pickup', pct: pickupPct, color: '#6c833f' }].map(row => (
-                                    <div key={row.label}>
+                                {types.map((row, i) => (
+                                    <div key={row.type}>
                                         <div className="flex justify-between mb-1">
                                             <div className="flex items-center gap-1.5">
-                                                <div className="w-2 h-2 rounded-full" style={{ background: row.color }} />
+                                                <div className="w-2 h-2 rounded-full" style={{ background: ORDER_TYPE_COLORS[i] || '#ccc' }} />
                                                 <span className="text-xs font-body text-text-dark">{row.label}</span>
                                             </div>
                                             <span className="text-xs font-bold font-body text-text-dark">{row.pct}%</span>
                                         </div>
                                         <div className="h-1 bg-neutral-gray/15 rounded-full overflow-hidden">
-                                            <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: row.color, transition: 'width 0.4s ease' }} />
+                                            <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: ORDER_TYPE_COLORS[i] || '#ccc', transition: 'width 0.4s ease' }} />
                                         </div>
                                     </div>
                                 ))}

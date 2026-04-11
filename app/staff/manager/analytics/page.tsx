@@ -374,7 +374,7 @@ function PaymentSplitCard({ methods }: { methods?: PaymentMethod[] }) {
 
 // ─── Fulfilment rate ──────────────────────────────────────────────────────────
 
-function FulfilmentRate({ ordersByStatus }: { ordersByStatus?: Record<string, number> }) {
+function FulfilmentRate({ ordersByStatus, periodLabel = 'today' }: { ordersByStatus?: Record<string, number>; periodLabel?: string }) {
     const statusValues = Object.values(ordersByStatus ?? {});
     const totalOrders = statusValues.reduce((sum, count) => sum + count, 0);
     const cancelled = ordersByStatus?.cancelled ?? 0;
@@ -384,7 +384,7 @@ function FulfilmentRate({ ordersByStatus }: { ordersByStatus?: Record<string, nu
 
     return (
         <Card>
-            <SectionHeader title="Order Fulfilment Rate" sub="Fulfilled vs cancelled today" />
+            <SectionHeader title="Order Fulfilment Rate" sub={`Fulfilled vs cancelled ${periodLabel}`} />
             <div className="flex justify-between items-end mb-4">
                 <div>
                     <p className="text-4xl font-bold font-body text-secondary leading-none">{onTime}%</p>
@@ -400,7 +400,7 @@ function FulfilmentRate({ ordersByStatus }: { ordersByStatus?: Record<string, nu
                 <div className="h-full bg-warning rounded-r-full" style={{ width: `${delayed}%` }} />
             </div>
             <p className="text-[11px] text-neutral-gray font-body mt-3">
-                <span className="text-text-dark font-semibold">{fulfilled} of {totalOrders}</span> orders fulfilled today
+                <span className="text-text-dark font-semibold">{fulfilled} of {totalOrders}</span> orders fulfilled {periodLabel}
             </p>
         </Card>
     );
@@ -408,14 +408,14 @@ function FulfilmentRate({ ordersByStatus }: { ordersByStatus?: Record<string, nu
 
 // ─── Top items ────────────────────────────────────────────────────────────────
 
-function TopItemsCard({ items }: { items?: TopItem[] }) {
+function TopItemsCard({ items, periodLabel = 'Today' }: { items?: TopItem[]; periodLabel?: string }) {
     const topItems = items?.slice(0, 5) ?? [];
     const maxRev = Math.max(...topItems.map(i => i.rev), 1);
     
     if (topItems.length === 0) {
         return (
             <Card className="flex-1 min-w-0">
-                <SectionHeader title="Top 5 Items Today" sub="By revenue — units in brackets" />
+                <SectionHeader title={`Top 5 Items — ${periodLabel}`} sub="By revenue — units in brackets" />
                 <div className="text-center py-8 text-neutral-gray text-sm font-body">
                     No data available
                 </div>
@@ -425,7 +425,7 @@ function TopItemsCard({ items }: { items?: TopItem[] }) {
     
     return (
         <Card className="flex-1 min-w-0">
-            <SectionHeader title="Top 5 Items Today" sub="By revenue — units in brackets" />
+            <SectionHeader title={`Top 5 Items — ${periodLabel}`} sub="By revenue — units in brackets" />
             <div className="flex flex-col gap-3">
                 {topItems.map((item, i) => (
                     <div key={item.id ?? item.name}>
@@ -916,8 +916,8 @@ export default function ManagerAnalyticsPage() {
                         <button
                             key={p.key}
                             type="button"
-                            onClick={() => { if (p.key !== 'custom') setPeriod(p.key); }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium font-body transition-all cursor-pointer ${
+                            onClick={() => { if (p.key === 'custom') { setPeriod('custom'); } else { setPeriod(p.key); } }}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium font-body transition-all cursor-pointer ${
                                 period === p.key
                                     ? 'bg-neutral-card text-text-dark shadow-sm'
                                     : 'text-neutral-gray hover:text-text-dark'
@@ -1018,12 +1018,12 @@ export default function ManagerAnalyticsPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 <PrepTimeTrend avgPrepTime={periodOrders?.average_prep_time ?? undefined} />
                 <PaymentSplitCard methods={paymentMethods} />
-                <FulfilmentRate ordersByStatus={periodOrders?.orders_by_status} />
+                <FulfilmentRate ordersByStatus={periodOrders?.orders_by_status} periodLabel={periodLabel} />
             </div>
 
             {/* ══ ROW 4 — Top items + OOS ══════════════════════════════════════ */}
             <div className="flex flex-col md:flex-row gap-3 mb-3">
-                <TopItemsCard items={topItems} />
+                <TopItemsCard items={topItems} periodLabel={periodLabel} />
                 <OutOfStockCard />
             </div>
 
