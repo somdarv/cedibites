@@ -13,6 +13,7 @@ import {
     MoneyIcon,
     ProhibitIcon,
     CreditCardIcon,
+    HandCoinsIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { useBranchStaffSales } from '@/lib/api/hooks/useBranches';
@@ -41,6 +42,8 @@ interface StaffSalesRow {
     momo_count: number;
     cash_total: number;
     cash_count: number;
+    manual_momo_total: number;
+    manual_momo_count: number;
     no_charge_total: number;
     no_charge_count: number;
     card_total: number;
@@ -51,10 +54,11 @@ interface StaffSalesRow {
 // ─── Payment method config ────────────────────────────────────────────────────
 
 const METHODS = [
-    { key: 'momo',      label: 'MoMo',      icon: DeviceMobileIcon, color: 'text-yellow-600',  bg: 'bg-yellow-600/8' },
-    { key: 'cash',      label: 'Cash',       icon: MoneyIcon,        color: 'text-secondary',   bg: 'bg-secondary/8' },
-    { key: 'no_charge', label: 'No Charge',  icon: ProhibitIcon,     color: 'text-teal-600',    bg: 'bg-teal-600/8' },
-    { key: 'card',      label: 'Card',       icon: CreditCardIcon,   color: 'text-blue-600',    bg: 'bg-blue-600/8' },
+    { key: 'momo',         label: 'MoMo',        icon: DeviceMobileIcon, color: 'text-yellow-600',  bg: 'bg-yellow-600/8' },
+    { key: 'cash',         label: 'Cash',        icon: MoneyIcon,        color: 'text-secondary',   bg: 'bg-secondary/8' },
+    { key: 'manual_momo',  label: 'Direct MoMo', icon: HandCoinsIcon,    color: 'text-orange-600',  bg: 'bg-orange-600/8' },
+    { key: 'no_charge',    label: 'No Charge',   icon: ProhibitIcon,     color: 'text-teal-600',    bg: 'bg-teal-600/8' },
+    { key: 'card',         label: 'Card',        icon: CreditCardIcon,   color: 'text-blue-600',    bg: 'bg-blue-600/8' },
 ] as const;
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -90,10 +94,11 @@ export default function StaffSalesPage() {
                 revenue: acc.revenue + r.total_revenue,
                 momo: acc.momo + r.momo_total,
                 cash: acc.cash + r.cash_total,
+                manualMomo: acc.manualMomo + r.manual_momo_total,
                 noCharge: acc.noCharge + r.no_charge_total,
                 card: acc.card + r.card_total,
             }),
-            { orders: 0, revenue: 0, momo: 0, cash: 0, noCharge: 0, card: 0 },
+            { orders: 0, revenue: 0, momo: 0, cash: 0, manualMomo: 0, noCharge: 0, card: 0 },
         );
     }, [rows]);
 
@@ -197,7 +202,7 @@ export default function StaffSalesPage() {
                             </div>
 
                             {/* Payment breakdown */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                                 {METHODS.map(m => {
                                     const total = row[`${m.key}_total` as keyof StaffSalesRow] as number;
                                     const count = row[`${m.key}_count` as keyof StaffSalesRow] as number;
@@ -240,6 +245,12 @@ export default function StaffSalesPage() {
                                 <MoneyIcon size={12} weight="fill" className="text-secondary" />
                                 <span className="text-text-dark">Cash: {formatGHS(totals.cash)}</span>
                             </div>
+                            {totals.manualMomo > 0 && (
+                                <div className="flex items-center gap-1.5">
+                                    <HandCoinsIcon size={12} weight="fill" className="text-orange-600" />
+                                    <span className="text-text-dark">Direct MoMo: {formatGHS(totals.manualMomo)}</span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-1.5">
                                 <CreditCardIcon size={12} weight="fill" className="text-blue-600" />
                                 <span className="text-text-dark">Card: {formatGHS(totals.card)}</span>

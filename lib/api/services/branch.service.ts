@@ -36,6 +36,8 @@ export interface StaffSalesRow {
   momo_count: number;
   cash_total: number;
   cash_count: number;
+  manual_momo_total: number;
+  manual_momo_count: number;
   no_charge_total: number;
   no_charge_count: number;
   card_total: number;

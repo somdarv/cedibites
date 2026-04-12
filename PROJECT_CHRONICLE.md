@@ -81,6 +81,60 @@ Items still needing attention.
 
 ---
 
+## [2026-04-12] Session: 13-Issue Audit Fix
+
+### Intent
+
+Fix and enhance analytics UI across admin, partner, and manager portals — correcting corrupted chart rendering, adding new period options, surfacing new backend data fields (order type splits, supporting stats, fulfilled customer filtering), and UX improvements.
+
+### Changes Made
+
+| File | Change | Reason |
+|------|--------|--------|
+| `app/admin/analytics/page.tsx` | Fixed corrupted WeeklyRevenueComparison (bar widths, heights, text positioning) | Chart bars and labels were misaligned after prior changes |
+| `app/admin/analytics/page.tsx` | Added "Last Week" period option | Users needed week-over-week comparison capability |
+| `app/admin/analytics/page.tsx` | Enhanced AvgItemsPerOrder with supporting stats (`single_item_orders_pct`, `multi_item_orders`, `max_items_in_order`) | Provides actionable context around the average |
+| `app/admin/analytics/page.tsx` | Dynamic order type donut chart (delivery, pickup, dine_in, etc. with label/pct/revenue) | Replaced static delivery vs pickup binary with dynamic breakdown from backend |
+| `app/admin/analytics/page.tsx` | Changed top customers title to "Top 5 Customers by Fulfilled Orders" | Reflects backend change to filter by completed/delivered orders only |
+| `app/partner/analytics/page.tsx` | Updated customer title to fulfilled orders, added dynamic order type split | Partner portal aligned with admin analytics changes |
+| `app/staff/manager/analytics/page.tsx` | Fixed custom filter button guard, increased pill sizing | Button was accessible when it shouldn't be; pills were too small on mobile |
+| `app/staff/manager/analytics/page.tsx` | Made FulfilmentRate and TopItemsCard period-aware | These cards were ignoring the selected period — now filter by date range |
+| `app/staff/manager/settings/page.tsx` | Added help tooltip explaining branch status toggle | BM needed guidance on what the toggle does (chosen over full documentation page) |
+| `lib/api/hooks/useAnalytics.ts` | Added `last_week` to `AnalyticsPeriod` type and `getDateRange()` | New period option for analytics hooks |
+| `lib/api/services/analytics.service.ts` | Updated `SalesAnalytics` and `DeliveryPickupAnalytics` types with new fields | TypeScript types match updated API response shape |
+
+### Decisions
+
+- **Decision**: BM configurator gets tooltip explanation rather than full documentation page
+  - **Rationale**: A tooltip provides just-in-time help without navigating away. Full docs page is overkill for a single toggle.
+- **Decision**: Average items per order enhanced with 3 supporting stats (Option A) over redesigning the card layout
+  - **Rationale**: Adding stats below the main metric preserves the existing card grid layout while adding actionable detail. A redesign would affect the entire analytics page structure.
+- **Decision**: Dynamic order type donut chart replaces static delivery/pickup split
+  - **Rationale**: Backend now returns all order types dynamically. Hardcoding delivery/pickup would miss dine_in and future order types.
+
+### Current State
+
+- **Admin Analytics**: WeeklyRevenueComparison chart renders correctly, 10 period options (Today through Lifetime including Last Week), dynamic order type donut, enhanced avg items card, top 5 fulfilled customers
+- **Partner Analytics**: Dynamic order type split, fulfilled customer title
+- **Manager Analytics**: Custom filter button guarded properly, larger pills, period-aware FulfilmentRate and TopItemsCard
+- **Manager Settings**: Branch status toggle has explanatory tooltip
+- **Analytics types**: `SalesAnalytics` and `DeliveryPickupAnalytics` updated with new fields from backend
+- **Deployed**: Commit `7f3e1a8` merged to `main`
+
+### Cross-Repo Impact
+
+| File (Backend repo) | Change | Impact |
+|------|--------|--------|
+| `app/Http/Controllers/Api/CustomerController.php` | PostgreSQL sort fix: `NULLS LAST` | Proper NULL handling for customer sort |
+| `app/Services/Analytics/AnalyticsService.php` | Separated cash/cash_on_delivery, dynamic order types, fulfilled customer filter, avg items stats, staff sales unassigned bucket | All new data fields consumed by updated frontend types and UI |
+
+### Pending / Follow-up
+
+- Monitor WeeklyRevenueComparison chart with different data volumes to ensure bar scaling holds
+- Consider making the analytics period selector a shared component (duplicated across admin, partner, manager)
+
+---
+
 ## [2026-04-10] Session: Multi-Issue Fix – Analytics, Menu Toggle, Branch Status, Scrollbar, Shifts
 
 ### Intent
