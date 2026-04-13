@@ -155,6 +155,7 @@ function receiptHTML(order: Order, branch: ReceiptBranch, kind: ReceiptKind): st
   ${isPastOrder ? '<div class="past-order-banner">⏱ RECORDED PAST ORDER</div>' : ''}
 
   <div class="divider"></div>
+  <table class="meta-table">
     <tr>
       <td class="label">Receipt No.:</td>
       <td>${order.orderNumber}</td>
@@ -253,11 +254,17 @@ export function printReceipt(
     toast.error('Popup blocked — please allow popups for this site to print receipts.');
     return;
   }
-  win.document.write(receiptHTML(order, resolvedBranch, kind));
-  win.document.close();
-  win.focus();
-  setTimeout(() => {
-    win.print();
+  try {
+    win.document.write(receiptHTML(order, resolvedBranch, kind));
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 300);
+  } catch (err) {
+    console.error('[Receipt] Failed to generate receipt:', err);
     win.close();
-  }, 300);
+    toast.error('Failed to generate receipt. Please try reprinting from the Orders page.');
+  }
 }
