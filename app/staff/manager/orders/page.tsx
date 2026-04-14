@@ -428,7 +428,7 @@ export default function ManagerOrdersPage() {
 
             {/* Table */}
             <div className="bg-neutral-card border border-[#f0e8d8] rounded-2xl overflow-hidden mb-4">
-                <div className="hidden md:grid grid-cols-[1.2fr_0.8fr_1.4fr_0.9fr_0.9fr_0.8fr_1fr_0.8fr] gap-3 px-4 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
+                <div className="hidden md:grid grid-cols-[1fr_0.7fr_1.4fr_0.9fr_0.9fr_1.1fr_1fr_0.8fr] gap-3 px-4 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
                     {['Order #', 'Source', 'Customer', 'Payment', 'Pay Status', 'Status', 'Amount', 'Time'].map(h => (
                         <span key={h} className="text-neutral-gray text-[10px] font-bold font-body uppercase tracking-wider">{h}</span>
                     ))}
@@ -446,7 +446,7 @@ export default function ManagerOrdersPage() {
                 ) : (
                     orders.map((order, i) => (
                         <div key={order.id} onClick={() => setSelectedOrder(order)}
-                            className={`px-4 py-3.5 flex flex-col md:grid md:grid-cols-[1.2fr_0.8fr_1.4fr_0.9fr_0.9fr_0.8fr_1fr_0.8fr] gap-2 md:gap-3 md:items-center cursor-pointer hover:bg-neutral-light/60 transition-colors ${i < orders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}>
+                            className={`px-4 py-3.5 flex flex-col md:grid md:grid-cols-[1fr_0.7fr_1.4fr_0.9fr_0.9fr_1.1fr_1fr_0.8fr] gap-2 md:gap-3 md:items-center cursor-pointer hover:bg-neutral-light/60 transition-colors ${i < orders.length - 1 ? 'border-b border-[#f0e8d8]' : ''}`}>
                             <div className="flex items-center gap-2 md:block">
                                 <span className="text-text-dark text-sm font-bold font-body">#{order.id}</span>
                                 <ArrowUpRightIcon size={12} className="text-neutral-gray/40 md:hidden" />

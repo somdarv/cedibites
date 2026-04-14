@@ -73,7 +73,7 @@ function OrderRow({ order, isLast }: { order: Order; isLast: boolean }) {
     return (
         <>
             <div
-                className={`px-5 py-3.5 flex flex-col md:grid md:grid-cols-[2fr_1.2fr_1fr_1fr_1fr_auto] gap-2 md:gap-4 md:items-center cursor-pointer hover:bg-neutral-light/60 transition-colors ${!isLast ? 'border-b border-[#f0e8d8]' : ''}`}
+                className={`px-5 py-3.5 flex flex-col md:grid md:grid-cols-[2fr_1fr_1.2fr_1fr_1fr_auto] gap-2 md:gap-4 md:items-center cursor-pointer hover:bg-neutral-light/60 transition-colors ${!isLast ? 'border-b border-[#f0e8d8]' : ''}`}
                 onClick={() => setOpen(o => !o)}
             >
                 <div className="min-w-0">
@@ -270,7 +270,7 @@ export default function PartnerOrdersPage() {
                 </div>
             ) : (
                 <div className="bg-neutral-card border border-[#f0e8d8] rounded-2xl overflow-hidden">
-                    <div className="hidden md:grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
+                    <div className="hidden md:grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
                         {['Customer', 'Items', 'Status', 'Time', 'Amount', ''].map((h, i) => (
                             <span key={i} className="text-neutral-gray text-[10px] font-bold font-body uppercase tracking-wider">{h}</span>
                         ))}

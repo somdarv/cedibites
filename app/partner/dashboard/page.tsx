@@ -237,7 +237,7 @@ export default function PartnerDashboardPage() {
                     </div>
                 ) : (
                     <>
-                        <div className="hidden md:grid grid-cols-[2fr_1.2fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
+                        <div className="hidden md:grid grid-cols-[2fr_1fr_1.2fr_1fr_1fr] gap-4 px-5 py-3 border-b border-[#f0e8d8] bg-[#faf6f0]">
                             {['Customer', 'Items', 'Status', 'Time', 'Amount'].map(h => (
                                 <span key={h} className="text-neutral-gray text-[10px] font-bold font-body uppercase tracking-wider">{h}</span>
                             ))}
@@ -245,7 +245,7 @@ export default function PartnerDashboardPage() {
                         {todayOrders.slice(0, 12).map((order, i) => (
                             <div
                                 key={order.id}
-                                className={`px-5 py-3.5 flex flex-col md:grid md:grid-cols-[2fr_1.2fr_1fr_1fr_1fr] gap-2 md:gap-4 md:items-center hover:bg-neutral-light/60 transition-colors ${i < Math.min(todayOrders.length, 12) - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
+                                className={`px-5 py-3.5 flex flex-col md:grid md:grid-cols-[2fr_1fr_1.2fr_1fr_1fr] gap-2 md:gap-4 md:items-center hover:bg-neutral-light/60 transition-colors ${i < Math.min(todayOrders.length, 12) - 1 ? 'border-b border-[#f0e8d8]' : ''}`}
                             >
                                 <div className="min-w-0">
                                     <p className="text-text-dark text-sm font-semibold font-body truncate">{order.contact.name}</p>
