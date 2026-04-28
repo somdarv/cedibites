@@ -124,8 +124,8 @@ Two compounding bugs:
 
 ### Changes Made
 
-| File | Change | Reason |
-|------|--------|--------|
+| File                                         | Change                                                     | Reason                                                                                                                                               |
+| -------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `app/components/providers/QueryProvider.tsx` | Changed mutations config from `retry: 1` to `retry: false` | Mutations change server state and must never be auto-retried. The retry was causing phantom double-fire on any mutation that returned a server error |
 
 ### Decisions
@@ -140,8 +140,8 @@ Two compounding bugs:
 
 ### Cross-Repo Impact
 
-| File (Backend repo) | Change | Impact |
-|---------------------|--------|--------|
+| File (Backend repo)                                    | Change                                                                | Impact                                                                                                                                         |
+| ------------------------------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `app/Http/Controllers/Api/CancelRequestController.php` | `requestCancel()` and `rejectCancel()` wrapped in `DB::transaction()` | Ensures atomicity — if activity log or eager loading fails, the status change rolls back instead of leaving the order in an inconsistent state |
 
 ### Pending / Follow-up

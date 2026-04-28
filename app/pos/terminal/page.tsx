@@ -322,7 +322,15 @@ export default function POSTerminalPage() {
         }
       }
     }
-    return results;
+
+    // Sort: simple option names (no "+" combos) first, then combo items.
+    // Within each group, sort alphabetically by option name.
+    return results.sort((a, b) => {
+      const aIsCombo = a.option.name.includes('+');
+      const bIsCombo = b.option.name.includes('+');
+      if (aIsCombo !== bIsCombo) return aIsCombo ? 1 : -1;
+      return a.option.name.localeCompare(b.option.name);
+    });
   }, [searchQuery, branchMenuItems]);
 
   const handleOptionAdd = useCallback((option: ItemOption) => {
