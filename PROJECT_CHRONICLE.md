@@ -81,12 +81,42 @@ Items still needing attention.
 
 ---
 
-## [2026-05-01] Session: Audit Log Custom Filters + Order Period Summary Strip
+## [2026-05-01] Session: Audit Log Action List Cleanup (cancellation events surfaced)
 
 ### Intent
-Two observability improvements emerging from a data-integrity investigation:
-1. Admin audit log needed precise pinpoint filtering — custom date range, action type, and user (causer).
-2. Every orders table (admin/manager/partner/POS/sales) needed a low-attention strip summarising **valid** vs **issues** (cancelled/failed/refunded) for the current filter scope, so staff can see order quality at a glance without leaving the page.
+Investigator was looking for a specific order in the audit log and couldn't filter by cancellation. Two problems:
+1. The `Action Type` dropdown listed events that the backend never emits (`pos_login`, `menu_config_updated`, `'Guest cart claimed'`, generic `created`/`deleted`).
+2. It was missing the entire cancellation flow (`cancel_requested`, `cancel_approved`, `cancel_rejected`, `cancelled`) plus several real events from EmployeeAuth, Customer, Platform, and Shifts controllers.
+
+### Changes Made
+| File | Change | Reason |
+|------|--------|--------|
+| `app/admin/audit/page.tsx` | Replaced `EVENT_LABELS` with the exact set of events emitted by the backend (cross-checked against every `->event('...')` call in `cedibites_api`); added `EVENT_GROUPS` for `<optgroup>` grouping in the dropdown | Investigators can now pinpoint cancellation requests, approvals, rejections, direct cancels, refunds, and all real auth/shift/customer/platform events. Dead options removed. |
+
+### Real backend events now surfaced (grouped)
+- **Orders**: `status_changed`, `cancel_requested`, `cancel_approved`, `cancel_rejected`, `cancelled`, `refunded`
+- **Staff**: `staff_login`, `staff_login_failed`, `staff_logout`, `force_logout`, `password_reset_required`, `role_changed`
+- **Shifts**: `shift_started`, `shift_ended`
+- **Customers**: `customer_login`, `customer_logout`, `profile_updated`, `customer_deleted`, `customer_suspended`, `customer_unsuspended`, `customer_force_logout`
+- **System**: `updated`, `job_retried`, `cache_cleared`, `maintenance_toggled`, `admin_created`, `admin_revoked`, `password_reset`, `passwords_viewed`, `password_viewed`, `passcode_changed`, `passcode_failed`
+
+### Decisions
+- **Decision**: Cross-check against `grep -r "->event('"` in the backend rather than guess.
+  - **Rationale**: Listing fictional events teaches users to distrust the filter. Listing real ones teaches them to trust it.
+- **Decision**: Group via `<optgroup>` instead of separate dropdowns.
+  - **Rationale**: Single control, scannable structure, native browser behaviour. No new state to manage.
+- **Decision**: Did NOT remove `EVENT_LABELS` keys that aren't in `EVENT_GROUPS` — kept the labels map complete so the *table rows* still render friendly action labels even for events not in the filter list (defensive).
+
+### Verification
+- Confirmed cancellation events use `activity('orders')->performedOn($order)` in `CancelRequestController` → so they correctly surface under the existing "order" entity filter as well.
+- `npm run build` passes.
+
+### Pending / Follow-up
+- None. Investigator can now find the missing order's cancellation history.
+
+---
+
+## [2026-05-01] Session: Audit Log Custom Filters + Order Period Summary Strip
 
 ### Changes Made
 | File | Change | Reason |

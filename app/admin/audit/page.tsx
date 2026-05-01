@@ -17,23 +17,76 @@ import type { ActivityLog, ActivityLogEntity, ActivityLogSeverity } from '@/type
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
+// Action labels — keep these exactly aligned with the events emitted by the
+// backend (search for `->event('...')` in cedibites_api). Grouped here for the
+// filter dropdown so investigators can pinpoint what they're after quickly.
 const EVENT_LABELS: Record<string, string> = {
-    created: 'Created',
-    updated: 'Updated',
-    deleted: 'Deleted',
+    // Orders
     status_changed: 'Order Status Change',
+    cancel_requested: 'Cancellation Requested',
+    cancel_approved: 'Cancellation Approved',
+    cancel_rejected: 'Cancellation Rejected',
+    cancelled: 'Order Cancelled',
     refunded: 'Refund Issued',
+
+    // Staff auth & lifecycle
+    staff_login: 'Staff Login',
+    staff_login_failed: 'Staff Login Failed',
+    staff_logout: 'Staff Logout',
+    force_logout: 'Staff Force Logout',
+    password_reset_required: 'Password Reset Required',
     role_changed: 'Role Changed',
-    staff_login: 'Login',
-    staff_logout: 'Logout',
-    pos_login: 'POS Login',
-    customer_login: 'Customer Login',
+
+    // Shifts
     shift_started: 'Shift Started',
     shift_ended: 'Shift Ended',
-    menu_config_updated: 'Menu Config Updated',
-    'Guest cart claimed': 'Guest Cart Claimed',
+
+    // Customers
+    customer_login: 'Customer Login',
+    customer_logout: 'Customer Logout',
+    profile_updated: 'Customer Profile Updated',
     customer_deleted: 'Customer Deleted',
+    customer_suspended: 'Customer Suspended',
+    customer_unsuspended: 'Customer Unsuspended',
+    customer_force_logout: 'Customer Force Logout',
+
+    // System / Platform
+    updated: 'Settings Updated',
+    job_retried: 'Failed Job Retried',
+    cache_cleared: 'Cache Cleared',
+    maintenance_toggled: 'Maintenance Toggled',
+    admin_created: 'Admin Created',
+    admin_revoked: 'Admin Revoked',
+    password_reset: 'Admin Password Reset',
+    passwords_viewed: 'Passwords Viewed',
+    password_viewed: 'Password Viewed',
+    passcode_changed: 'Passcode Changed',
+    passcode_failed: 'Passcode Failed',
 };
+
+// Logical grouping for the dropdown <optgroup>s — order matters.
+const EVENT_GROUPS: { label: string; events: string[] }[] = [
+    {
+        label: 'Orders',
+        events: ['status_changed', 'cancel_requested', 'cancel_approved', 'cancel_rejected', 'cancelled', 'refunded'],
+    },
+    {
+        label: 'Staff',
+        events: ['staff_login', 'staff_login_failed', 'staff_logout', 'force_logout', 'password_reset_required', 'role_changed'],
+    },
+    {
+        label: 'Shifts',
+        events: ['shift_started', 'shift_ended'],
+    },
+    {
+        label: 'Customers',
+        events: ['customer_login', 'customer_logout', 'profile_updated', 'customer_deleted', 'customer_suspended', 'customer_unsuspended', 'customer_force_logout'],
+    },
+    {
+        label: 'System',
+        events: ['updated', 'job_retried', 'cache_cleared', 'maintenance_toggled', 'admin_created', 'admin_revoked', 'password_reset', 'passwords_viewed', 'password_viewed', 'passcode_changed', 'passcode_failed'],
+    },
+];
 
 const SEVERITY_STYLES: Record<ActivityLogSeverity, { badge: string; dot: string; icon: React.ElementType }> = {
     info:        { badge: 'bg-info/10 text-info',           dot: 'bg-info',    icon: InfoIcon    },
@@ -276,8 +329,12 @@ export default function AdminAuditPage() {
                                 className="w-full px-3 py-2 rounded-xl border border-[#f0e8d8] bg-neutral-light text-sm font-body text-text-dark focus:outline-none focus:border-primary/40"
                             >
                                 <option value="All">All actions</option>
-                                {Object.entries(EVENT_LABELS).map(([value, label]) => (
-                                    <option key={value} value={value}>{label}</option>
+                                {EVENT_GROUPS.map((group) => (
+                                    <optgroup key={group.label} label={group.label}>
+                                        {group.events.map((evt) => (
+                                            <option key={evt} value={evt}>{EVENT_LABELS[evt]}</option>
+                                        ))}
+                                    </optgroup>
                                 ))}
                             </select>
                         </div>
