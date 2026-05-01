@@ -654,7 +654,7 @@ function BranchPerformanceTable({ branchPerformance }: { branchPerformance?: Arr
 function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
     topCustomers?: Array<{ name?: string; orders_count?: number; total_spend?: number; user?: { name?: string }; }>;
     deliveryPickup?: { delivery_pct: number; pickup_pct: number; types?: Array<{ type: string; label: string; pct: number; revenue: number }> };
-    paymentMethods?: Array<{ label: string; pct: number }>;
+    paymentMethods?: Array<{ label: string; pct: number; amount?: number; count?: number }>;
 }) {
     const ORDER_TYPE_COLORS = ['#e49925', '#6c833f', '#c8a87a', '#1976d2', '#8b7f70'];
     const types = deliveryPickup?.types ?? [
@@ -757,12 +757,17 @@ function CustomerInsights({ topCustomers, deliveryPickup, paymentMethods }: {
                         <div className="flex flex-col gap-2">
                             {paymentData.map((row, i) => (
                                 <div key={row.label}>
-                                    <div className="flex justify-between mb-1">
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="w-2 h-2 rounded-full" style={{ background: paymentColors[i] || '#ccc' }} />
-                                            <span className="text-xs font-body text-text-dark">{row.label}</span>
+                                    <div className="flex justify-between mb-1 gap-2">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: paymentColors[i] || '#ccc' }} />
+                                            <span className="text-xs font-body text-text-dark truncate">{row.label}</span>
                                         </div>
-                                        <span className="text-xs font-bold font-body text-text-dark">{row.pct}%</span>
+                                        <div className="flex items-baseline gap-2 shrink-0">
+                                            {typeof row.amount === 'number' && row.amount > 0 && (
+                                                <span className="text-xs font-semibold font-body text-text-dark">{formatGHS(row.amount)}</span>
+                                            )}
+                                            <span className="text-xs font-bold font-body text-neutral-gray tabular-nums">{row.pct}%</span>
+                                        </div>
                                     </div>
                                     <div className="h-1.5 bg-neutral-gray/15 rounded-full overflow-hidden">
                                         <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: paymentColors[i] || '#ccc', transition: 'width 0.4s ease' }} />

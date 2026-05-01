@@ -123,6 +123,8 @@ export interface DeliveryPickupAnalytics {
 export interface PaymentMethod {
   label: string;
   pct: number;
+  amount?: number;
+  count?: number;
 }
 
 export interface PromoMetric {
