@@ -38,17 +38,19 @@ export function getDateRange(period: AnalyticsPeriod, customRange?: CustomRange)
       return { date_from: y, date_to: y };
     }
     case 'week': {
+      // Sunday-start week (Sun..Sat). 0=Sun … 6=Sat.
       const weekStart = new Date(now);
-      const daysSinceMonday = (weekStart.getDay() + 6) % 7;
-      weekStart.setDate(weekStart.getDate() - daysSinceMonday);
+      const daysSinceSunday = weekStart.getDay();
+      weekStart.setDate(weekStart.getDate() - daysSinceSunday);
       return { date_from: weekStart.toISOString().slice(0, 10), date_to: today };
     }
     case 'last_week': {
-      const end = new Date(now);
-      end.setDate(end.getDate() - ((end.getDay() + 6) % 7) - 1);
-      const start = new Date(end);
-      start.setDate(start.getDate() - 6);
-      return { date_from: start.toISOString().slice(0, 10), date_to: end.toISOString().slice(0, 10) };
+      // Last Sun..Sat (the full prior calendar week).
+      const lastSat = new Date(now);
+      lastSat.setDate(lastSat.getDate() - lastSat.getDay() - 1);
+      const lastSun = new Date(lastSat);
+      lastSun.setDate(lastSun.getDate() - 6);
+      return { date_from: lastSun.toISOString().slice(0, 10), date_to: lastSat.toISOString().slice(0, 10) };
     }
     case 'month': {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

@@ -35,7 +35,7 @@ type Period = 'today' | 'yesterday' | 'week' | 'last_week' | 'month' | 'last_mon
 
 const BRANCH_COLORS = ['#e49925', '#6c833f', '#c8a87a'];
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const HOURS = ['7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22'];
 
@@ -100,7 +100,7 @@ function RevenueChart({ salesByDay }: { salesByDay?: Array<{ date: string; total
         const orders = Array(7).fill(0) as number[];
         if (salesByDay?.length) {
             for (const d of salesByDay) {
-                const idx = (new Date(d.date).getDay() + 6) % 7; // 0=Mon…6=Sun
+                const idx = new Date(d.date).getDay(); // 0=Sun … 6=Sat
                 totals[idx] += Number(d.total);
                 orders[idx] += d.orders;
             }
@@ -168,12 +168,11 @@ function RevenueChart({ salesByDay }: { salesByDay?: Array<{ date: string; total
 // ─── Weekly revenue comparison ────────────────────────────────────────────────
 
 function mapSalesByDayToWeekBars(salesByDay?: Array<{ date: string; total: number }>): number[] {
-    const bars = [0, 0, 0, 0, 0, 0, 0]; // Mon-Sun
+    const bars = [0, 0, 0, 0, 0, 0, 0]; // Sun-Sat
     if (!salesByDay?.length) return bars;
     for (const d of salesByDay) {
         const date = new Date(d.date);
-        const dow = date.getDay();
-        const idx = (dow + 6) % 7;
+        const idx = date.getDay(); // 0=Sun … 6=Sat
         bars[idx] = (bars[idx] ?? 0) + Number(d.total);
     }
     return bars;
@@ -194,20 +193,21 @@ function WeeklyRevenueComparison({
     return (
         <Card>
             <SectionTitle title="Revenue vs Last Week" sub="Daily comparison — hover for details" />
-            <div className="flex items-end gap-1.5 h-24">
+            <div className="flex items-end gap-2 h-48">
                 {DAYS.map((day, i) => {
                     const thisVal = weekRevenue[i] ?? 0;
                     const lastVal = lastWeekRevenue[i] ?? 0;
-                    const thisH  = Math.round((thisVal / max) * 88);
-                    const lastH  = Math.round((lastVal / max) * 88);
+                    const thisH  = Math.round((thisVal / max) * 168);
+                    const lastH  = Math.round((lastVal / max) * 168);
                     const isToday = i === todayIdx;
                     const diff   = lastVal > 0 ? Math.round(((thisVal - lastVal) / lastVal) * 100) : 0;
+                    const formatLabel = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v).toString();
                     return (
                         <div
                             key={day}
                             className="flex-1 flex flex-col items-center gap-1 relative"
                             onMouseEnter={() => setHovered(i)}
-                            onMouseLeave={() => setHovered(null)} 
+                            onMouseLeave={() => setHovered(null)}
                         >
                             {hovered === i && (
                                 <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 bg-neutral-card border border-brown-light/20 rounded-xl px-3 py-2 z-10 whitespace-nowrap text-[11px] text-text-dark shadow-lg">
@@ -220,20 +220,34 @@ function WeeklyRevenueComparison({
                                 </div>
                             )}
 
-                            <div className="flex items-end gap-0.5 relative" style={{ height: 88 }}>
-                                {thisVal > 0 && (
-                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[8px] font-bold text-primary leading-none whitespace-nowrap">
-                                        {thisVal >= 1000 ? `${(thisVal / 1000).toFixed(1)}k` : Math.round(thisVal)}
-                                    </span>
-                                )}
-                                <div className="w-3 rounded-sm bg-brown-light/25" style={{ height: Math.max(lastH, 3) }} />
+                            <div className="flex items-end gap-1 w-full justify-center" style={{ height: 168 }}>
+                                {/* Last week bar */}
                                 <div
-                                    className="w-5 rounded-sm"
-                                    style={{ height: Math.max(thisH, 3), background: isToday ? '#e49925' : '#c8a87a' }}
-                                />
+                                    className="flex-1 max-w-5.5 rounded-md bg-brown-light/30 flex items-end justify-center pb-1"
+                                    style={{ height: Math.max(lastH, 18) }}
+                                    title={`Last ${day}: ₵${lastVal.toLocaleString()}`}
+                                >
+                                    {lastVal > 0 && (
+                                        <span className="text-[10px] font-bold text-text-dark/70 leading-none select-none [writing-mode:vertical-rl] rotate-180">
+                                            {formatLabel(lastVal)}
+                                        </span>
+                                    )}
+                                </div>
+                                {/* This week bar */}
+                                <div
+                                    className="flex-1 max-w-5.5 rounded-md flex items-end justify-center pb-1"
+                                    style={{ height: Math.max(thisH, 18), background: isToday ? '#e49925' : '#c8a87a' }}
+                                    title={`This ${day}: ₵${thisVal.toLocaleString()}`}
+                                >
+                                    {thisVal > 0 && (
+                                        <span className="text-[10px] font-bold text-white leading-none select-none [writing-mode:vertical-rl] rotate-180">
+                                            {formatLabel(thisVal)}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
-                            <span className={`text-[9px] font-body ${isToday ? 'text-primary font-bold' : 'text-neutral-gray'}`}>{day}</span>
+                            <span className={`text-[10px] font-body ${isToday ? 'text-primary font-bold' : 'text-neutral-gray'}`}>{day}</span>
                         </div>
                     );
                 })}
@@ -244,7 +258,7 @@ function WeeklyRevenueComparison({
                     <span className="text-[11px] text-neutral-gray font-body">This week</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-sm bg-brown-light/25" />
+                    <div className="w-2.5 h-2.5 rounded-sm bg-brown-light/30" />
                     <span className="text-[11px] text-neutral-gray font-body">Last week</span>
                 </div>
             </div>
@@ -829,7 +843,7 @@ function OrdersByDayOfWeek({ salesByDay }: { salesByDay?: Array<{ date: string; 
         const counts = Array(7).fill(0) as number[];
         if (salesByDay?.length) {
             for (const { date, orders } of salesByDay) {
-                const idx = (new Date(date).getDay() + 6) % 7; // 0=Mon…6=Sun
+                const idx = new Date(date).getDay(); // 0=Sun … 6=Sat
                 counts[idx] += orders;
             }
         }
@@ -1158,12 +1172,13 @@ export default function AdminAnalyticsPage() {
     // Weekly revenue comparison data
     const { sales: weekSales } = useAnalytics('week', branchId);
     const lastWeekRange = useMemo(() => {
+        // Prior calendar week: last Sun … last Sat.
         const now = new Date();
-        const end = new Date(now);
-        end.setDate(end.getDate() - 7);
-        const start = new Date(end);
-        start.setDate(start.getDate() - 6);
-        return { date_from: start.toISOString().slice(0, 10), date_to: end.toISOString().slice(0, 10) };
+        const lastSat = new Date(now);
+        lastSat.setDate(lastSat.getDate() - lastSat.getDay() - 1);
+        const lastSun = new Date(lastSat);
+        lastSun.setDate(lastSun.getDate() - 6);
+        return { date_from: lastSun.toISOString().slice(0, 10), date_to: lastSat.toISOString().slice(0, 10) };
     }, []);
     const { data: lastWeekSales } = useQuery({
         queryKey: ['analytics', 'sales', 'last-week', branchId],
@@ -1172,7 +1187,7 @@ export default function AdminAnalyticsPage() {
     });
     const weekRevenue = useMemo(() => mapSalesByDayToWeekBars(weekSales?.sales_by_day), [weekSales?.sales_by_day]);
     const lastWeekRevenue = useMemo(() => mapSalesByDayToWeekBars(lastWeekSales?.sales_by_day), [lastWeekSales?.sales_by_day]);
-    const TODAY_IDX = (new Date().getDay() + 6) % 7;
+    const TODAY_IDX = new Date().getDay(); // 0=Sun … 6=Sat
 
     // Today's analytics for prep time
     const { orders: todayOrderAnalytics } = useAnalytics('today', branchId);
