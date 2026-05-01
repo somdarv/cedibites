@@ -464,6 +464,8 @@ export interface OrderPeriodSummary {
   refunded_amount: number;
   no_charge_count: number;
   no_charge_amount: number;
+  issues_count: number;
+  issues_amount: number;
   total_count: number;
 }
 

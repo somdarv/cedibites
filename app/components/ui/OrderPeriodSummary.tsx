@@ -23,7 +23,8 @@ interface Props {
  * three pills (valid / issues / total) using small text & muted backgrounds.
  *
  * - "Valid" = paid (status != cancelled AND has completed payment)
- * - "Issues" = cancelled + failed + refunded combined
+ * - "Issues" = distinct orders that are cancelled OR refunded OR failed-without-completed.
+ *              An order matching multiple buckets is counted ONCE; its amount is summed once.
  * - "Total" = every order in the scope
  *
  * Mirrors the AnalyticsService definitions so numbers match the dashboards.
@@ -35,12 +36,8 @@ export default function OrderPeriodSummary({
     countsOnly = false,
     className = '',
 }: Props): React.ReactElement {
-    const issuesCount = summary
-        ? summary.cancelled_count + summary.failed_count + summary.refunded_count
-        : 0;
-    const issuesAmount = summary
-        ? summary.cancelled_amount + summary.failed_amount + summary.refunded_amount
-        : 0;
+    const issuesCount = summary?.issues_count ?? 0;
+    const issuesAmount = summary?.issues_amount ?? 0;
 
     const showLoading = isLoading && !summary;
 
