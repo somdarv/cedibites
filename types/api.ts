@@ -401,6 +401,13 @@ export interface Order {
   cancel_request_reason?: string | null;
   cancel_requested_at?: string | null;
   cancel_requested_by_user?: { id: number; name?: string | null } | null;
+  internal_notes?: Array<{
+    id: string;
+    note: string;
+    by_user_id: number;
+    by_name: string | null;
+    at: string;
+  }>;
   recorded_at?: string;
   created_at: string;
   updated_at: string;

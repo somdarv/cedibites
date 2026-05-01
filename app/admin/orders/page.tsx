@@ -185,6 +185,7 @@ function OrderDetailPanel({
     const [showConfirm, setShowConfirm] = useState<null | 'cancel' | 'refund'>(null);
     const [noteText, setNoteText] = useState('');
     const [showNote, setShowNote] = useState(false);
+    const [savingNote, setSavingNote] = useState(false);
     const [showStatusPicker, setShowStatusPicker] = useState(false);
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const { cancelOrder } = useCancelOrder();
@@ -205,6 +206,25 @@ function OrderDetailPanel({
             toast.error('Failed to update status');
         } finally {
             setUpdatingStatus(false);
+        }
+    }
+
+    async function saveNote(): Promise<void> {
+        const trimmed = noteText.trim();
+        if (!trimmed) {
+            toast.error('Note cannot be empty');
+            return;
+        }
+        setSavingNote(true);
+        try {
+            await orderService.addInternalNote(order.dbId, trimmed);
+            queryClient.invalidateQueries({ queryKey: ['employee-orders'] });
+            setNoteText('');
+            toast.success('Note saved');
+        } catch {
+            toast.error('Failed to save note');
+        } finally {
+            setSavingNote(false);
         }
     }
 
@@ -349,18 +369,35 @@ function OrderDetailPanel({
                     {showNote && (
                         <div>
                             <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-2">Internal Note</p>
+
+                            {order.internalNotes && order.internalNotes.length > 0 && (
+                                <div className="flex flex-col gap-2 mb-3">
+                                    {order.internalNotes.map((n) => (
+                                        <div key={n.id} className="bg-neutral-light border border-[#f0e8d8] rounded-xl px-3 py-2.5">
+                                            <p className="text-text-dark text-xs font-body whitespace-pre-wrap">{n.note}</p>
+                                            <p className="text-neutral-gray text-[10px] font-body mt-1">
+                                                {n.byName ?? 'Staff'} · {new Date(n.at).toLocaleString('en-GH', { timeZone: 'Africa/Accra' })}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             <textarea
                                 value={noteText}
                                 onChange={e => setNoteText(e.target.value)}
                                 rows={3}
-                                className="w-full bg-neutral-light border border-[#f0e8d8] rounded-xl px-3 py-2.5 text-text-dark text-sm font-body resize-none focus:outline-none focus:border-primary/40"
+                                disabled={savingNote}
+                                className="w-full bg-neutral-light border border-[#f0e8d8] rounded-xl px-3 py-2.5 text-text-dark text-sm font-body resize-none focus:outline-none focus:border-primary/40 disabled:opacity-50"
                                 placeholder="Staff-only note..."
                             />
                             <button
                                 type="button"
-                                className="mt-2 px-4 py-2 bg-primary rounded-xl text-white text-xs font-medium font-body cursor-pointer"
+                                onClick={saveNote}
+                                disabled={savingNote || !noteText.trim()}
+                                className="mt-2 px-4 py-2 bg-primary rounded-xl text-white text-xs font-medium font-body cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                                Save note
+                                {savingNote ? 'Saving…' : 'Save note'}
                             </button>
                         </div>
                     )}

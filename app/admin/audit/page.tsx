@@ -28,6 +28,7 @@ const EVENT_LABELS: Record<string, string> = {
     cancel_rejected: 'Cancellation Rejected',
     cancelled: 'Order Cancelled',
     refunded: 'Refund Issued',
+    note_added: 'Internal Note Added',
 
     // Staff auth & lifecycle
     staff_login: 'Staff Login',
@@ -68,7 +69,7 @@ const EVENT_LABELS: Record<string, string> = {
 const EVENT_GROUPS: { label: string; events: string[] }[] = [
     {
         label: 'Orders',
-        events: ['status_changed', 'cancel_requested', 'cancel_approved', 'cancel_rejected', 'cancelled', 'refunded'],
+        events: ['status_changed', 'cancel_requested', 'cancel_approved', 'cancel_rejected', 'cancelled', 'refunded', 'note_added'],
     },
     {
         label: 'Staff',

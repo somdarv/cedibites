@@ -43,6 +43,12 @@ export interface AdminOrder {
   cancelRequestedBy?: string | null;
   cancelRequestReason?: string | null;
   cancelRequestedAt?: string | null;
+  internalNotes?: Array<{
+    id: string;
+    note: string;
+    byName: string | null;
+    at: string;
+  }>;
 }
 
 const SOURCE_MAP: Record<string, string> = {
@@ -118,12 +124,14 @@ function formatPlacedAtFull(iso: string): string {
 function formatStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     received: 'Received',
+    accepted: 'Accepted',
     preparing: 'Preparing',
     ready: 'Ready',
     ready_for_pickup: 'Ready for Pickup',
     out_for_delivery: 'Out for Delivery',
     delivered: 'Delivered',
     completed: 'Completed',
+    cancel_requested: 'Cancellation Requested',
     cancelled: 'Cancelled',
   };
   return labels[status] ?? status;
@@ -232,6 +240,12 @@ export function mapApiOrderToAdminOrder(api: Order): AdminOrder {
     cancelRequestedBy: api.cancel_requested_by_user?.name ?? (api.cancel_requested_by ? `Staff #${api.cancel_requested_by}` : null),
     cancelRequestReason: api.cancel_request_reason ?? null,
     cancelRequestedAt: api.cancel_requested_at ?? null,
+    internalNotes: (api.internal_notes ?? []).map((n) => ({
+      id: n.id,
+      note: n.note,
+      byName: n.by_name ?? null,
+      at: n.at,
+    })),
   };
 }
 

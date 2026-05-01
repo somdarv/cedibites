@@ -82,6 +82,13 @@ export const orderService = {
   },
 
   /**
+   * Append an internal note to an order (admin only).
+   */
+  addInternalNote: (id: number, note: string): Promise<{ data: Order }> => {
+    return apiClient.post(`/admin/orders/${id}/notes`, { note });
+  },
+
+  /**
    * Get employee/admin orders (paginated). Uses staff token.
    */
   getEmployeeOrders: (params?: EmployeeOrdersParams): Promise<PaginatedResponse<Order>> => {
