@@ -1,7 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { orderService } from '../services/order.service';
 import type { EmployeeOrdersParams } from '../services/order.service';
-import type { Order as ApiOrder } from '@/types/api';
+import type { Order as ApiOrder, OrderPeriodSummary } from '@/types/api';
 
 export const useEmployeeOrderStats = () => {
   const { data, isLoading, error, refetch } = useQuery({
@@ -63,4 +63,28 @@ export const useEmployeeOrders = (params?: EmployeeOrdersParams) => {
     error,
     refetch,
   };
+};
+
+/**
+ * Lightweight period summary for the orders table — counts of valid /
+ * cancelled / failed / refunded / no-charge orders matching the same
+ * filter scope as the table.
+ */
+export const useEmployeeOrdersPeriodSummary = (params?: EmployeeOrdersParams) => {
+  // Drop pagination keys — the summary is for the whole filtered scope, not the page.
+  const summaryParams: EmployeeOrdersParams | undefined = params
+    ? { ...params, page: undefined, per_page: undefined }
+    : undefined;
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['employee-orders-summary', summaryParams],
+    queryFn: () => orderService.getEmployeeOrdersPeriodSummary(summaryParams),
+    enabled: typeof window !== 'undefined' && !!localStorage.getItem('cedibites_staff_token'),
+    staleTime: 30 * 1000,
+    refetchInterval: 30_000,
+    placeholderData: keepPreviousData,
+  });
+
+  const summary = (data?.data ?? null) as OrderPeriodSummary | null;
+  return { summary, isLoading, error, refetch };
 };

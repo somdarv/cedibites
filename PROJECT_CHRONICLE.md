@@ -81,6 +81,55 @@ Items still needing attention.
 
 ---
 
+## [2026-05-01] Session: Audit Log Custom Filters + Order Period Summary Strip
+
+### Intent
+Two observability improvements emerging from a data-integrity investigation:
+1. Admin audit log needed precise pinpoint filtering — custom date range, action type, and user (causer).
+2. Every orders table (admin/manager/partner/POS/sales) needed a low-attention strip summarising **valid** vs **issues** (cancelled/failed/refunded) for the current filter scope, so staff can see order quality at a glance without leaving the page.
+
+### Changes Made
+| File | Change | Reason |
+|------|--------|--------|
+| `app/components/ui/OrderPeriodSummary.tsx` | New shared component | Three pills (Valid · Issues · Total) with breakdown sub-line; designed to sit above tables without competing for attention |
+| `lib/api/hooks/useEmployeeOrders.ts` | Added `useEmployeeOrdersPeriodSummary(params)` | React Query hook mirroring the orders filter scope; strips pagination, refetches every 30s |
+| `lib/api/services/order.service.ts` | Added `getEmployeeOrdersPeriodSummary` | Calls `GET /employee/orders/summary` |
+| `lib/api/hooks/useActivityLogs.ts` | Added `useActivityLogCausers` | Powers the new "filter by user" dropdown on audit page |
+| `lib/api/services/activityLog.service.ts` | Added `getActivityLogCausers` | Calls `GET /admin/activity-logs/causers` |
+| `types/api.ts` | Added `OrderPeriodSummary` interface | Shared shape for new endpoint |
+| `app/admin/audit/page.tsx` | Added custom date pickers (when `Custom` preset selected), Action Type dropdown, User (Causer) dropdown, "Clear all filters" link | Enables pinpoint filtering without backend changes — backend already accepted these params |
+| `app/admin/orders/page.tsx` | Wired `OrderPeriodSummary` under header subtitle, label = current `datePreset` | Per-scope quality summary |
+| `app/staff/manager/orders/page.tsx` | Same | Same |
+| `app/partner/orders/page.tsx` | Wired with all-time scope (page has no date filter) | Same |
+| `app/staff/sales/orders/page.tsx` | Wired with `Today` label | Same |
+| `app/pos/orders/page.tsx` | Wired in `countsOnly` mode for tighter mobile header | Same |
+
+### Pages Skipped (Intentional)
+- `app/staff/orders/OrdersView.tsx` — kanban-style realtime view, different fetch shape; bolting on a server summary risked breakage.
+- `app/staff/partner/orders/page.tsx` — uses in-memory `useOrderStore`, not a server-fetched paginated list.
+- `app/(customer)/orders/page.tsx` — personal context (own orders); summary doesn't apply.
+
+### Decisions
+- **Decision**: Mirror `AnalyticsService` semantics in the new summary endpoint.
+  - **Rationale**: Numbers shown next to a table must match the dashboards or trust collapses. "Valid" = `status != cancelled` AND has payment with `payment_status = completed`; "Issues" = cancelled + failed + refunded counts combined.
+- **Decision**: Reuse the existing `getBranchOrders()` filter pipeline server-side rather than duplicate filter parsing.
+  - **Rationale**: Guarantees the summary always matches the table for the same params — no drift risk, and the role/branch scoping enforcement is inherited.
+- **Decision**: Used five separate `whereHas` aggregate clones instead of a single `LEFT JOIN payments` with `CASE` sums.
+  - **Rationale**: Orders can have multiple payment rows (retries, partial refunds). A join would double-count amounts. Separate clones with `whereHas` keep counts/sums per-order accurate.
+- **Decision**: Causers dropdown narrows by current date scope.
+  - **Rationale**: Keeps the dropdown short and contextually relevant — only shows users who actually acted in the visible time window.
+
+### Current State
+- `npm run build` passes cleanly across all 96 routes.
+- All TS types resolve, no lint errors.
+- `OrderPeriodSummary` reusable across any orders table; supports `countsOnly` and custom `label` props for adaptation per surface.
+
+### Pending / Follow-up
+- Consider extending the summary strip to `staff/orders` (kanban) and `staff/partner/orders` (store-driven) in a follow-up — would need adapters since they don't use `useEmployeeOrders`.
+- Could add CSV export of the summary for compliance trail.
+
+---
+
 ## [2026-04-28] Session: POS Search — Match Option Names First
 
 ### Intent

@@ -24,7 +24,8 @@ import { formatGHS } from '@/lib/utils/currency';
 import { useBranch } from '@/app/components/providers/BranchProvider';
 import { printReceipt } from '@/lib/utils/printReceipt';
 import { FULFILLMENT_LABELS, STATUS_CONFIG } from '@/lib/constants/order.constants';
-import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import { useEmployeeOrders, useEmployeeOrdersPeriodSummary } from '@/lib/api/hooks/useEmployeeOrders';
+import OrderPeriodSummary from '@/app/components/ui/OrderPeriodSummary';
 import { mapApiOrderToOrder } from '@/lib/api/adapters/order.adapter';
 import { formatOrderLineItemSummary } from '@/lib/utils/orderItemDisplay';
 import CancelOrderModal from '@/app/components/ui/CancelOrderModal';
@@ -81,6 +82,18 @@ export default function POSOrdersPage() {
     date_to: today,
     per_page: 100,
   });
+
+  const { summary: periodSummary, isLoading: summaryLoading } = useEmployeeOrdersPeriodSummary(
+    session?.staffId
+      ? {
+          branch_id: session.branchId ? Number(session.branchId) : undefined,
+          staff_id: session.staffId,
+          order_source: ['pos', 'manual_entry'],
+          date_from: today,
+          date_to: today,
+        }
+      : undefined,
+  );
 
   // ─── Real-time order updates via Reverb ───────────────────────────────
   useEffect(() => {
@@ -173,6 +186,9 @@ export default function POSOrdersPage() {
           <div>
             <h1 className="text-xl font-bold text-text-dark">Today&apos;s Orders</h1>
             <p className="text-xs text-neutral-gray mt-0.5">Today · {session.staffName}</p>
+            <div className="mt-2">
+              <OrderPeriodSummary summary={periodSummary} isLoading={summaryLoading} countsOnly />
+            </div>
           </div>
           <button
             type="button"

@@ -1,5 +1,5 @@
 import apiClient from '../client';
-import type { ActivityLog, ActivityLogsParams } from '@/types/api';
+import type { ActivityLog, ActivityLogCauser, ActivityLogsParams } from '@/types/api';
 
 interface ActivityLogsResponse {
   data: ActivityLog[];
@@ -37,5 +37,19 @@ export const activityLogService = {
       },
     });
     return response as unknown as ActivityLogsResponse;
+  },
+
+  /**
+   * List of distinct causers (users) appearing in the activity log,
+   * for the "filter by user" dropdown on the audit page.
+   */
+  getActivityLogCausers: async (params?: { date_from?: string; date_to?: string }): Promise<{ data: ActivityLogCauser[] }> => {
+    const response = await apiClient.get('/admin/activity-logs/causers', {
+      params: {
+        date_from: params?.date_from,
+        date_to: params?.date_to,
+      },
+    });
+    return response as unknown as { data: ActivityLogCauser[] };
   },
 };

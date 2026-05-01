@@ -445,6 +445,21 @@ export interface ActivityLogsParams {
   search?: string;
 }
 
+// Period summary for the orders table — shown across staff/admin/partner/POS pages.
+export interface OrderPeriodSummary {
+  valid_count: number;
+  valid_revenue: number;
+  cancelled_count: number;
+  cancelled_amount: number;
+  failed_count: number;
+  failed_amount: number;
+  refunded_count: number;
+  refunded_amount: number;
+  no_charge_count: number;
+  no_charge_amount: number;
+  total_count: number;
+}
+
 // Notification types
 export interface Notification {
   id: string;

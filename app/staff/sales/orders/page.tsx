@@ -16,7 +16,8 @@ import {
     ProhibitIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
-import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import { useEmployeeOrders, useEmployeeOrdersPeriodSummary } from '@/lib/api/hooks/useEmployeeOrders';
+import OrderPeriodSummary from '@/app/components/ui/OrderPeriodSummary';
 import { useRequestCancel, useCancelOrder } from '@/lib/api/hooks/useOrders';
 import { mapApiOrderToOrder } from '@/lib/api/adapters/order.adapter';
 import { formatPrice, type OrderStatus, type Order } from '@/types/order';
@@ -174,6 +175,12 @@ export default function SalesOrdersPage() {
         per_page: 200,
     });
 
+    const { summary: periodSummary, isLoading: summaryLoading } = useEmployeeOrdersPeriodSummary(
+        branchId
+            ? { branch_id: branchId, date_from: today, date_to: today }
+            : undefined,
+    );
+
     const todayOrders = useMemo(() =>
         apiOrders.map(mapApiOrderToOrder).sort((a, b) => b.placedAt - a.placedAt),
     [apiOrders]);
@@ -259,6 +266,9 @@ export default function SalesOrdersPage() {
                     <p className="text-neutral-gray text-sm font-body">
                         {todayOrders.length} order{todayOrders.length !== 1 ? 's' : ''} today · {activeCount} active
                     </p>
+                    <div className="mt-2">
+                        <OrderPeriodSummary summary={periodSummary} isLoading={summaryLoading} label="Today" />
+                    </div>
                 </div>
             </div>
 

@@ -23,3 +23,17 @@ export const useActivityLogs = (params?: ActivityLogsParams) => {
     refetch,
   };
 };
+
+/**
+ * Distinct causers for the audit-log "filter by user" dropdown.
+ * Optionally narrows by date range so the list stays relevant.
+ */
+export const useActivityLogCausers = (params?: { date_from?: string; date_to?: string }) => {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['activity-log-causers', params],
+    queryFn: () => activityLogService.getActivityLogCausers(params),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  return { causers: data?.data ?? [], isLoading, error };
+};

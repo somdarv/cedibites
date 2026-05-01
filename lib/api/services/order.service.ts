@@ -110,4 +110,15 @@ export const orderService = {
   getEmployeePendingOrders: (perPage?: number): Promise<PaginatedResponse<Order>> => {
     return apiClient.get('/employee/orders/pending', { params: { per_page: perPage ?? 10 } });
   },
+
+  /**
+   * Period summary (valid/cancelled/failed/refunded/no-charge) for the
+   * current orders filter scope. Uses staff token. Mirrors the same filters
+   * accepted by getEmployeeOrders so the summary always matches the table.
+   */
+  getEmployeeOrdersPeriodSummary: (params?: EmployeeOrdersParams): Promise<{
+    data: import('@/types/api').OrderPeriodSummary;
+  }> => {
+    return apiClient.get('/employee/orders/summary', { params });
+  },
 };

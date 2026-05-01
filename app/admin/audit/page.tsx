@@ -12,7 +12,7 @@ import {
     WarningCircleIcon as WarningIcon,
     FireIcon,
 } from '@phosphor-icons/react';
-import { useActivityLogs } from '@/lib/api/hooks/useActivityLogs';
+import { useActivityLogs, useActivityLogCausers } from '@/lib/api/hooks/useActivityLogs';
 import type { ActivityLog, ActivityLogEntity, ActivityLogSeverity } from '@/types/api';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -46,7 +46,10 @@ const SEVERITY_TYPES: ActivityLogSeverity[] = ['info', 'warning', 'destructive']
 
 const PAGE_SIZE = 15;
 
-function getDateRange(preset: string): { date_from?: string; date_to?: string } {
+function getDateRange(
+    preset: string,
+    custom?: { date_from: string; date_to: string },
+): { date_from?: string; date_to?: string } {
     const now = new Date();
     const toDate = (d: Date) => d.toISOString().slice(0, 10);
     switch (preset) {
@@ -66,6 +69,10 @@ function getDateRange(preset: string): { date_from?: string; date_to?: string } 
         }
         case 'This Month':
             return { date_from: toDate(new Date(now.getFullYear(), now.getMonth(), 1)), date_to: toDate(now) };
+        case 'Custom':
+            return custom?.date_from && custom?.date_to
+                ? { date_from: custom.date_from, date_to: custom.date_to }
+                : {};
         default:
             return {};
     }
@@ -104,6 +111,10 @@ export default function AdminAuditPage() {
     const [selectedEntity, setSelectedEntity] = useState<ActivityLogEntity | 'auth' | 'All'>('All');
     const [selectedSeverity, setSelectedSeverity] = useState<ActivityLogSeverity | 'All'>('All');
     const [datePreset, setDatePreset] = useState('Today');
+    const [customDateFrom, setCustomDateFrom] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [customDateTo, setCustomDateTo] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [selectedEvent, setSelectedEvent] = useState<string | 'All'>('All');
+    const [selectedCauserId, setSelectedCauserId] = useState<number | 'All'>('All');
     const [page, setPage] = useState(1);
     const [showFilters, setShowFilters] = useState(false);
 
@@ -112,7 +123,10 @@ export default function AdminAuditPage() {
         return () => clearTimeout(t);
     }, [searchInput]);
 
-    const dateRange = useMemo(() => getDateRange(datePreset), [datePreset]);
+    const dateRange = useMemo(
+        () => getDateRange(datePreset, datePreset === 'Custom' ? { date_from: customDateFrom, date_to: customDateTo } : undefined),
+        [datePreset, customDateFrom, customDateTo],
+    );
 
     const params = useMemo(() => ({
         page,
@@ -120,10 +134,14 @@ export default function AdminAuditPage() {
         search: search.trim() || undefined,
         entity: selectedEntity !== 'All' ? selectedEntity : undefined,
         severity: selectedSeverity !== 'All' ? selectedSeverity : undefined,
+        event: selectedEvent !== 'All' ? selectedEvent : undefined,
+        causer_id: selectedCauserId !== 'All' ? selectedCauserId : undefined,
         ...dateRange,
-    }), [page, selectedEntity, selectedSeverity, search, dateRange]);
+    }), [page, selectedEntity, selectedSeverity, selectedEvent, selectedCauserId, search, dateRange]);
 
     const { entries, meta, isLoading, error, refetch } = useActivityLogs(params);
+    // Causers list narrowed by current date scope (keeps the dropdown short & relevant).
+    const { causers } = useActivityLogCausers(dateRange);
 
     const handleExportCsv = useCallback(() => {
         const headers = ['Timestamp', 'Action', 'Details', 'Actor', 'Entity', 'Severity', 'IP'];
@@ -208,6 +226,23 @@ export default function AdminAuditPage() {
                     ))}
                 </div>
 
+                {datePreset === 'Custom' && (
+                    <div className="flex flex-col sm:flex-row gap-3 mb-2">
+                        <input
+                            type="date"
+                            value={customDateFrom}
+                            onChange={(event) => { setCustomDateFrom(event.target.value); setPage(1); }}
+                            className="px-3 py-2 rounded-xl border border-[#f0e8d8] bg-neutral-light text-sm font-body text-text-dark focus:outline-none focus:border-primary/40"
+                        />
+                        <input
+                            type="date"
+                            value={customDateTo}
+                            onChange={(event) => { setCustomDateTo(event.target.value); setPage(1); }}
+                            className="px-3 py-2 rounded-xl border border-[#f0e8d8] bg-neutral-light text-sm font-body text-text-dark focus:outline-none focus:border-primary/40"
+                        />
+                    </div>
+                )}
+
                 {/* Expanded filters */}
                 {showFilters && (
                     <div className="border-t border-[#f0e8d8] pt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -233,6 +268,55 @@ export default function AdminAuditPage() {
                                 ))}
                             </div>
                         </div>
+                        <div>
+                            <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-2">Action Type</p>
+                            <select
+                                value={selectedEvent}
+                                onChange={(e) => { setSelectedEvent(e.target.value || 'All'); setPage(1); }}
+                                className="w-full px-3 py-2 rounded-xl border border-[#f0e8d8] bg-neutral-light text-sm font-body text-text-dark focus:outline-none focus:border-primary/40"
+                            >
+                                <option value="All">All actions</option>
+                                {Object.entries(EVENT_LABELS).map(([value, label]) => (
+                                    <option key={value} value={value}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold font-body text-neutral-gray uppercase tracking-wider mb-2">User (Causer)</p>
+                            <select
+                                value={selectedCauserId}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setSelectedCauserId(v === 'All' ? 'All' : Number(v));
+                                    setPage(1);
+                                }}
+                                className="w-full px-3 py-2 rounded-xl border border-[#f0e8d8] bg-neutral-light text-sm font-body text-text-dark focus:outline-none focus:border-primary/40"
+                            >
+                                <option value="All">All users</option>
+                                {causers.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}{c.email ? ` (${c.email})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        {(selectedEntity !== 'All' || selectedSeverity !== 'All' || selectedEvent !== 'All' || selectedCauserId !== 'All') && (
+                            <div className="sm:col-span-2 flex justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedEntity('All');
+                                        setSelectedSeverity('All');
+                                        setSelectedEvent('All');
+                                        setSelectedCauserId('All');
+                                        setPage(1);
+                                    }}
+                                    className="text-xs font-medium font-body text-primary hover:underline cursor-pointer"
+                                >
+                                    Clear all filters
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

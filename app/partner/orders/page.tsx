@@ -15,7 +15,8 @@ import {
     WarningIcon,
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
-import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import { useEmployeeOrders, useEmployeeOrdersPeriodSummary } from '@/lib/api/hooks/useEmployeeOrders';
+import OrderPeriodSummary from '@/app/components/ui/OrderPeriodSummary';
 import { mapApiOrderToOrder } from '@/lib/api/adapters/order.adapter';
 import { formatPrice, type OrderStatus, type Order } from '@/types/order';
 import { STATUS_CONFIG } from '@/lib/constants/order.constants';
@@ -154,6 +155,7 @@ export default function PartnerOrdersPage() {
     const branchId = staffUser?.branches[0]?.id ? Number(staffUser.branches[0].id) : undefined;
 
     const { orders: apiOrders, isLoading, error } = useEmployeeOrders({ branch_id: branchId, per_page: 100 });
+    const { summary: periodSummary, isLoading: summaryLoading } = useEmployeeOrdersPeriodSummary(branchId ? { branch_id: branchId } : undefined);
 
     const branchOrders = useMemo(() =>
         apiOrders.map(mapApiOrderToOrder).sort((a, b) => b.placedAt - a.placedAt),
@@ -227,6 +229,9 @@ export default function PartnerOrdersPage() {
                     <p className="text-neutral-gray text-sm font-body">
                         {branchOrders.length} total · {activeCount} active now
                     </p>
+                    <div className="mt-2">
+                        <OrderPeriodSummary summary={periodSummary} isLoading={summaryLoading} label="All time" />
+                    </div>
                 </div>
             </div>
 

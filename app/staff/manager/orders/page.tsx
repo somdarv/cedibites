@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useEmployeeOrders } from '@/lib/api/hooks/useEmployeeOrders';
+import { useEmployeeOrders, useEmployeeOrdersPeriodSummary } from '@/lib/api/hooks/useEmployeeOrders';
+import OrderPeriodSummary from '@/app/components/ui/OrderPeriodSummary';
 import { orderService } from '@/lib/api/services/order.service';
 import type { EmployeeOrdersParams } from '@/lib/api/services/order.service';
 import type { AdminOrder } from '@/lib/api/adapters/order.adapter';
@@ -341,6 +342,7 @@ export default function ManagerOrdersPage() {
     }, [search, selectedStatuses, selectedSources, selectedPaymentStatuses, datePreset, customDateFrom, customDateTo, page, branchId]);
 
     const { orders: apiOrders, meta, isLoading } = useEmployeeOrders(orderParams);
+    const { summary: periodSummary, isLoading: summaryLoading } = useEmployeeOrdersPeriodSummary(orderParams);
     const orders = useMemo(() => apiOrders.map(mapApiOrderToAdminOrder), [apiOrders]);
     const totalPages = (meta as any)?.last_page ?? 1;
 
@@ -386,6 +388,9 @@ export default function ManagerOrdersPage() {
                         <h1 className="text-text-dark text-2xl font-bold font-body">Orders</h1>
                     </div>
                     <p className="text-neutral-gray text-sm font-body">{branchName} · {(meta as any)?.total ?? 0} orders</p>
+                    <div className="mt-2">
+                        <OrderPeriodSummary summary={periodSummary} isLoading={summaryLoading} label={datePreset} />
+                    </div>
                 </div>
                 <button type="button" onClick={handleExportCsv} disabled={isExporting || orders.length === 0}
                     className="flex items-center gap-2 px-4 py-2 bg-neutral-card border border-[#f0e8d8] rounded-xl text-text-dark text-sm font-medium font-body hover:border-primary/40 transition-colors cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
