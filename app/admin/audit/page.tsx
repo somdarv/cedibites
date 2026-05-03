@@ -63,7 +63,75 @@ const EVENT_LABELS: Record<string, string> = {
     password_viewed: 'Password Viewed',
     passcode_changed: 'Passcode Changed',
     passcode_failed: 'Passcode Failed',
+
+    // Generic Eloquent model events (User / Customer / Employee / Branch / Menu / Promo)
+    // These fire automatically via Spatie ActivityLog whenever a tracked field changes.
+    created: 'Record Created',
+    updated: 'Record Updated',
+    deleted: 'Record Deleted',
 };
+
+// Field labels for the property diff — keeps the audit trail human-readable
+// when a tracked attribute on a model changes (e.g. user.name → "Old → New").
+const FIELD_LABELS: Record<string, string> = {
+    name: 'Name',
+    email: 'Email',
+    phone: 'Phone',
+    status: 'Status',
+    user_id: 'User',
+    employee_no: 'Employee No.',
+    hire_date: 'Hire Date',
+    performance_rating: 'Performance Rating',
+    ssnit_number: 'SSNIT Number',
+    ghana_card_id: 'Ghana Card ID',
+    tin_number: 'TIN Number',
+    date_of_birth: 'Date of Birth',
+    nationality: 'Nationality',
+    emergency_contact_name: 'Emergency Contact Name',
+    emergency_contact_phone: 'Emergency Contact Phone',
+    emergency_contact_relationship: 'Emergency Contact Relationship',
+    is_guest: 'Guest',
+    is_active: 'Active',
+    address: 'Address',
+    must_reset_password: 'Must Reset Password',
+    password_reset_required_at: 'Password Reset Required At',
+    platform_passcode: 'Platform Passcode',
+    extended_staff_access: 'Extended Staff Access',
+    extended_order_access: 'Extended Order Access',
+};
+
+// Fields whose stored values are encrypted ciphertext (or otherwise unsafe to
+// render). We confirm the field changed but mask the actual values.
+const MASKED_FIELDS = new Set(['ssnit_number', 'ghana_card_id', 'tin_number', 'platform_passcode']);
+
+function formatFieldName(key: string): string {
+    return FIELD_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatFieldValue(key: string, value: unknown): string {
+    if (MASKED_FIELDS.has(key)) return '••••••';
+    if (value === null || value === undefined || value === '') return '∅';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+}
+
+interface PropertiesShape {
+    attributes?: Record<string, unknown>;
+    old?: Record<string, unknown>;
+}
+
+function getPropertyDiff(properties: Record<string, unknown>): { key: string; from: string; to: string }[] {
+    const props = properties as PropertiesShape;
+    const next = props.attributes ?? {};
+    const prev = props.old ?? {};
+    const keys = new Set<string>([...Object.keys(prev), ...Object.keys(next)]);
+    return Array.from(keys).map((key) => ({
+        key,
+        from: formatFieldValue(key, prev[key]),
+        to: formatFieldValue(key, next[key]),
+    }));
+}
 
 // Logical grouping for the dropdown <optgroup>s — order matters.
 const EVENT_GROUPS: { label: string; events: string[] }[] = [
@@ -86,6 +154,13 @@ const EVENT_GROUPS: { label: string; events: string[] }[] = [
     {
         label: 'System',
         events: ['updated', 'job_retried', 'cache_cleared', 'maintenance_toggled', 'admin_created', 'admin_revoked', 'password_reset', 'passwords_viewed', 'password_viewed', 'passcode_changed', 'passcode_failed'],
+    },
+    {
+        // Generic record-level audit events emitted by Spatie when a tracked
+        // model field changes. Use these to find any edit on a Staff/Customer/
+        // Branch/Menu record when you don't know the precise event name.
+        label: 'Record Changes',
+        events: ['created', 'updated', 'deleted'],
     },
 ];
 
@@ -424,6 +499,22 @@ export default function AdminAuditPage() {
                                 <div>
                                     <p className="text-text-dark text-xs font-semibold font-body">{getActionLabel(entry.event)}</p>
                                     <p className="text-neutral-gray text-[11px] font-body mt-0.5 leading-relaxed">{entry.description}</p>
+                                    {(() => {
+                                        const diff = getPropertyDiff(entry.properties);
+                                        if (diff.length === 0) return null;
+                                        return (
+                                            <ul className="mt-1.5 space-y-0.5">
+                                                {diff.map((d) => (
+                                                    <li key={d.key} className="text-[10px] font-body text-neutral-gray">
+                                                        <span className="font-semibold text-text-dark">{formatFieldName(d.key)}:</span>{' '}
+                                                        <span className="line-through text-error/70">{d.from}</span>{' '}
+                                                        <span className="text-neutral-gray">→</span>{' '}
+                                                        <span className="text-success font-medium">{d.to}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Actor */}

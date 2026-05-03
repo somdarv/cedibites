@@ -16,6 +16,8 @@ import {
 } from '@phosphor-icons/react';
 import { useStaffAuth } from '@/app/components/providers/StaffAuthProvider';
 import { roleDisplayName } from '@/types/staff';
+import { staffService } from '@/lib/api/services/staff.service';
+import { ApiError } from '@/lib/api/client';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -110,7 +112,6 @@ export default function StaffProfilePage() {
         e.preventDefault();
         const errs: Record<string, string> = {};
         if (!pwForm.current)               errs.current  = 'Required';
-        // Current password validation would require API call
         if (!pwForm.next)                  errs.next     = 'Required';
         else if (pwForm.next.length < 6)   errs.next     = 'At least 6 characters';
         if (pwForm.next !== pwForm.confirm) errs.confirm  = 'Passwords do not match';
@@ -118,12 +119,26 @@ export default function StaffProfilePage() {
         if (Object.keys(errs).length > 0) { setPwErrors(errs); return; }
 
         setPwLoading(true);
-        await new Promise(r => setTimeout(r, 600));
-        setPwLoading(false);
-        setPwForm({ current: '', next: '', confirm: '' });
         setPwErrors({});
-        setPwToast({ msg: 'Password updated successfully.', type: 'success' });
-        setTimeout(() => setPwToast(null), 4000);
+        try {
+            await staffService.changePassword(pwForm.current, pwForm.next);
+            setPwForm({ current: '', next: '', confirm: '' });
+            setPwToast({ msg: 'Password updated successfully.', type: 'success' });
+        } catch (err) {
+            const apiErr = err as ApiError & { errors?: Record<string, string[]> };
+            // Surface field-level validation errors when the API returns them
+            if (apiErr?.errors) {
+                const fieldErrs: Record<string, string> = {};
+                if (apiErr.errors.current_password?.length) fieldErrs.current = apiErr.errors.current_password[0];
+                if (apiErr.errors.password?.length)         fieldErrs.next    = apiErr.errors.password[0];
+                setPwErrors(fieldErrs);
+            }
+            const msg = apiErr?.message || 'Failed to update password. Please try again.';
+            setPwToast({ msg, type: 'error' });
+        } finally {
+            setPwLoading(false);
+            setTimeout(() => setPwToast(null), 4000);
+        }
     }
 
     if (!staffUser) return null;
