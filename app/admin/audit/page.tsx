@@ -52,7 +52,6 @@ const EVENT_LABELS: Record<string, string> = {
     customer_force_logout: 'Customer Force Logout',
 
     // System / Platform
-    updated: 'Settings Updated',
     job_retried: 'Failed Job Retried',
     cache_cleared: 'Cache Cleared',
     maintenance_toggled: 'Maintenance Toggled',
@@ -153,7 +152,7 @@ const EVENT_GROUPS: { label: string; events: string[] }[] = [
     },
     {
         label: 'System',
-        events: ['updated', 'job_retried', 'cache_cleared', 'maintenance_toggled', 'admin_created', 'admin_revoked', 'password_reset', 'passwords_viewed', 'password_viewed', 'passcode_changed', 'passcode_failed'],
+        events: ['job_retried', 'cache_cleared', 'maintenance_toggled', 'admin_created', 'admin_revoked', 'password_reset', 'passwords_viewed', 'password_viewed', 'passcode_changed', 'passcode_failed'],
     },
     {
         // Generic record-level audit events emitted by Spatie when a tracked
